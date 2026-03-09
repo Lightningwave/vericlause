@@ -1,0 +1,3 @@
+# Place Singapore Employment Act 1968 (Revised 2026) and Workplace Fairness Act
+# PDF files here. Download from Singapore Statutes Online.
+# Then run: npx tsx scripts/ingest-laws.ts
