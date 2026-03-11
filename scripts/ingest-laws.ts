@@ -1,24 +1,26 @@
 /**
- * Ingest Singapore employment law PDFs into Pinecone.
+ * Ingest Docling-parsed law markdown files into Pinecone using OpenAI embeddings.
  *
  * Usage:
  *   npx tsx scripts/ingest-laws.ts
  *
- * Requires .env.local with GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX.
- * Place statute PDFs in the data/ folder.
+ * Requires .env or .env.local with OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_INDEX.
+ * Run `python scripts/docling_parse_laws.py` first to produce data/laws-parsed/*.md.
  */
 import fs from "fs";
 import path from "path";
 import { config } from "dotenv";
-import pdfParse from "pdf-parse";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
 
 config({ path: path.resolve(process.cwd(), ".env.local") });
+config({ path: path.resolve(process.cwd(), ".env") });
 
-const DATA_DIR = path.resolve(process.cwd(), "data");
+const PARSED_DIR = path.resolve(process.cwd(), "data", "laws-parsed");
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 50;
+const EMBED_MODEL = "text-embedding-3-small";
+const EMBED_BATCH_SIZE = 100;
 const INDEX_NAME = process.env.PINECONE_INDEX || "vericlause-laws";
 const NAMESPACE = "employment_act";
 
@@ -33,53 +35,79 @@ function chunkText(text: string, size: number, overlap: number): string[] {
   return chunks;
 }
 
-async function embedBatch(texts: string[], genAI: GoogleGenerativeAI): Promise<number[][]> {
-  const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-  const results: number[][] = [];
-  for (const text of texts) {
-    const res = await model.embedContent(text);
-    results.push(res.embedding.values);
+function collectMarkdownFiles(dir: string): string[] {
+  const files: string[] = [];
+  if (!fs.existsSync(dir)) return files;
+
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectMarkdownFiles(full));
+    } else if (entry.name.toLowerCase().endsWith(".md")) {
+      files.push(full);
+    }
   }
-  return results;
+  return files;
+}
+
+async function embedBatch(
+  openai: OpenAI,
+  texts: string[],
+): Promise<number[][]> {
+  const response = await openai.embeddings.create({
+    model: EMBED_MODEL,
+    input: texts,
+  });
+  return response.data
+    .sort((a, b) => a.index - b.index)
+    .map((d) => d.embedding);
 }
 
 async function main() {
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
   const pineconeKey = process.env.PINECONE_API_KEY;
-  if (!geminiKey) { console.error("Set GEMINI_API_KEY in .env.local"); return; }
-  if (!pineconeKey) { console.error("Set PINECONE_API_KEY in .env.local"); return; }
-
-  const pdfFiles = fs.readdirSync(DATA_DIR).filter((f) => f.toLowerCase().endsWith(".pdf"));
-  if (pdfFiles.length === 0) {
-    console.error(`No PDFs found in ${DATA_DIR}. Place Employment Act / Workplace Fairness Act PDFs there.`);
+  if (!openaiKey) {
+    console.error("Set OPENAI_API_KEY in .env or .env.local");
+    return;
+  }
+  if (!pineconeKey) {
+    console.error("Set PINECONE_API_KEY in .env or .env.local");
     return;
   }
 
-  console.log(`Found ${pdfFiles.length} PDF(s). Processing...`);
-
-  const allChunks: { text: string; actName: string; chunkIndex: number }[] = [];
-  for (const filename of pdfFiles) {
-    const buffer = fs.readFileSync(path.join(DATA_DIR, filename));
-    const data = await pdfParse(buffer);
-    const actName = path.parse(filename).name;
-    const chunks = chunkText(data.text, CHUNK_SIZE, CHUNK_OVERLAP);
-    chunks.forEach((text, i) => allChunks.push({ text, actName, chunkIndex: i }));
-    console.log(`  ${filename}: ${chunks.length} chunks`);
+  const mdFiles = collectMarkdownFiles(PARSED_DIR);
+  if (mdFiles.length === 0) {
+    console.error(
+      `No markdown files found under ${PARSED_DIR}.\n` +
+        `Run \`python scripts/docling_parse_laws.py\` first to parse law PDFs with Docling.`,
+    );
+    return;
   }
 
-  console.log(`Total: ${allChunks.length} chunks. Embedding...`);
+  console.log(`Found ${mdFiles.length} Docling markdown file(s). Chunking...`);
 
-  const genAI = new GoogleGenerativeAI(geminiKey);
+  const allChunks: { text: string; actName: string; chunkIndex: number }[] = [];
+  for (const filePath of mdFiles) {
+    const text = fs.readFileSync(filePath, "utf8");
+    const actName = path.parse(filePath).name;
+    const chunks = chunkText(text, CHUNK_SIZE, CHUNK_OVERLAP);
+    chunks.forEach((t, i) => allChunks.push({ text: t, actName, chunkIndex: i }));
+    console.log(`  ${path.relative(PARSED_DIR, filePath)}: ${chunks.length} chunks`);
+  }
+
+  console.log(`Total: ${allChunks.length} chunks. Embedding with OpenAI ${EMBED_MODEL}...`);
+
+  const openai = new OpenAI({ apiKey: openaiKey });
   const texts = allChunks.map((c) => c.text);
 
-  // Embed in batches of 20 to avoid rate limits
   const allVectors: number[][] = [];
-  const batchSize = 20;
-  for (let i = 0; i < texts.length; i += batchSize) {
-    const batch = texts.slice(i, i + batchSize);
-    const vecs = await embedBatch(batch, genAI);
+  for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
+    const batch = texts.slice(i, i + EMBED_BATCH_SIZE);
+    const vecs = await embedBatch(openai, batch);
     allVectors.push(...vecs);
-    console.log(`  Embedded ${Math.min(i + batchSize, texts.length)} / ${texts.length}`);
+    console.log(
+      `  Embedded ${Math.min(i + EMBED_BATCH_SIZE, texts.length)} / ${texts.length}`,
+    );
   }
 
   console.log("Upserting to Pinecone...");
@@ -89,7 +117,7 @@ async function main() {
   const upsertBatch = 100;
   for (let i = 0; i < allChunks.length; i += upsertBatch) {
     const batch = allChunks.slice(i, i + upsertBatch);
-    const vectors = batch.map((c, j) => ({
+    const records = batch.map((c, j) => ({
       id: `${c.actName}_${i + j}`,
       values: allVectors[i + j],
       metadata: {
@@ -98,8 +126,11 @@ async function main() {
         chunk_index: c.chunkIndex,
       },
     }));
-    await index.namespace(NAMESPACE).upsert(vectors);
-    console.log(`  Upserted ${Math.min(i + upsertBatch, allChunks.length)} / ${allChunks.length}`);
+
+    await index.upsert({ records, namespace: NAMESPACE });
+    console.log(
+      `  Upserted ${Math.min(i + upsertBatch, allChunks.length)} / ${allChunks.length}`,
+    );
   }
 
   console.log("Ingest complete.");
