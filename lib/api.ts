@@ -21,7 +21,7 @@ export async function uploadPdf(file: File): Promise<{
 
 export async function analyzeDocument(body: {
   document_id: string;
-  purge_after?: boolean;
+  employee_context?: import("./types").EmployeeContext;
 }): Promise<import("./types").ComplianceReport> {
   const res = await fetch("/api/analyze", {
     method: "POST",
@@ -33,8 +33,4 @@ export async function analyzeDocument(body: {
     throw new Error(err.detail || res.statusText || "Analysis failed");
   }
   return res.json();
-}
-
-export async function purgeDocument(documentId: string): Promise<void> {
-  await fetch(`/api/purge/${documentId}`, { method: "POST" });
 }

@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pdfToText } from "@/lib/services/pdf";
 import { extractContractEntities } from "@/lib/services/extraction";
-import { createDocumentId, storeDocument, setExtracted } from "@/lib/services/store";
+import {
+  getAuthenticatedUser,
+  uploadPdfToStorage,
+  insertDocument,
+} from "@/lib/services/db";
 
 export async function POST(req: NextRequest) {
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+
   const formData = await req.formData();
   const file = formData.get("file");
 
@@ -16,10 +25,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Only PDF files are accepted" }, { status: 400 });
   }
 
+  const buffer = Buffer.from(await file.arrayBuffer());
+
   let rawText: string;
+  let pages: Awaited<ReturnType<typeof pdfToText>>["pages"] = [];
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    rawText = await pdfToText(buffer);
+    const parsed = await pdfToText(buffer);
+    rawText = parsed.text;
+    pages = parsed.pages;
   } catch (e) {
     return NextResponse.json(
       { detail: `PDF could not be read: ${e instanceof Error ? e.message : e}` },
@@ -31,23 +44,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "PDF produced no text" }, { status: 422 });
   }
 
-  const documentId = createDocumentId();
-  storeDocument(documentId, rawText);
+  const [storageResult, extractionResult] = await Promise.allSettled([
+    uploadPdfToStorage(user.id, name, buffer),
+    extractContractEntities(rawText, pages),
+  ]);
 
-  try {
-    const extracted = await extractContractEntities(rawText);
-    setExtracted(documentId, extracted);
-    return NextResponse.json({
-      document_id: documentId,
-      raw_text_length: rawText.length,
-      extracted,
-    });
-  } catch (e) {
-    return NextResponse.json({
-      document_id: documentId,
-      raw_text_length: rawText.length,
-      extracted: null,
-      extraction_error: e instanceof Error ? e.message : "Extraction failed",
-    });
-  }
+  const filePath = storageResult.status === "fulfilled" ? storageResult.value : undefined;
+  const extracted = extractionResult.status === "fulfilled" ? extractionResult.value : null;
+  const extractionError = extractionResult.status === "rejected"
+    ? (extractionResult.reason instanceof Error ? extractionResult.reason.message : "Extraction failed")
+    : undefined;
+
+  const doc = await insertDocument(user.id, name, rawText, extracted, filePath);
+
+  return NextResponse.json({
+    document_id: doc.id,
+    raw_text_length: rawText.length,
+    extracted,
+    ...(extractionError ? { extraction_error: extractionError } : {}),
+  });
 }
