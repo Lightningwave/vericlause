@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { DisclaimerModal, useDisclaimerAccepted } from "@/components/DisclaimerModal";
 import { OnboardingForm } from "@/components/OnboardingForm";
 import { ComplianceScore } from "@/components/ComplianceScore";
@@ -18,7 +18,19 @@ type Step = "onboarding" | "upload" | "analyzing" | "report";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
   const [disclaimerAccepted, acceptDisclaimer] = useDisclaimerAccepted();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        router.replace("/auth/sign-in");
+      } else {
+        setAuthChecked(true);
+      }
+    });
+  }, [router]);
   const [step, setStep] = useState<Step>("onboarding");
   const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext>({ monthly_salary: null, work_type: null });
   const [documentId, setDocumentId] = useState<string | null>(null);
@@ -67,6 +79,14 @@ export default function DashboardPage() {
       setStep("upload");
     }
   }, [handleAnalyze]);
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-navy-950" />
+      </div>
+    );
+  }
 
   if (!disclaimerAccepted) {
     return (

@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { SiteNavbar } from "@/components/SiteNavbar";
+import { createClient } from "@/lib/supabase/server";
 
-export default function HomePage() {
+export default async function HomePage() {
+  let isLoggedIn = false;
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    isLoggedIn = !!user;
+  } catch {
+    // Supabase not configured — treat as not logged in
+  }
   const featureCards = [
     {
       title: "Statutory Ground Truth",
@@ -26,20 +35,31 @@ export default function HomePage() {
           { href: "#faq", label: "FAQ" },
         ]}
         rightSlot={
-          <>
-            <Link
-              href="/auth/sign-in"
-              className="hidden text-sm font-medium text-slate-700 transition-colors hover:text-navy-950 md:inline-block"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/auth/sign-up"
-              className="rounded-md border border-navy-950 bg-white px-5 py-2 text-sm font-medium text-navy-950 shadow-sm transition-all hover:bg-navy-950 hover:text-white"
-            >
-              Get Started
-            </Link>
-          </>
+          isLoggedIn ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="rounded-md border border-navy-950 bg-white px-5 py-2 text-sm font-medium text-navy-950 shadow-sm transition-all hover:bg-navy-950 hover:text-white"
+              >
+                Dashboard
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/auth/sign-in"
+                className="hidden text-sm font-medium text-slate-700 transition-colors hover:text-navy-950 md:inline-block"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/auth/sign-up"
+                className="rounded-md border border-navy-950 bg-white px-5 py-2 text-sm font-medium text-navy-950 shadow-sm transition-all hover:bg-navy-950 hover:text-white"
+              >
+                Get Started
+              </Link>
+            </>
+          )
         }
       />
 
@@ -60,31 +80,33 @@ export default function HomePage() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <Link
-                  href="/auth/sign-up"
+                  href={isLoggedIn ? "/dashboard" : "/auth/sign-up"}
                   className="rounded-md border border-navy-950 bg-white px-6 py-3 text-base font-medium text-navy-950 shadow-md transition-all hover:bg-navy-950 hover:text-white"
                 >
-                  Analyze Contract Free
+                  {isLoggedIn ? "Go to Dashboard" : "Analyze Contract Free"}
                 </Link>
-                <Link
-                  href="/dashboard"
-                  className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-6 py-3 text-base font-medium text-slate-700 hover:border-navy-200 hover:text-navy-950 transition-all"
-                >
-                  Try Demo
-                  <svg
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    className="h-4 w-4 text-gold-500 transition-transform group-hover:translate-x-0.5"
-                    aria-hidden="true"
+                {!isLoggedIn && (
+                  <Link
+                    href="/auth/sign-in"
+                    className="group flex items-center gap-2 rounded-md border border-slate-200 bg-white px-6 py-3 text-base font-medium text-slate-700 hover:border-navy-200 hover:text-navy-950 transition-all"
                   >
-                    <path
-                      d="M4.167 10h11.666m0 0-4.166-4.167M15.833 10l-4.166 4.167"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </Link>
+                    Sign in
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="h-4 w-4 text-gold-500 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M4.167 10h11.666m0 0-4.166-4.167M15.833 10l-4.166 4.167"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </Link>
+                )}
               </div>
               <p className="mt-4 text-xs text-slate-400">
                 Secure & Confidential. No legal advice provided.
@@ -240,18 +262,29 @@ export default function HomePage() {
               Join hundreds of Singaporean professionals ensuring their rights are protected.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                href="/auth/sign-up"
-                className="w-full sm:w-auto rounded-md border border-navy-950 bg-white px-8 py-3.5 text-base font-medium text-navy-950 shadow-lg transition-all hover:bg-navy-950 hover:text-white"
-              >
-                Create Free Account
-              </Link>
-              <Link
-                href="/dashboard"
-                className="w-full sm:w-auto rounded-md border border-slate-300 bg-white px-8 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 transition-all"
-              >
-                View Dashboard
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  href="/dashboard"
+                  className="w-full sm:w-auto rounded-md border border-navy-950 bg-white px-8 py-3.5 text-base font-medium text-navy-950 shadow-lg transition-all hover:bg-navy-950 hover:text-white"
+                >
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/auth/sign-up"
+                    className="w-full sm:w-auto rounded-md border border-navy-950 bg-white px-8 py-3.5 text-base font-medium text-navy-950 shadow-lg transition-all hover:bg-navy-950 hover:text-white"
+                  >
+                    Create Free Account
+                  </Link>
+                  <Link
+                    href="/auth/sign-in"
+                    className="w-full sm:w-auto rounded-md border border-slate-300 bg-white px-8 py-3.5 text-base font-medium text-slate-700 hover:bg-slate-50 transition-all"
+                  >
+                    Sign in
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </section>
