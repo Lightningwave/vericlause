@@ -2,10 +2,18 @@
 
 Compliance verification for Singapore employment contracts. Grounds every answer in the Singapore Employment Act, Workplace Fairness Act, and Tripartite Guidelines via agentic RAG — minimizing AI hallucination by citing only retrieved legal provisions.
 
+## Features
+
+- **Compliance Analysis** — Upload a contract PDF, extract every clause, and verify each against Singapore employment law using agentic RAG with cited legal provisions
+- **Verdict Translation** — Translate compliance verdicts and explanations into Chinese or Tamil on demand
+- **Contract Comparison** — Upload two contracts side-by-side, compare key terms and clauses with a better/worse/equal assessment from the employee's perspective
+- **Market Benchmark** — Score contract terms (salary, leave, notice, probation) against typical Singapore market ranges for the role
+- **PDF Viewer with Highlighting** — Split-view with clause-to-PDF location mapping so users can see exactly where each clause appears
+
 ## Stack
 
 - **Frontend + Backend**: Next.js 14 (App Router, API Routes), TypeScript, Tailwind CSS
-- **Primary LLM**: OpenAI `gpt-4o-mini` — agentic extraction and compliance verdicts
+- **Primary LLM**: OpenAI `gpt-4o-mini` — agentic extraction, compliance verdicts, translation, comparison, benchmarking
 - **Fallback LLM**: Groq `llama-3.1-8b-instant` — non-agentic fallback when OpenAI fails
 - **Embeddings**: OpenAI `text-embedding-3-small` (1536 dimensions)
 - **Vector DB**: Pinecone (free tier) — stores law/guideline chunks for RAG
@@ -75,6 +83,56 @@ Key design decisions:
 - **Binding law vs advisory guidelines**: violations of EA/WFA → "violated"; non-compliance with Tripartite Guidelines → "caution" (advisory only)
 - **Forced verdict**: on the final iteration, `tool_choice` forces `submit_verdict` so the agent always produces a result
 - **Text fallback**: if the agent responds with plain text instead of a tool call, the system attempts to parse a verdict from the text
+
+### Stage 3: Translate (`POST /api/translate`)
+
+```
+Verdicts array + language code (zh | ta)
+  │
+  ▼
+OpenAI gpt-4o-mini — Legal Translation
+  │  → translates explanation, contract_value, law_value
+  │  → keeps statute citations in English
+  │
+  ▼
+Returns verdicts with translated_* fields
+```
+
+Translation runs on-demand when the user selects a language from the dropdown, keeping the initial analysis fast.
+
+### Stage 4: Compare (`POST /api/compare`)
+
+```
+Document A ID + Document B ID
+  │
+  ▼
+Load both extracted contracts from Supabase
+  │
+  ▼
+OpenAI gpt-4o-mini — Structured Comparison
+  │  → key_terms[]: salary, leave, notice, probation side-by-side
+  │  → clauses[]: clause-by-clause diff with assessment
+  │  → summary: overall 2-3 sentence comparison
+  │
+  ▼
+Assessment from employee's perspective:
+  a_better | b_better | equal | different
+```
+
+### Stage 5: Benchmark (`POST /api/benchmark`)
+
+```
+Job title + extracted key terms (salary, leave, notice, probation)
+  │
+  ▼
+OpenAI gpt-4o-mini — Market Analysis
+  │  → items[]: each term vs SG market range for the role
+  │  → assessment: above | at | below market
+  │  → overall_summary
+  │
+  ▼
+Framed as indicative estimates (disclaimer included)
+```
 
 ## Quick Start
 
@@ -155,14 +213,22 @@ vericlause/
 │   ├── api/
 │   │   ├── upload/route.ts          ← PDF upload + extraction
 │   │   ├── analyze/route.ts         ← agentic RAG compliance check
+│   │   ├── translate/route.ts       ← verdict translation (Chinese/Tamil)
+│   │   ├── compare/route.ts         ← two-contract comparison
+│   │   ├── benchmark/route.ts       ← market benchmark scoring
 │   │   ├── document/[id]/route.ts   ← document status
 │   │   └── purge/[id]/route.ts      ← data cleanup
-│   ├── dashboard/page.tsx           ← main dashboard (PDF viewer + clause panel)
+│   ├── dashboard/page.tsx           ← main dashboard (PDF viewer + clause panel + benchmark)
+│   ├── compare/page.tsx             ← dual-upload contract comparison
 │   ├── page.tsx                     ← landing page
 │   ├── layout.tsx, globals.css
 ├── components/
 │   ├── ContractViewer.tsx           ← PDF viewer with text highlighting
-│   ├── ClausePanel.tsx              ← clause list + verdict badges
+│   ├── ClausePanel.tsx              ← clause list + verdict badges (with translation)
+│   ├── VerdictBadge.tsx             ← individual verdict card (with translation)
+│   ├── BenchmarkPanel.tsx           ← market benchmark results
+│   ├── ComparisonTable.tsx          ← key terms comparison table
+│   ├── ClauseDiff.tsx               ← clause-by-clause comparison cards
 │   ├── SiteNavbar.tsx               ← navigation bar
 │   ├── AuthShell.tsx                ← auth-gated layout wrapper
 │   ├── DisclaimerModal.tsx          ← legal disclaimer

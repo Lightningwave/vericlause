@@ -16,6 +16,8 @@ const GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant";
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
 const CONCURRENCY = 4;
+const MAX_CLAUSES_DEFAULT = 40;
+const MAX_CLAUSE_CHARS_DEFAULT = 6000;
 
 // ---------------------------------------------------------------------------
 // Singleton clients
@@ -61,10 +63,11 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn();
     } catch (err: unknown) {
-      const isRateLimit =
-        err instanceof Error &&
-        "status" in err &&
-        (err as { status: number }).status === 429;
+      const status =
+        typeof err === "object" && err !== null && "status" in err
+          ? (err as { status?: unknown }).status
+          : undefined;
+      const isRateLimit = status === 429;
       if (!isRateLimit || attempt === MAX_RETRIES - 1) throw err;
       const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
       await new Promise((r) => setTimeout(r, delay));
@@ -555,7 +558,10 @@ async function checkKetCompleteness(
   const clauseTitles = (extracted.clauses ?? []).map((c) =>
     c.clause_title.toLowerCase(),
   );
-  const clauseTexts = (extracted.clauses ?? []).join(" ").toLowerCase();
+  const clauseTexts = (extracted.clauses ?? [])
+    .map((c) => `${c.clause_title}\n${c.clause_text}`)
+    .join("\n\n")
+    .toLowerCase();
 
   const missing: string[] = [];
   const ketKeywords: Record<string, string[]> = {
@@ -700,9 +706,9 @@ export async function runComplianceCheck(
   _rawText: string,
   ctx: EmployeeContext = { monthly_salary: null, work_type: null },
 ): Promise<ComplianceVerdict[]> {
-  const clauses = extracted.clauses ?? [];
+  const allClauses = extracted.clauses ?? [];
 
-  if (clauses.length === 0) {
+  if (allClauses.length === 0) {
     return [
       {
         clause_type: "general",
@@ -715,13 +721,242 @@ export async function runComplianceCheck(
     ];
   }
 
+  const maxClauses = Number(process.env.MAX_CLAUSES_PER_ANALYSIS ?? MAX_CLAUSES_DEFAULT);
+  const maxClauseChars = Number(process.env.MAX_CLAUSE_CHARS ?? MAX_CLAUSE_CHARS_DEFAULT);
+
+  const clauses = allClauses
+    .filter((c) => (c.clause_title?.trim() ?? "").length > 0 || (c.clause_text?.trim() ?? "").length > 0)
+    .slice(0, Number.isFinite(maxClauses) && maxClauses > 0 ? maxClauses : MAX_CLAUSES_DEFAULT)
+    .map((c) => ({
+      ...c,
+      clause_title: c.clause_title?.slice(0, 200) ?? "",
+      clause_text: (c.clause_text ?? "").slice(0, Number.isFinite(maxClauseChars) && maxClauseChars > 0 ? maxClauseChars : MAX_CLAUSE_CHARS_DEFAULT),
+    }));
+
+  // Per-run caches to reduce duplicate embedding + retrieval calls
+  const embeddingCache = new Map<string, number[]>();
+  const retrievalCache = new Map<string, LawChunk[]>();
+
+  async function embedQueryCached(text: string): Promise<number[]> {
+    const key = text.trim();
+    const hit = embeddingCache.get(key);
+    if (hit) return hit;
+    const v = await embedQuery(key);
+    embeddingCache.set(key, v);
+    return v;
+  }
+
+  async function retrieveLawChunksCached(query: string, topK = TOP_K): Promise<LawChunk[]> {
+    const cacheKey = `${topK}:${query.trim()}`;
+    const hit = retrievalCache.get(cacheKey);
+    if (hit) return hit;
+    const index = getPineconeIndex();
+    const vector = await embedQueryCached(query);
+    const res = await index.namespace(NAMESPACE).query({
+      vector,
+      topK,
+      includeMetadata: true,
+    });
+    const chunks = (res.matches ?? [])
+      .map((m) => {
+        const meta = m.metadata as Record<string, unknown> | undefined;
+        return {
+          text: (meta?.text as string) ?? "",
+          actName: (meta?.act_name as string) ?? "Unknown",
+        };
+      })
+      .filter((c) => c.text.length > 0);
+    retrievalCache.set(cacheKey, chunks);
+    return chunks;
+  }
+
+  async function executeToolCallCached(
+    toolName: string,
+    args: Record<string, string>,
+  ): Promise<string> {
+    const query = args.query ?? "";
+
+    switch (toolName) {
+      case "search_employment_act": {
+        const augmented = query + " Employment Act Singapore";
+        const chunks = await retrieveLawChunksCached(augmented);
+        const eaChunks = chunks.filter((c) => {
+          const name = c.actName.toLowerCase();
+          return name.includes("employment act") || name.includes("employment claims");
+        });
+        return formatChunksForAgent(eaChunks.length > 0 ? eaChunks : chunks);
+      }
+
+      case "search_ket_requirements": {
+        const augmented = query + " key employment terms KETs mandatory written";
+        const chunks = await retrieveLawChunksCached(augmented);
+        const ketChunks = chunks.filter((c) =>
+          c.actName.toLowerCase().includes("ket"),
+        );
+        return formatChunksForAgent(ketChunks.length > 0 ? ketChunks : chunks);
+      }
+
+      case "search_guidelines": {
+        const augmented = query + " tripartite guidelines workplace fairness";
+        const chunks = await retrieveLawChunksCached(augmented);
+        const guidelineChunks = chunks.filter((c) => {
+          const name = c.actName.toLowerCase();
+          return name.includes("tripartite") || name.includes("fairness") || name.includes("guideline");
+        });
+        return formatChunksForAgent(guidelineChunks.length > 0 ? guidelineChunks : chunks);
+      }
+
+      default:
+        return "Unknown tool. Use search_employment_act, search_ket_requirements, or search_guidelines.";
+    }
+  }
+
   const [clauseVerdicts, ketVerdict] = await Promise.all([
     mapConcurrent(clauses, CONCURRENCY, async (clause) => {
       try {
-        return await agentVerdictForClause(clause.clause_title, clause.clause_text, ctx);
+        // Inline a cached variant of the agent loop to reuse retrieval/embedding results within this run.
+        const client = getOpenAIClient();
+        const systemPrompt = buildSystemPrompt(ctx);
+
+        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Analyze this contract clause for compliance with Singapore law.\n\nClause title: ${clause.clause_title}\nClause text: ${clause.clause_text}`,
+          },
+        ];
+
+        for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
+          const isLast = iteration === MAX_AGENT_ITERATIONS - 1;
+
+          const response = await withRetry(() =>
+            client.chat.completions.create({
+              model: OPENAI_MODEL,
+              messages,
+              tools: TOOLS,
+              tool_choice: isLast
+                ? { type: "function", function: { name: "submit_verdict" } }
+                : "auto",
+              temperature: 0,
+            }),
+          );
+
+          const choice = response.choices[0];
+          const assistantMessage = choice.message;
+          messages.push(assistantMessage);
+
+          if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
+            const textContent = assistantMessage.content ?? "";
+            const parsed = tryParseTextVerdict(textContent, clause.clause_title, clause.clause_text);
+            if (parsed) return parsed;
+
+            messages.push({
+              role: "user",
+              content:
+                "You must call the submit_verdict tool to finalize your analysis. Do not respond with plain text.",
+            });
+            continue;
+          }
+
+          for (const toolCall of assistantMessage.tool_calls) {
+            if (toolCall.type !== "function") continue;
+
+            const fnName = toolCall.function.name;
+            const args = JSON.parse(toolCall.function.arguments) as Record<string, string>;
+
+            if (fnName === "submit_verdict") {
+              return {
+                clause_type: args.clause_type ?? clause.clause_title,
+                contract_value: args.contract_value ?? clause.clause_text.slice(0, 200),
+                law_value: args.law_value ?? null,
+                verdict: (["compliant", "caution", "violated"].includes(args.verdict)
+                  ? args.verdict
+                  : "caution") as ComplianceVerdict["verdict"],
+                citation: args.citation ?? null,
+                explanation: args.explanation ?? null,
+              };
+            }
+
+            const result = await executeToolCallCached(fnName, args);
+            messages.push({
+              role: "tool",
+              tool_call_id: toolCall.id,
+              content: result,
+            });
+          }
+        }
+
+        return {
+          clause_type: clause.clause_title,
+          contract_value: clause.clause_text.slice(0, 200),
+          law_value: null,
+          verdict: "caution" as const,
+          citation: null,
+          explanation: "Agent did not reach a verdict within the allowed iterations.",
+        };
       } catch {
         try {
-          return await directVerdictForClause(clause.clause_title, clause.clause_text, ctx);
+          // Direct fallback still benefits from cached retrieval
+          const searchQuery = clause.clause_title + " Singapore Employment Act Workplace Fairness Act";
+          const lawChunks = await retrieveLawChunksCached(searchQuery);
+
+          const lawText =
+            lawChunks.length > 0
+              ? lawChunks
+                  .map((c, i) => `[Excerpt ${i + 1} — Source: ${c.actName}]\n${c.text}`)
+                  .join("\n\n---\n\n")
+              : "(No relevant law excerpts found.)";
+
+          const partIV = derivePartIVApplicability(ctx);
+
+          const userMsg = [
+            "Contract clause title: " + clause.clause_title,
+            "Contract clause text: " + clause.clause_text,
+            "",
+            "Employee context: " + partIV,
+            "",
+            "Relevant law/guideline excerpts:",
+            lawText,
+          ].join("\n");
+
+          const client = getGroqClient();
+          const response = await withRetry(() =>
+            client.chat.completions.create({
+              model: GROQ_FALLBACK_MODEL,
+              messages: [
+                { role: "system", content: DIRECT_VERDICT_PROMPT },
+                { role: "user", content: userMsg },
+              ],
+              temperature: 0,
+            }),
+          );
+
+          const raw = response.choices[0]?.message?.content ?? "";
+          const content = extractJson(raw);
+
+          try {
+            const data = JSON.parse(content) as Record<string, unknown>;
+            const v = data.verdict as string;
+            return {
+              clause_type: (data.clause_type as string) ?? clause.clause_title,
+              contract_value: (data.contract_value as string) ?? clause.clause_text.slice(0, 200),
+              law_value: (data.law_value as string) ?? null,
+              verdict: (["compliant", "caution", "violated"].includes(v)
+                ? v
+                : "caution") as ComplianceVerdict["verdict"],
+              citation: (data.citation as string) ?? null,
+              explanation: (data.explanation as string) ?? null,
+            };
+          } catch {
+            return {
+              clause_type: clause.clause_title,
+              contract_value: clause.clause_text.slice(0, 200),
+              law_value: null,
+              verdict: "caution" as const,
+              citation: null,
+              explanation: "Could not parse model response.",
+            };
+          }
         } catch {
           return {
             clause_type: clause.clause_title,

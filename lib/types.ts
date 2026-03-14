@@ -34,6 +34,9 @@ export interface ComplianceVerdict {
   verdict: "compliant" | "caution" | "violated";
   citation: string | null;
   explanation: string | null;
+  translated_contract_value?: string | null;
+  translated_law_value?: string | null;
+  translated_explanation?: string | null;
 }
 
 export interface ComplianceReport {
@@ -41,4 +44,55 @@ export interface ComplianceReport {
   extracted: ExtractedContract;
   verdicts: ComplianceVerdict[];
   compliance_score: number;
+}
+
+// ---------------------------------------------------------------------------
+// Translation
+// ---------------------------------------------------------------------------
+
+export type TranslationLanguage = "zh" | "ta";
+
+// ---------------------------------------------------------------------------
+// Contract Comparison
+// ---------------------------------------------------------------------------
+
+export interface ClauseComparison {
+  clause_topic: string;
+  contract_a_value: string | null;
+  contract_b_value: string | null;
+  assessment: "a_better" | "b_better" | "equal" | "different";
+  explanation: string;
+}
+
+export interface KeyTermComparison {
+  term: string;
+  contract_a_value: string | null;
+  contract_b_value: string | null;
+  assessment: "a_better" | "b_better" | "equal" | "different";
+}
+
+export interface ContractComparison {
+  document_a_id: string;
+  document_b_id: string;
+  key_terms: KeyTermComparison[];
+  clauses: ClauseComparison[];
+  summary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Market Benchmark
+// ---------------------------------------------------------------------------
+
+export interface BenchmarkItem {
+  term: string;
+  contract_value: string | null;
+  market_range: string;
+  assessment: "above" | "at" | "below";
+  explanation: string;
+}
+
+export interface BenchmarkResult {
+  job_title: string;
+  items: BenchmarkItem[];
+  overall_summary: string;
 }

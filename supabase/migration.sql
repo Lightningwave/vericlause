@@ -57,6 +57,35 @@ create policy "Users can delete their own reports"
 create index idx_reports_document_id on public.reports(document_id);
 create index idx_reports_user_id on public.reports(user_id);
 
+-- 2b. Analysis jobs table (async/polling workflow)
+create table public.analysis_jobs (
+  id           uuid primary key default gen_random_uuid(),
+  document_id  uuid not null references public.documents(id) on delete cascade,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  status       text not null default 'queued', -- queued | running | succeeded | failed
+  error        text,
+  report_id    uuid references public.reports(id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+alter table public.analysis_jobs enable row level security;
+
+create policy "Users can insert their own analysis jobs"
+  on public.analysis_jobs for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can view their own analysis jobs"
+  on public.analysis_jobs for select
+  using (auth.uid() = user_id);
+
+create policy "Users can update their own analysis jobs"
+  on public.analysis_jobs for update
+  using (auth.uid() = user_id);
+
+create index idx_analysis_jobs_document_id on public.analysis_jobs(document_id);
+create index idx_analysis_jobs_user_id on public.analysis_jobs(user_id);
+
 -- 3. Storage bucket for contract PDFs
 insert into storage.buckets (id, name, public)
 values ('contracts', 'contracts', false);
