@@ -8,8 +8,13 @@ import { VerdictBadge } from "@/components/VerdictBadge";
 import { SiteNavbar } from "@/components/SiteNavbar";
 import { ContractViewer } from "@/components/ContractViewer";
 import { ClausePanel } from "@/components/ClausePanel";
-import { uploadPdf, analyzeDocument, type ComplianceReport } from "@/lib/api";
-import type { EmployeeContext } from "@/lib/types";
+import { BenchmarkPanel } from "@/components/BenchmarkPanel";
+import { DocumentList } from "@/components/DocumentList";
+import {
+  uploadPdf, analyzeDocument, getAnalyzeJob, translateVerdicts, benchmarkContract,
+  listDocuments, getDocumentWithReport, type ComplianceReport, type DocumentSummary,
+} from "@/lib/api";
+import type { EmployeeContext, TranslationLanguage, ComplianceVerdict, BenchmarkResult, ExtractedContract } from "@/lib/types";
 import type { OnboardingData } from "@/components/OnboardingForm";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -21,6 +26,8 @@ export default function DashboardPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [disclaimerAccepted, acceptDisclaimer] = useDisclaimerAccepted();
 
+  const [userDocs, setUserDocs] = useState<DocumentSummary[]>([]);
+
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -28,6 +35,7 @@ export default function DashboardPage() {
         router.replace("/auth/sign-in");
       } else {
         setAuthChecked(true);
+        listDocuments().then(setUserDocs);
       }
     });
   }, [router]);
@@ -37,9 +45,15 @@ export default function DashboardPage() {
   const [report, setReport] = useState<ComplianceReport | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [analyzeJobId, setAnalyzeJobId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [activeClause, setActiveClause] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"clauses" | "verdicts">("clauses");
+  const [viewMode, setViewMode] = useState<"clauses" | "verdicts" | "benchmark">("clauses");
+  const [translationLang, setTranslationLang] = useState<TranslationLanguage | "en">("en");
+  const [translatedVerdicts, setTranslatedVerdicts] = useState<ComplianceVerdict[] | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | null>(null);
+  const [benchmarking, setBenchmarking] = useState(false);
   const activeClauseData = activeClause
     ? report?.extracted.clauses?.find((c) => c.clause_title === activeClause) ?? null
     : null;
@@ -48,12 +62,41 @@ export default function DashboardPage() {
     setAnalyzeError(null);
     setStep("analyzing");
     try {
-      const analysis = await analyzeDocument({
+      const started = await analyzeDocument({
         document_id: docId,
         employee_context: employeeCtx,
       });
-      setReport(analysis);
-      setStep("report");
+      setAnalyzeJobId(started.job_id);
+
+      if (started.report) {
+        setReport(started.report);
+        setStep("report");
+        return;
+      }
+
+      const deadline = Date.now() + 180_000;
+      while (Date.now() < deadline) {
+        const { job } = await getAnalyzeJob(started.job_id);
+        if (job.status === "succeeded") {
+          const result = await getDocumentWithReport(docId);
+          if (result?.report && result.document.extracted) {
+            setReport({
+              document_id: docId,
+              extracted: result.document.extracted as ExtractedContract,
+              verdicts: result.report.verdicts,
+              compliance_score: result.report.compliance_score,
+            });
+            setStep("report");
+            return;
+          }
+          break;
+        }
+        if (job.status === "failed") {
+          throw new Error(job.error ?? "Analysis failed");
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      throw new Error("Analysis is taking longer than expected. Please retry.");
     } catch (e) {
       setAnalyzeError(e instanceof Error ? e.message : "Analysis failed");
       setStep("upload");
@@ -68,6 +111,8 @@ export default function DashboardPage() {
     try {
       const res = await uploadPdf(f);
       setDocumentId(res.document_id);
+      setAnalyzeJobId(null);
+      listDocuments().then(setUserDocs);
       if (res.extraction_error) {
         setAnalyzeError(res.extraction_error);
         setStep("upload");
@@ -79,6 +124,91 @@ export default function DashboardPage() {
       setStep("upload");
     }
   }, [handleAnalyze]);
+
+  const handleSelectExisting = useCallback(async (doc: DocumentSummary) => {
+    setDocumentId(doc.id);
+    setAnalyzeJobId(null);
+    setFile(null);
+    setActiveClause(null);
+    setTranslatedVerdicts(null);
+    setTranslationLang("en");
+    setBenchmarkResult(null);
+
+    const result = await getDocumentWithReport(doc.id);
+    if (!result) return;
+
+    // Fetch the stored PDF for the viewer
+    try {
+      const pdfRes = await fetch(`/api/documents/${doc.id}/pdf`);
+      if (pdfRes.ok) {
+        const blob = await pdfRes.blob();
+        const pdfFile = new File([blob], doc.file_name, { type: "application/pdf" });
+        setFile(pdfFile);
+      }
+    } catch {
+      // PDF preview will show "not available" — non-blocking
+    }
+
+    if (result.report && result.document.extracted) {
+      setReport({
+        document_id: doc.id,
+        extracted: result.document.extracted as ExtractedContract,
+        verdicts: result.report.verdicts,
+        compliance_score: result.report.compliance_score,
+      });
+      setStep("report");
+    } else if (result.document.extracted) {
+      setReport(null);
+      setStep("upload");
+      await handleAnalyze(doc.id);
+    } else {
+      setStep("upload");
+    }
+  }, [handleAnalyze]);
+
+  const handleDocDeleted = useCallback((docId: string) => {
+    setUserDocs((prev) => prev.filter((d) => d.id !== docId));
+  }, []);
+
+  const handleTranslate = useCallback(async (lang: TranslationLanguage | "en") => {
+    setTranslationLang(lang);
+    if (lang === "en" || !report) {
+      setTranslatedVerdicts(null);
+      return;
+    }
+    setTranslating(true);
+    try {
+      const res = await translateVerdicts(report.verdicts, lang);
+      setTranslatedVerdicts(res.verdicts);
+    } catch {
+      setTranslatedVerdicts(null);
+    } finally {
+      setTranslating(false);
+    }
+  }, [report]);
+
+  const handleBenchmark = useCallback(async () => {
+    if (!report?.extracted || benchmarkResult || benchmarking) return;
+    setBenchmarking(true);
+    try {
+      const ext = report.extracted;
+      const noticeDays = ext.notice_period_days
+        ?? (ext.notice_period_weeks != null ? ext.notice_period_weeks * 7 : null)
+        ?? (ext.notice_period_months != null ? ext.notice_period_months * 30 : null);
+      const res = await benchmarkContract({
+        job_title: ext.job_title ?? "General",
+        salary: ext.salary,
+        annual_leave_days: ext.annual_leave_days,
+        notice_period_days: noticeDays,
+        probation_months: ext.probation_months,
+      });
+      setBenchmarkResult(res);
+    } catch {
+      setBenchmarkResult(null);
+    } finally {
+      setBenchmarking(false);
+    }
+  }, [report, benchmarkResult, benchmarking]);
 
   if (!authChecked) {
     return (
@@ -102,6 +232,7 @@ export default function DashboardPage() {
         links={[
           { href: "/", label: "Home" },
           { href: "/dashboard", label: "Dashboard" },
+          { href: "/compare", label: "Compare" },
         ]}
         rightSlot={
           <button
@@ -190,9 +321,20 @@ export default function DashboardPage() {
                       Retry Analysis
                     </button>
                   )}
+                  {analyzeJobId && (
+                    <p className="mt-2 text-[11px] text-amber-800/80">
+                      Job ID: <span className="font-mono">{analyzeJobId}</span>
+                    </p>
+                  )}
                 </div>
               )}
             </div>
+            <DocumentList
+              documents={userDocs}
+              onSelect={handleSelectExisting}
+              onDeleted={handleDocDeleted}
+            />
+
             <button
               onClick={() => setStep("onboarding")}
               className="mt-6 w-full text-sm text-slate-500 hover:text-navy-900"
@@ -212,12 +354,28 @@ export default function DashboardPage() {
 
         {step === "report" && report && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
               <div>
                 <h1 className="font-serif text-2xl font-bold text-navy-950">Compliance Report</h1>
                 <p className="text-slate-600 text-sm mt-1">Generated on {new Date().toLocaleDateString()}</p>
               </div>
               <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Language</label>
+                  <select
+                    value={translationLang}
+                    onChange={(e) => handleTranslate(e.target.value as TranslationLanguage | "en")}
+                    disabled={translating}
+                    className="text-sm rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-slate-700 shadow-sm focus:border-navy-400 focus:ring-1 focus:ring-navy-400"
+                  >
+                    <option value="en">English</option>
+                    <option value="zh">中文 (Chinese)</option>
+                    <option value="ta">தமிழ் (Tamil)</option>
+                  </select>
+                  {translating && (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-navy-600" />
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     setStep("upload");
@@ -225,6 +383,10 @@ export default function DashboardPage() {
                     setDocumentId(null);
                     setFile(null);
                     setActiveClause(null);
+                    setTranslatedVerdicts(null);
+                    setTranslationLang("en");
+                    setBenchmarkResult(null);
+                    listDocuments().then(setUserDocs);
                   }}
                   className="text-sm font-medium text-navy-600 hover:text-navy-900 underline-offset-4 hover:underline"
                 >
@@ -312,24 +474,53 @@ export default function DashboardPage() {
                   >
                     Detailed Verdicts ({report.verdicts.length})
                   </button>
+                  <button
+                    onClick={() => {
+                      setViewMode("benchmark");
+                      handleBenchmark();
+                    }}
+                    className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                      viewMode === "benchmark" ? "bg-white text-navy-950 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Market Benchmark
+                  </button>
                 </div>
 
                 <div className="flex-1 min-h-0 overflow-auto">
                   {viewMode === "clauses" && report.extracted.clauses?.length > 0 ? (
                     <ClausePanel
                       clauses={report.extracted.clauses}
-                      verdicts={report.verdicts}
+                      verdicts={translationLang !== "en" && translatedVerdicts ? translatedVerdicts : report.verdicts}
                       activeClause={activeClause}
                       onClauseClick={(title) => {
                         setActiveClause(activeClause === title ? null : title);
                       }}
+                      showTranslation={translationLang !== "en" && !!translatedVerdicts}
                     />
                   ) : viewMode === "verdicts" ? (
                     <div className="space-y-3">
-                      {report.verdicts.map((v, i) => (
-                        <VerdictBadge key={i} verdict={v} />
+                      {(translationLang !== "en" && translatedVerdicts ? translatedVerdicts : report.verdicts).map((v, i) => (
+                        <VerdictBadge
+                          key={i}
+                          verdict={v}
+                          showTranslation={translationLang !== "en" && !!translatedVerdicts}
+                        />
                       ))}
                     </div>
+                  ) : viewMode === "benchmark" ? (
+                    benchmarking ? (
+                      <div className="flex flex-col items-center justify-center py-16">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-navy-600" />
+                        <p className="mt-4 text-sm text-slate-500">Benchmarking against market data...</p>
+                      </div>
+                    ) : benchmarkResult ? (
+                      <BenchmarkPanel result={benchmarkResult} />
+                    ) : (
+                      <p className="text-sm text-slate-500 py-8 text-center">
+                        Unable to load benchmark data. Try again.
+                      </p>
+                    )
                   ) : (
                     <p className="text-sm text-slate-500 py-8 text-center">No clauses extracted</p>
                   )}

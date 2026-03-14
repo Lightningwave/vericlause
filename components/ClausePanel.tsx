@@ -8,6 +8,7 @@ interface ClausePanelProps {
   verdicts: ComplianceVerdict[];
   activeClause: string | null;
   onClauseClick: (clauseTitle: string) => void;
+  showTranslation?: boolean;
 }
 
 function verdictForClause(
@@ -49,7 +50,7 @@ const DEFAULT_STYLE = {
   label: "text-slate-500",
 };
 
-export function ClausePanel({ clauses, verdicts, activeClause, onClauseClick }: ClausePanelProps) {
+export function ClausePanel({ clauses, verdicts, activeClause, onClauseClick, showTranslation }: ClausePanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const clauseRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -101,7 +102,7 @@ export function ClausePanel({ clauses, verdicts, activeClause, onClauseClick }: 
             )}
             {v?.explanation && (
               <p className={`mt-2 text-xs font-medium ${style.label} border-t border-current/10 pt-2`}>
-                {v.explanation}
+                {showTranslation && v.translated_explanation ? v.translated_explanation : v.explanation}
               </p>
             )}
             {v?.citation && (

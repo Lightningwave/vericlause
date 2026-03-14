@@ -213,7 +213,7 @@ export function ContractViewer({
   const pdfFile = { id: FILE_ID, url: fileUrl };
 
   return (
-    <div ref={containerRef} className="h-full">
+    <div ref={containerRef} className="h-full pdf-zoom-80">
       <PdfFocusProvider>
         <PDFViewer
           file={pdfFile}

@@ -2,7 +2,12 @@
 
 import type { ComplianceVerdict } from "@/lib/api";
 
-export function VerdictBadge({ verdict }: { verdict: ComplianceVerdict }) {
+interface VerdictBadgeProps {
+  verdict: ComplianceVerdict;
+  showTranslation?: boolean;
+}
+
+export function VerdictBadge({ verdict, showTranslation }: VerdictBadgeProps) {
   const styles =
     verdict.verdict === "compliant"
       ? "bg-emerald-50 border-emerald-100 text-emerald-900"
@@ -15,6 +20,16 @@ export function VerdictBadge({ verdict }: { verdict: ComplianceVerdict }) {
 
   const labelColor = 
     verdict.verdict === "compliant" ? "text-emerald-700" : verdict.verdict === "caution" ? "text-amber-700" : "text-red-700";
+
+  const contractVal = showTranslation && verdict.translated_contract_value
+    ? verdict.translated_contract_value
+    : verdict.contract_value;
+  const lawVal = showTranslation && verdict.translated_law_value
+    ? verdict.translated_law_value
+    : verdict.law_value;
+  const explanationVal = showTranslation && verdict.translated_explanation
+    ? verdict.translated_explanation
+    : verdict.explanation;
 
   return (
     <div className={`rounded-lg border p-5 ${styles}`}>
@@ -31,23 +46,23 @@ export function VerdictBadge({ verdict }: { verdict: ComplianceVerdict }) {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
-        {verdict.contract_value && (
+        {contractVal && (
           <div className="bg-white/50 p-3 rounded border border-current/10">
             <span className="block text-xs uppercase tracking-wider opacity-70 mb-1">Contract Says</span>
-            <span className="font-medium">{verdict.contract_value}</span>
+            <span className="font-medium">{contractVal}</span>
           </div>
         )}
-        {verdict.law_value && (
+        {lawVal && (
           <div className="bg-white/50 p-3 rounded border border-current/10">
             <span className="block text-xs uppercase tracking-wider opacity-70 mb-1">Law Requires</span>
-            <span className="font-medium">{verdict.law_value}</span>
+            <span className="font-medium">{lawVal}</span>
           </div>
         )}
       </div>
 
-      {verdict.explanation && (
+      {explanationVal && (
         <p className="text-sm leading-relaxed opacity-90 border-t border-current/10 pt-3">
-          {verdict.explanation}
+          {explanationVal}
         </p>
       )}
       
