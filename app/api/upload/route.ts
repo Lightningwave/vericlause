@@ -5,6 +5,7 @@ import {
   getAuthenticatedUser,
   uploadPdfToStorage,
   insertDocument,
+  findDuplicateDocument,
 } from "@/lib/services/db";
 
 export async function POST(req: NextRequest) {
@@ -26,6 +27,16 @@ export async function POST(req: NextRequest) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  const existing = await findDuplicateDocument(user.id, name);
+  if (existing?.extracted) {
+    return NextResponse.json({
+      document_id: existing.id,
+      raw_text_length: existing.raw_text.length,
+      extracted: existing.extracted,
+      reused: true,
+    });
+  }
 
   let rawText: string;
   let pages: Awaited<ReturnType<typeof pdfToText>>["pages"] = [];
