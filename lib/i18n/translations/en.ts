@@ -199,6 +199,61 @@ const en = {
     "Once your resume is ready, continue to job matching and recommendation.",
   resume_builder_back_review: "Back to Review",
   resume_builder_continue_jobs: "Continue to Job Matching",
+    jobs_nav: "Jobs",
+  jobs_badge: "Job Discovery",
+  jobs_title: "Find jobs that match your resume",
+  jobs_description:
+    "Search recommended roles based on your resume profile, or import a job posting from a URL to compare opportunities in one place.",
+
+  jobs_import_title: "Import a job posting",
+  jobs_import_description:
+    "Paste a job link from any external site and add it to your shortlist for comparison.",
+  jobs_import_label: "Job posting URL",
+  jobs_import_button: "Import Job Posting",
+
+  jobs_filter_title: "Filter sources",
+  jobs_filter_description:
+    "View all jobs together or narrow results by recommendation source.",
+  jobs_filter_all: "All Jobs",
+  jobs_filter_mcf: "MyCareersFuture",
+  jobs_filter_imported: "Imported URLs",
+
+  jobs_tip_title: "Discovery tip",
+  jobs_tip_description:
+    "Shortlist roles with stronger match scores first, then compare requirements and salary before applying.",
+
+  jobs_results_badge: "Recommended Jobs",
+  jobs_results_title: "Your shortlisted opportunities",
+  jobs_results_description:
+    "These roles are shown as example matches from resume analysis and imported postings.",
+  jobs_results_count: "jobs found",
+  jobs_match_label: "match",
+  jobs_save_button: "Save Job",
+  jobs_compare_button: "Compare",
+  jobs_footer_note:
+    "You can shortlist up to five jobs for comparison and recommendation.",
+  jobs_back_resume: "Back to Resume",
+  jobs_continue_recommendation: "Continue to Recommendation",
+  jobs_recommendation_badge: "AI Recommendation",
+jobs_recommendation_title: "Your best job match",
+jobs_recommendation_description:
+  "Based on your resume and shortlisted roles, we identified the job that most closely matches your skills and experience.",
+
+jobs_recommendation_score: "Match Score",
+jobs_recommendation_score_note:
+  "This score reflects how closely your resume aligns with the job requirements and responsibilities.",
+
+jobs_recommendation_strengths: "Strengths for this role",
+jobs_recommendation_improve: "Areas to improve",
+
+jobs_recommendation_best_match: "Best Match",
+jobs_recommendation_why: "Why this role fits you",
+jobs_recommendation_reason:
+  "Your resume demonstrates relevant experience in coordination, documentation, and communication, which aligns well with the requirements of this role.",
+
+jobs_view_listing: "View Job Listing",
+jobs_back_to_list: "Back to Job Discovery",
+jobs_continue_interview: "Continue to Interview Prep",
 };
 
 export default en;

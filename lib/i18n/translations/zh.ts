@@ -185,6 +185,61 @@ const zh = {
     "简历准备好后，继续进入职位匹配和推荐。",
   resume_builder_back_review: "返回审查",
   resume_builder_continue_jobs: "继续职位匹配",
+    jobs_nav: "职位",
+  jobs_badge: "职位发现",
+  jobs_title: "查找与你的简历匹配的职位",
+  jobs_description:
+    "根据你的简历资料搜索推荐职位，或通过链接导入职位信息，在同一处比较机会。",
+
+  jobs_import_title: "导入职位信息",
+  jobs_import_description:
+    "粘贴外部招聘网站的职位链接，并将其加入你的比较清单。",
+  jobs_import_label: "职位链接",
+  jobs_import_button: "导入职位",
+
+  jobs_filter_title: "筛选来源",
+  jobs_filter_description:
+    "查看所有职位，或按推荐来源筛选结果。",
+  jobs_filter_all: "全部职位",
+  jobs_filter_mcf: "MyCareersFuture",
+  jobs_filter_imported: "导入链接",
+
+  jobs_tip_title: "发现提示",
+  jobs_tip_description:
+    "先筛选匹配分数较高的职位，再比较要求和薪资后决定申请。",
+
+  jobs_results_badge: "推荐职位",
+  jobs_results_title: "你的职位清单",
+  jobs_results_description:
+    "这些职位展示了简历分析推荐和导入职位的示例结果。",
+  jobs_results_count: "个职位",
+  jobs_match_label: "匹配度",
+  jobs_save_button: "保存职位",
+  jobs_compare_button: "比较",
+  jobs_footer_note:
+    "你最多可以选择五个职位用于比较和推荐。",
+  jobs_back_resume: "返回简历",
+  jobs_continue_recommendation: "继续推荐",
+  jobs_recommendation_badge: "AI 推荐",
+jobs_recommendation_title: "最适合你的职位",
+jobs_recommendation_description:
+  "根据你的简历和已选择的职位，我们为你推荐了最匹配的工作机会。",
+
+jobs_recommendation_score: "匹配评分",
+jobs_recommendation_score_note:
+  "该评分反映了你的简历与职位要求之间的匹配程度。",
+
+jobs_recommendation_strengths: "与你匹配的优势",
+jobs_recommendation_improve: "建议改进的部分",
+
+jobs_recommendation_best_match: "最佳匹配职位",
+jobs_recommendation_why: "为什么这个职位适合你",
+jobs_recommendation_reason:
+  "你的简历显示你在协调、文档管理和沟通方面具有相关经验，这些能力与该职位的核心要求高度匹配。",
+
+jobs_view_listing: "查看职位详情",
+jobs_back_to_list: "返回职位列表",
+jobs_continue_interview: "继续面试准备",
 };
 
 export default zh;

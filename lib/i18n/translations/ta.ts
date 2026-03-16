@@ -200,6 +200,61 @@ const ta = {
     "உங்கள் ரெஸ்யூமே தயாரானதும், வேலை பொருத்தம் மற்றும் பரிந்துரைக்குச் செல்லுங்கள்.",
   resume_builder_back_review: "மதிப்பாய்வுக்கு திரும்பு",
   resume_builder_continue_jobs: "வேலை பொருத்தத்துக்குத் தொடரவும்",
+    jobs_nav: "வேலைகள்",
+  jobs_badge: "வேலை தேடல்",
+  jobs_title: "உங்கள் ரெஸ்யூமேக்கு பொருந்தும் வேலைகளை கண்டுபிடிக்கவும்",
+  jobs_description:
+    "உங்கள் ரெஸ்யூமே அடிப்படையில் பரிந்துரைக்கப்பட்ட வேலைகளை காணுங்கள், அல்லது வெளிப்புற வேலை இணைப்பை இறக்குமதி செய்து ஒரே இடத்தில் ஒப்பிடுங்கள்.",
+
+  jobs_import_title: "வேலை அறிவிப்பை இறக்குமதி செய்",
+  jobs_import_description:
+    "வெளியக தளத்திலிருந்து வேலை இணைப்பை ஒட்டி, அதை உங்கள் shortlist-இல் சேர்க்கவும்.",
+  jobs_import_label: "வேலை URL",
+  jobs_import_button: "வேலை அறிவிப்பை இறக்குமதி செய்",
+
+  jobs_filter_title: "மூலத்தை வடிகட்டு",
+  jobs_filter_description:
+    "அனைத்து வேலைகளையும் ஒன்றாகப் பாருங்கள் அல்லது பரிந்துரை மூலத்தின் அடிப்படையில் வடிகட்டுங்கள்.",
+  jobs_filter_all: "அனைத்து வேலைகள்",
+  jobs_filter_mcf: "MyCareersFuture",
+  jobs_filter_imported: "இறக்குமதி செய்யப்பட்ட URLகள்",
+
+  jobs_tip_title: "தேடல் குறிப்பு",
+  jobs_tip_description:
+    "முதலில் அதிக பொருத்த மதிப்பெண் உள்ள வேலைகளைத் தேர்வு செய்து, பின்னர் தேவைகள் மற்றும் சம்பளத்தை ஒப்பிடுங்கள்.",
+
+  jobs_results_badge: "பரிந்துரைக்கப்பட்ட வேலைகள்",
+  jobs_results_title: "உங்கள் shortlist வாய்ப்புகள்",
+  jobs_results_description:
+    "இவை ரெஸ்யூமே பகுப்பாய்வு மற்றும் இறக்குமதி செய்யப்பட்ட வேலை அறிவிப்புகளின் உதாரண பொருத்தங்கள்.",
+  jobs_results_count: "வேலைகள் கண்டுபிடிக்கப்பட்டது",
+  jobs_match_label: "பொருத்தம்",
+  jobs_save_button: "வேலை சேமி",
+  jobs_compare_button: "ஒப்பிடு",
+  jobs_footer_note:
+    "ஒப்பீடு மற்றும் பரிந்துரைக்காக அதிகபட்சம் ஐந்து வேலைகளை shortlist செய்யலாம்.",
+  jobs_back_resume: "ரெஸ்யூமேக்கு திரும்பு",
+  jobs_continue_recommendation: "பரிந்துரைக்குத் தொடரவும்",
+  jobs_recommendation_badge: "AI பரிந்துரை",
+jobs_recommendation_title: "உங்களுக்கு சிறந்த வேலை பொருத்தம்",
+jobs_recommendation_description:
+  "உங்கள் ரெஸ்யூமே மற்றும் தேர்ந்தெடுக்கப்பட்ட வேலை வாய்ப்புகளை அடிப்படையாகக் கொண்டு, உங்கள் திறன்களுக்கு மிகவும் பொருந்தும் வேலை வாய்ப்பை நாங்கள் கண்டறிந்துள்ளோம்.",
+
+jobs_recommendation_score: "பொருத்த மதிப்பெண்",
+jobs_recommendation_score_note:
+  "இந்த மதிப்பெண் உங்கள் ரெஸ்யூமே வேலை தேவைகளுடன் எவ்வளவு பொருந்துகிறது என்பதை காட்டுகிறது.",
+
+jobs_recommendation_strengths: "இந்த பணிக்கான உங்கள் பலங்கள்",
+jobs_recommendation_improve: "மேம்படுத்த வேண்டிய பகுதிகள்",
+
+jobs_recommendation_best_match: "சிறந்த பொருத்தம்",
+jobs_recommendation_why: "இந்த வேலை உங்களுக்கு ஏன் பொருத்தமானது",
+jobs_recommendation_reason:
+  "உங்கள் ரெஸ்யூமே ஒருங்கிணைப்பு, ஆவண மேலாண்மை மற்றும் தொடர்பு திறன்களில் அனுபவத்தை காட்டுகிறது, இது இந்த பணியின் தேவைகளுடன் நன்றாக பொருந்துகிறது.",
+
+jobs_view_listing: "வேலை அறிவிப்பை பார்க்கவும்",
+jobs_back_to_list: "வேலை தேடலுக்கு திரும்பவும்",
+jobs_continue_interview: "நேர்காணல் தயாரிப்பிற்கு தொடரவும்",
 };
 
 export default ta;

@@ -201,6 +201,61 @@ const ms = {
     "Selepas resume anda siap, teruskan ke padanan dan cadangan kerja.",
   resume_builder_back_review: "Kembali ke Semakan",
   resume_builder_continue_jobs: "Teruskan ke Padanan Kerja",
+    jobs_nav: "Kerja",
+  jobs_badge: "Penemuan Kerja",
+  jobs_title: "Cari kerja yang sepadan dengan resume anda",
+  jobs_description:
+    "Cari peranan yang disyorkan berdasarkan profil resume anda, atau import pautan jawatan untuk membandingkan peluang di satu tempat.",
+
+  jobs_import_title: "Import jawatan kerja",
+  jobs_import_description:
+    "Tampal pautan jawatan dari laman luar dan tambahkannya ke senarai pendek anda untuk perbandingan.",
+  jobs_import_label: "URL jawatan kerja",
+  jobs_import_button: "Import Jawatan",
+
+  jobs_filter_title: "Tapis sumber",
+  jobs_filter_description:
+    "Lihat semua kerja bersama atau tapis hasil mengikut sumber cadangan.",
+  jobs_filter_all: "Semua Kerja",
+  jobs_filter_mcf: "MyCareersFuture",
+  jobs_filter_imported: "URL Import",
+
+  jobs_tip_title: "Petua carian",
+  jobs_tip_description:
+    "Utamakan peranan dengan skor padanan lebih tinggi, kemudian bandingkan keperluan dan gaji sebelum memohon.",
+
+  jobs_results_badge: "Kerja Disyorkan",
+  jobs_results_title: "Peluang yang disenarai pendek",
+  jobs_results_description:
+    "Peranan ini ditunjukkan sebagai contoh padanan daripada analisis resume dan jawatan yang diimport.",
+  jobs_results_count: "kerja ditemui",
+  jobs_match_label: "padanan",
+  jobs_save_button: "Simpan Kerja",
+  jobs_compare_button: "Bandingkan",
+  jobs_footer_note:
+    "Anda boleh menyenarai pendek sehingga lima kerja untuk perbandingan dan cadangan.",
+  jobs_back_resume: "Kembali ke Resume",
+  jobs_continue_recommendation: "Teruskan ke Cadangan",
+  jobs_recommendation_badge: "Cadangan AI",
+jobs_recommendation_title: "Padanan kerja terbaik anda",
+jobs_recommendation_description:
+  "Berdasarkan resume anda dan kerja yang disenarai pendek, kami mengenal pasti pekerjaan yang paling sesuai dengan kemahiran dan pengalaman anda.",
+
+jobs_recommendation_score: "Skor Padanan",
+jobs_recommendation_score_note:
+  "Skor ini menunjukkan sejauh mana resume anda sepadan dengan keperluan pekerjaan.",
+
+jobs_recommendation_strengths: "Kekuatan untuk peranan ini",
+jobs_recommendation_improve: "Bahagian yang boleh diperbaiki",
+
+jobs_recommendation_best_match: "Padanan Terbaik",
+jobs_recommendation_why: "Mengapa peranan ini sesuai untuk anda",
+jobs_recommendation_reason:
+  "Resume anda menunjukkan pengalaman dalam koordinasi, komunikasi, dan pengurusan dokumentasi yang sejajar dengan keperluan utama pekerjaan ini.",
+
+jobs_view_listing: "Lihat Iklan Kerja",
+jobs_back_to_list: "Kembali ke Penemuan Kerja",
+jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
 };
 
 export default ms;
