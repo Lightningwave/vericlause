@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import LanguageSwitcher from "./language-switcher";
+import { useLanguage } from "./providers/language-provider";
 
 type NavLink = {
   href: string;
@@ -13,6 +15,8 @@ type SiteNavbarProps = {
 };
 
 export function SiteNavbar({ links = [], rightSlot }: SiteNavbarProps) {
+  const { t } = useLanguage();
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -30,7 +34,7 @@ export function SiteNavbar({ links = [], rightSlot }: SiteNavbarProps) {
                 href={link.href}
                 className="transition-colors hover:text-navy-900"
               >
-                {link.label}
+                {t(link.label)}
               </a>
             ) : (
               <Link
@@ -38,13 +42,16 @@ export function SiteNavbar({ links = [], rightSlot }: SiteNavbarProps) {
                 href={link.href}
                 className="transition-colors hover:text-navy-900"
               >
-                {link.label}
+                {t(link.label)}
               </Link>
             ),
           )}
         </nav>
 
-        <div className="flex items-center gap-4">{rightSlot}</div>
+        <div className="flex items-center gap-4">
+          <LanguageSwitcher />
+          {rightSlot}
+        </div>
       </div>
     </header>
   );
