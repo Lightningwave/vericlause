@@ -256,6 +256,55 @@ jobs_recommendation_reason:
 jobs_view_listing: "Lihat Iklan Kerja",
 jobs_back_to_list: "Kembali ke Penemuan Kerja",
 jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
+  interview_badge: "Persediaan Temu Duga",
+  interview_title: "Berlatih untuk temu duga anda",
+  interview_description:
+    "Dapatkan soalan temu duga khusus peranan berdasarkan resume dan kerja yang disyorkan, kemudian perbaiki jawapan anda dengan maklum balas AI.",
+
+  interview_questions_title: "Soalan Temu Duga",
+  interview_questions_description:
+    "Pilih satu soalan di bawah dan latih jawapan anda.",
+  interview_type_behavioral: "Tingkah laku",
+  interview_type_role: "Khusus peranan",
+  interview_type_situational: "Situasi",
+
+  interview_question_1:
+    "Ceritakan satu masa apabila anda perlu mengurus beberapa keutamaan dalam tempoh yang singkat.",
+  interview_question_2:
+    "Mengapa anda sesuai untuk peranan yang berfokuskan operasi ini?",
+  interview_question_3:
+    "Bagaimana anda akan menangani situasi apabila pihak berkepentingan memerlukan kemas kini segera tetapi anda masih menunggu maklumat daripada pasukan lain?",
+
+  interview_answer_instruction:
+    "Tulis jawapan anda seolah-olah anda sedang bercakap dengan penemuduga sebenar. Kemudian ia boleh disambungkan kepada aliran penilaian AI Zack.",
+  interview_answer_label: "Jawapan Anda",
+  interview_submit_answer: "Hantar Jawapan",
+  interview_voice_button: "Latihan Suara Akan Datang",
+
+  interview_feedback_badge: "Maklum Balas AI",
+  interview_feedback_title: "Semakan Jawapan",
+  interview_feedback_score: "Skor",
+  interview_feedback_strengths: "Apa yang anda lakukan dengan baik",
+  interview_feedback_improve: "Cara untuk menambah baik",
+  interview_feedback_strength_1:
+    "Jawapan anda jelas dan mudah difahami.",
+  interview_feedback_strength_2:
+    "Anda menunjukkan cara berfikir yang tersusun.",
+  interview_feedback_strength_3:
+    "Jawapan anda relevan dengan peranan dan menunjukkan tanggungjawab.",
+  interview_feedback_improve_1:
+    "Sertakan contoh kehidupan sebenar yang lebih khusus daripada pengalaman anda.",
+  interview_feedback_improve_2:
+    "Tambah hasil atau pencapaian yang boleh diukur jika boleh.",
+  interview_feedback_improve_3:
+    "Akhiri dengan kesimpulan yang lebih kuat dan kaitkan jawapan anda dengan peranan tersebut.",
+
+  interview_tip_title: "Petua temu duga",
+  interview_tip_description:
+    "Jawapan temu duga yang kuat biasanya khusus, tersusun, dan jelas berkaitan dengan kerja yang anda mahukan.",
+
+  interview_back_recommendation: "Kembali ke Cadangan",
+  interview_next_question: "Soalan Seterusnya",
 };
 
 export default ms;

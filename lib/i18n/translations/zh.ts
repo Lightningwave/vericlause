@@ -240,6 +240,53 @@ jobs_recommendation_reason:
 jobs_view_listing: "查看职位详情",
 jobs_back_to_list: "返回职位列表",
 jobs_continue_interview: "继续面试准备",
+  interview_badge: "面试准备",
+  interview_title: "为你的面试做好准备",
+  interview_description:
+    "根据你的简历和推荐职位生成针对性的面试问题，并通过 AI 反馈优化你的回答。",
+
+  interview_questions_title: "面试问题",
+  interview_questions_description:
+    "从下面选择一个问题并练习你的回答。",
+  interview_type_behavioral: "行为题",
+  interview_type_role: "岗位相关",
+  interview_type_situational: "情境题",
+
+  interview_question_1:
+    "请介绍一次你在紧迫期限内同时处理多项任务的经历。",
+  interview_question_2:
+    "为什么你适合这个以运营为重点的职位？",
+  interview_question_3:
+    "如果利益相关者急需更新，而你还在等待其他团队提供信息，你会如何处理？",
+
+  interview_answer_instruction:
+    "请像面对真实面试官一样作答。之后这里可以接入 Zack 的 AI 评分流程。",
+  interview_answer_label: "你的回答",
+  interview_submit_answer: "提交回答",
+  interview_voice_button: "语音练习即将推出",
+
+  interview_feedback_badge: "AI 反馈",
+  interview_feedback_title: "回答评估",
+  interview_feedback_score: "评分",
+  interview_feedback_strengths: "你做得好的地方",
+  interview_feedback_improve: "可改进的地方",
+  interview_feedback_strength_1: "你的回答清晰，易于理解。",
+  interview_feedback_strength_2: "你展示了有条理的思考方式。",
+  interview_feedback_strength_3:
+    "你的回答与岗位相关，并体现了责任感。",
+  interview_feedback_improve_1:
+    "加入一个更具体的真实经历作为例子。",
+  interview_feedback_improve_2:
+    "尽量加入可量化的成果或结果。",
+  interview_feedback_improve_3:
+    "用更有力的结尾将回答与职位要求联系起来。",
+
+  interview_tip_title: "面试提示",
+  interview_tip_description:
+    "强有力的面试回答通常是具体的、有结构的，并且与目标职位紧密相关。",
+
+  interview_back_recommendation: "返回推荐页面",
+  interview_next_question: "下一个问题",
 };
 
 export default zh;

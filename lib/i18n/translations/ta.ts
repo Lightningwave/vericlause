@@ -255,6 +255,55 @@ jobs_recommendation_reason:
 jobs_view_listing: "வேலை அறிவிப்பை பார்க்கவும்",
 jobs_back_to_list: "வேலை தேடலுக்கு திரும்பவும்",
 jobs_continue_interview: "நேர்காணல் தயாரிப்பிற்கு தொடரவும்",
+  interview_badge: "நேர்காணல் தயாரிப்பு",
+  interview_title: "உங்கள் நேர்காணலுக்காக பயிற்சி செய்யுங்கள்",
+  interview_description:
+    "உங்கள் ரெஸ்யூமே மற்றும் பரிந்துரைக்கப்பட்ட வேலையின் அடிப்படையில் பணி சார்ந்த நேர்காணல் கேள்விகளைப் பெற்று, AI கருத்துக்களுடன் உங்கள் பதில்களை மேம்படுத்துங்கள்.",
+
+  interview_questions_title: "நேர்காணல் கேள்விகள்",
+  interview_questions_description:
+    "கீழே உள்ள ஒரு கேள்வியைத் தேர்ந்து உங்கள் பதிலைப் பயிற்சி செய்யுங்கள்.",
+  interview_type_behavioral: "நடத்தை",
+  interview_type_role: "பணி சார்ந்த",
+  interview_type_situational: "சூழ்நிலை",
+
+  interview_question_1:
+    "குறைந்த நேரத்தில் பல முன்னுரிமைகளை நிர்வகித்த ஒரு அனுபவத்தைப் பற்றி சொல்லுங்கள்.",
+  interview_question_2:
+    "இந்த operations-மையமான வேலையிற்குப் நீங்கள் ஏன் சிறந்த பொருத்தம்?",
+  interview_question_3:
+    "ஒரு stakeholder அவசரமாக புதுப்பிப்பு கேட்டால், ஆனால் நீங்கள் இன்னும் மற்றொரு குழுவின் தகவலைக் காத்திருந்தால், அதை எப்படி கையாள்வீர்கள்?",
+
+  interview_answer_instruction:
+    "உங்கள் பதிலை ஒரு உண்மையான நேர்காணல் நடத்துனரிடம் பேசுவது போல எழுதுங்கள். பின்னர் இது Zack உருவாக்கும் AI மதிப்பீட்டு செயல்முறையுடன் இணைக்கப்படும்.",
+  interview_answer_label: "உங்கள் பதில்",
+  interview_submit_answer: "பதிலை சமர்ப்பிக்கவும்",
+  interview_voice_button: "குரல் பயிற்சி விரைவில்",
+
+  interview_feedback_badge: "AI கருத்து",
+  interview_feedback_title: "பதில் மதிப்பாய்வு",
+  interview_feedback_score: "மதிப்பெண்",
+  interview_feedback_strengths: "நீங்கள் செய்த நல்ல அம்சங்கள்",
+  interview_feedback_improve: "மேம்படுத்த வேண்டிய வழிகள்",
+  interview_feedback_strength_1:
+    "உங்கள் பதில் தெளிவாகவும் எளிதாகப் புரிந்துகொள்ளக்கூடியதாகவும் உள்ளது.",
+  interview_feedback_strength_2:
+    "நீங்கள் ஒழுங்குபடுத்தப்பட்ட சிந்தனையை வெளிப்படுத்தியுள்ளீர்கள்.",
+  interview_feedback_strength_3:
+    "உங்கள் பதில் இந்த வேலையுடன் தொடர்புடையது மற்றும் பொறுப்புணர்வைக் காட்டுகிறது.",
+  interview_feedback_improve_1:
+    "உங்கள் அனுபவத்திலிருந்து இன்னும் குறிப்பான ஒரு உண்மையான உதாரணத்தைச் சேர்க்கவும்.",
+  interview_feedback_improve_2:
+    "சாத்தியமானால் அளவிடக்கூடிய முடிவுகள் அல்லது சாதனைகளைச் சேர்க்கவும்.",
+  interview_feedback_improve_3:
+    "உங்கள் பதிலை அந்த வேலையுடன் இணைக்கும் வலுவான முடிவுடன் நிறைவு செய்யுங்கள்.",
+
+  interview_tip_title: "நேர்காணல் குறிப்பு",
+  interview_tip_description:
+    "ஒரு வலுவான நேர்காணல் பதில் பொதுவாக குறிப்பானது, ஒழுங்கானது, மற்றும் நீங்கள் விரும்பும் வேலையுடன் தெளிவாக இணைந்திருக்கும்.",
+
+  interview_back_recommendation: "பரிந்துரைக்குத் திரும்பு",
+  interview_next_question: "அடுத்த கேள்வி",
 };
 
 export default ta;

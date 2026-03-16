@@ -254,6 +254,53 @@ jobs_recommendation_reason:
 jobs_view_listing: "View Job Listing",
 jobs_back_to_list: "Back to Job Discovery",
 jobs_continue_interview: "Continue to Interview Prep",
+  interview_badge: "Interview Preparation",
+  interview_title: "Practice for your interview",
+  interview_description:
+    "Get role-specific interview questions based on your resume and recommended job, then improve your answers with AI feedback.",
+
+  interview_questions_title: "Interview Questions",
+  interview_questions_description:
+    "Choose a question below and practice your answer.",
+  interview_type_behavioral: "Behavioral",
+  interview_type_role: "Role-specific",
+  interview_type_situational: "Situational",
+
+  interview_question_1:
+    "Tell me about a time when you had to manage multiple priorities under a tight deadline.",
+  interview_question_2:
+    "Why are you a strong fit for this operations-focused role?",
+  interview_question_3:
+    "How would you handle a situation where a stakeholder urgently needs an update but you are still waiting for input from another team?",
+
+  interview_answer_instruction:
+    "Write your answer as if you are speaking to a real interviewer. Later, this can connect to Zack’s AI answer evaluation flow.",
+  interview_answer_label: "Your Answer",
+  interview_submit_answer: "Submit Answer",
+  interview_voice_button: "Voice Practice Coming Soon",
+
+  interview_feedback_badge: "AI Feedback",
+  interview_feedback_title: "Answer Review",
+  interview_feedback_score: "Score",
+  interview_feedback_strengths: "What you did well",
+  interview_feedback_improve: "How to improve",
+  interview_feedback_strength_1: "Your answer is clear and easy to follow.",
+  interview_feedback_strength_2: "You showed a structured way of thinking.",
+  interview_feedback_strength_3:
+    "Your response is relevant to the role and demonstrates responsibility.",
+  interview_feedback_improve_1:
+    "Include a more concrete real-life example from your past experience.",
+  interview_feedback_improve_2:
+    "Add measurable outcomes or results if possible.",
+  interview_feedback_improve_3:
+    "End with a stronger conclusion linking your answer back to the role.",
+
+  interview_tip_title: "Interview tip",
+  interview_tip_description:
+    "A strong interview answer is usually specific, structured, and clearly tied to the job you want.",
+
+  interview_back_recommendation: "Back to Recommendation",
+  interview_next_question: "Next Question",
 };
 
 export default en;
