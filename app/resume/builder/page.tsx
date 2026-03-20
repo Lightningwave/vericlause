@@ -1,351 +1,93 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { SiteNavbar } from "@/components/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 
-type ExperienceItem = {
-  id: number;
-  role: string;
-  company: string;
-  period: string;
-  description: string;
-};
-
-export default function ResumeBuilderPage() {
+export default function ResumePage() {
   const { t } = useLanguage();
 
-  const [summary, setSummary] = useState(
-    "Detail-oriented professional with experience in coordination, operations support, and stakeholder communication."
-  );
-
-  const [skills, setSkills] = useState(
-    "Communication, Microsoft Office, Project Coordination, Reporting"
-  );
-
-  const [education, setEducation] = useState(
-    "Diploma in Business Administration"
-  );
-
-  const [experiences, setExperiences] = useState<ExperienceItem[]>([
-    {
-      id: 1,
-      role: "Operations Executive",
-      company: "ABC Company",
-      period: "2022 - Present",
-      description:
-        "Managed documentation, coordinated internal teams, and supported reporting timelines.",
-    },
-    {
-      id: 2,
-      role: "Customer Support Associate",
-      company: "XYZ Services",
-      period: "2020 - 2022",
-      description:
-        "Handled client communication, tracked issues, and maintained support records.",
-    },
-  ]);
-
-  function updateExperience(
-    id: number,
-    field: keyof ExperienceItem,
-    value: string
-  ) {
-    setExperiences((prev) =>
-      prev.map((exp) => (exp.id === id ? { ...exp, [field]: value } : exp))
-    );
-  }
-
-  function addExperience() {
-    setExperiences((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        role: "",
-        company: "",
-        period: "",
-        description: "",
-      },
-    ]);
-  }
-
-  function removeExperience(id: number) {
-    setExperiences((prev) => prev.filter((exp) => exp.id !== id));
-  }
-
   return (
-    <div className="min-h-screen bg-white">
+    <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
-        links={[
-          { href: "/", label: "nav_home" },
-          { href: "/resume", label: "nav_resume" },
-          { href: "/resume/review", label: "resume_review_nav" },
-        ]}
         rightSlot={
           <Link
-            href="/auth/sign-in"
-            className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
+            href="/dashboard"
+            className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
-            {t("sign_in")}
+            {t("nav_dashboard")}
           </Link>
         }
       />
 
-      <main className="mx-auto max-w-7xl px-6 py-14 md:py-18">
-        <section className="mb-10">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gold-600">
-            {t("resume_builder_badge")}
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">
+        <div className="mb-8 max-w-3xl">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b88a44]">
+            {t("nav_resume")}
           </p>
-          <h1 className="font-serif text-4xl font-bold text-navy-950 md:text-5xl">
-            {t("resume_builder_title")}
+          <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-950 sm:text-5xl">
+            Resume Upload
           </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-relaxed text-slate-600">
-            {t("resume_builder_description")}
+          <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
+            Upload your resume to begin AI review, editing, and job matching.
           </p>
-        </section>
+        </div>
 
-        <section className="grid gap-8 lg:grid-cols-[1fr_340px]">
-          <div className="space-y-8">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-              <div className="mb-5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gold-600">
-                    {t("resume_builder_section")}
-                  </p>
-                  <h2 className="mt-2 font-serif text-2xl font-bold text-navy-950">
-                    {t("resume_builder_summary_title")}
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-                >
-                  {t("resume_builder_ai_rewrite")}
-                </button>
-              </div>
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-navy-950">Upload Resume</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Start by uploading your existing resume. You can also continue with voice resume input if needed.
+            </p>
 
-              <textarea
-                rows={5}
-                value={summary}
-                onChange={(e) => setSummary(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-navy-300"
+            <form
+              className="mt-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                window.location.href = "/resume/review";
+              }}
+            >
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100"
               />
-            </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-              <div className="mb-5 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-gold-600">
-                    {t("resume_builder_section")}
-                  </p>
-                  <h2 className="mt-2 font-serif text-2xl font-bold text-navy-950">
-                    {t("resume_builder_experience_title")}
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={addExperience}
-                  className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800"
-                >
-                  {t("resume_builder_add_experience")}
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                {experiences.map((exp) => (
-                  <div
-                    key={exp.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-5"
-                  >
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-navy-950">
-                          {t("resume_builder_role")}
-                        </label>
-                        <input
-                          type="text"
-                          value={exp.role}
-                          onChange={(e) =>
-                            updateExperience(exp.id, "role", e.target.value)
-                          }
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-300"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-2 block text-sm font-semibold text-navy-950">
-                          {t("resume_builder_company")}
-                        </label>
-                        <input
-                          type="text"
-                          value={exp.company}
-                          onChange={(e) =>
-                            updateExperience(exp.id, "company", e.target.value)
-                          }
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-300"
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="mb-2 block text-sm font-semibold text-navy-950">
-                          {t("resume_builder_period")}
-                        </label>
-                        <input
-                          type="text"
-                          value={exp.period}
-                          onChange={(e) =>
-                            updateExperience(exp.id, "period", e.target.value)
-                          }
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-300"
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="mb-2 block text-sm font-semibold text-navy-950">
-                          {t("resume_builder_description_label")}
-                        </label>
-                        <textarea
-                          rows={4}
-                          value={exp.description}
-                          onChange={(e) =>
-                            updateExperience(exp.id, "description", e.target.value)
-                          }
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-300"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-                      >
-                        {t("resume_builder_improve_bullets")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeExperience(exp.id)}
-                        className="rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-all hover:border-red-300"
-                      >
-                        {t("resume_builder_remove")}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-              <div className="mb-5">
-                <p className="text-xs font-semibold uppercase tracking-widest text-gold-600">
-                  {t("resume_builder_section")}
-                </p>
-                <h2 className="mt-2 font-serif text-2xl font-bold text-navy-950">
-                  {t("resume_builder_skills_title")}
-                </h2>
-              </div>
-
-              <textarea
-                rows={4}
-                value={skills}
-                onChange={(e) => setSkills(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-navy-300"
-              />
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-              <div className="mb-5">
-                <p className="text-xs font-semibold uppercase tracking-widest text-gold-600">
-                  {t("resume_builder_section")}
-                </p>
-                <h2 className="mt-2 font-serif text-2xl font-bold text-navy-950">
-                  {t("resume_builder_education_title")}
-                </h2>
-              </div>
-
-              <textarea
-                rows={4}
-                value={education}
-                onChange={(e) => setEducation(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none transition-all focus:border-navy-300"
-              />
-            </div>
-          </div>
+              <button
+                type="submit"
+                className="mt-4 w-full rounded-xl bg-navy-950 px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
+              >
+                Go to Resume Review
+              </button>
+            </form>
+          </section>
 
           <aside className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-serif text-xl font-bold text-navy-950">
-                {t("resume_builder_tools_title")}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                {t("resume_builder_tools_description")}
+              <h2 className="text-xl font-semibold text-navy-950">Alternative Option</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Users who are less comfortable typing can create their resume through guided voice input.
               </p>
 
-              <div className="mt-5 space-y-3">
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-                >
-                  {t("resume_builder_ai_rewrite")}
-                </button>
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-                >
-                  {t("resume_builder_generate_pdf")}
-                </button>
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-                >
-                  {t("resume_builder_generate_docx")}
-                </button>
-                <button
-                  type="button"
-                  className="w-full cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-400"
-                  disabled
-                >
-                  {t("resume_builder_voice_assist")}
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
-              <h3 className="font-serif text-lg font-bold text-emerald-800">
-                {t("resume_builder_tip_title")}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-emerald-700">
-                {t("resume_builder_tip_description")}
-              </p>
+              <Link
+                href="/resume/voice"
+                className="mt-4 inline-flex rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                {t("nav_voice_resume")}
+              </Link>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-serif text-lg font-bold text-navy-950">
-                {t("resume_builder_next_title")}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                {t("resume_builder_next_description")}
-              </p>
-
-              <div className="mt-5 flex flex-col gap-3">
-                <Link
-                  href="/resume/review"
-                  className="rounded-md border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-                >
-                  {t("resume_builder_back_review")}
-                </Link>
-                <button
-                  type="button"
-                  className="rounded-md bg-navy-950 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-navy-800"
-                >
-                  {t("resume_builder_continue_jobs")}
-                </button>
+              <h2 className="text-xl font-semibold text-navy-950">What happens next</h2>
+              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <p>• Resume Review: AI checks strengths and improvements.</p>
+                <p>• Resume Builder: edit and refine resume sections.</p>
+                <p>• Job Matching: compare your resume against suitable roles.</p>
               </div>
             </div>
           </aside>
-        </section>
-      </main>
-    </div>
+        </div>
+      </section>
+    </main>
   );
 }

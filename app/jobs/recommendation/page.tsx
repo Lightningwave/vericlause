@@ -4,192 +4,154 @@ import Link from "next/link";
 import { SiteNavbar } from "@/components/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 
-type RecommendedJob = {
+type Recommendation = {
   title: string;
   company: string;
-  location: string;
-  salary: string;
   matchScore: number;
-  listingUrl: string;
+  strengths: string[];
+  improvements: string[];
+  reasoning: string;
+  applyUrl: string;
+};
+
+const mockRecommendation: Recommendation = {
+  title: "Operations Executive",
+  company: "Inter Group",
+  matchScore: 88,
+  strengths: [
+    "Your coordination and documentation experience align well with this role.",
+    "Your communication background supports stakeholder and internal team follow-up.",
+    "Your profile shows transferable operational support capabilities.",
+  ],
+  improvements: [
+    "Add more measurable achievements to your resume.",
+    "Highlight specific tools or systems you have used.",
+    "Strengthen your professional summary around operations impact.",
+  ],
+  reasoning:
+    "This role appears to be the strongest fit based on your coordination, administration, and support experience. Your background aligns well with process support and day-to-day operational responsibilities.",
+  applyUrl: "https://example.com/job/operations-executive",
 };
 
 export default function JobRecommendationPage() {
   const { t } = useLanguage();
 
-  const recommendedJob: RecommendedJob = {
-    title: "Operations Executive",
-    company: "NovaEdge Consulting",
-    location: "Singapore",
-    salary: "SGD 3,800 - 4,500",
-    matchScore: 88,
-    listingUrl:
-      "https://www.mycareersfuture.gov.sg/job/operations-executive-example",
-  };
-
-  const strengths = [
-    "Strong coordination and documentation experience",
-    "Relevant operations and administrative skills",
-    "Communication and stakeholder management abilities",
-  ];
-
-  const improvements = [
-    "Add measurable achievements in your previous roles",
-    "Highlight project coordination experience more clearly",
-    "Include industry-specific tools used in operations roles",
-  ];
-
   return (
-    <div className="min-h-screen bg-white">
+    <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
-        links={[
-          { href: "/", label: "nav_home" },
-          { href: "/resume", label: "nav_resume" },
-          { href: "/jobs", label: "jobs_nav" },
-        ]}
         rightSlot={
           <Link
-            href="/auth/sign-in"
-            className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-navy-200 hover:text-navy-950"
+            href="/dashboard"
+            className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
-            {t("sign_in")}
+            {t("nav_dashboard")}
           </Link>
         }
       />
 
-      <main className="mx-auto max-w-7xl px-6 py-14 md:py-18">
-        <section className="mb-10">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gold-600">
-            {t("jobs_recommendation_badge")}
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">
+        <div className="mb-8 max-w-3xl">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b88a44]">
+            {t("nav_recommendation")}
           </p>
-
-          <h1 className="font-serif text-4xl font-bold text-navy-950 md:text-5xl">
-            {t("jobs_recommendation_title")}
+          <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-950 sm:text-5xl">
+            AI Job Recommendation
           </h1>
-
-          <p className="mt-4 max-w-3xl text-lg text-slate-600">
-            {t("jobs_recommendation_description")}
+          <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
+            Review the strongest role match, why it fits, and what to improve before applying.
           </p>
-        </section>
+        </div>
 
-        <section className="grid gap-8 lg:grid-cols-[380px_minmax(0,1fr)]">
-          <aside className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">
-                {t("jobs_recommendation_score")}
-              </p>
-
-              <h2 className="mt-2 font-serif text-4xl font-bold text-navy-950">
-                {recommendedJob.matchScore}
-                <span className="ml-1 text-xl text-slate-400">/100</span>
-              </h2>
-
-              <div className="mt-5 h-2 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full bg-gold-500"
-                  style={{ width: `${recommendedJob.matchScore}%` }}
-                />
-              </div>
-
-              <p className="mt-4 text-sm text-slate-600">
-                {t("jobs_recommendation_score_note")}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-serif text-xl font-bold text-navy-950">
-                {t("jobs_recommendation_strengths")}
-              </h3>
-
-              <ul className="mt-4 space-y-3">
-                {strengths.map((item, index) => (
-                  <li key={index} className="flex gap-3 text-sm text-slate-700">
-                    <span className="text-emerald-600">✓</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-serif text-xl font-bold text-navy-950">
-                {t("jobs_recommendation_improve")}
-              </h3>
-
-              <ul className="mt-4 space-y-3">
-                {improvements.map((item, index) => (
-                  <li key={index} className="flex gap-3 text-sm text-slate-700">
-                    <span className="text-red-600">!</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </aside>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="border-b border-slate-100 pb-6">
-              <p className="text-xs font-semibold uppercase tracking-widest text-gold-600">
-                {t("jobs_recommendation_best_match")}
-              </p>
-
-              <h2 className="mt-2 font-serif text-2xl font-bold text-navy-950">
-                {recommendedJob.title}
-              </h2>
-
-              <p className="mt-1 text-sm font-medium text-slate-700">
-                {recommendedJob.company}
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
-                <span className="border px-3 py-1 rounded-full bg-white border-slate-200">
-                  {recommendedJob.location}
-                </span>
-
-                <span className="border px-3 py-1 rounded-full bg-white border-slate-200">
-                  {recommendedJob.salary}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-6">
+        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h3 className="font-serif text-lg font-bold text-navy-950">
-                  {t("jobs_recommendation_why")}
-                </h3>
+                <p className="text-sm font-medium text-slate-500">{mockRecommendation.company}</p>
+                <h2 className="mt-1 text-3xl font-semibold text-navy-950">
+                  {mockRecommendation.title}
+                </h2>
+              </div>
 
-                <p className="mt-2 text-sm text-slate-600">
-                  {t("jobs_recommendation_reason")}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Match Score
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-navy-950">
+                  {mockRecommendation.matchScore}%
                 </p>
               </div>
             </div>
 
-            <div className="mt-10 flex flex-wrap gap-3 border-t border-slate-100 pt-6">
-              <a
-                href={recommendedJob.listingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md bg-navy-950 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800"
-              >
-                {t("jobs_view_listing")}
-              </a>
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Why this role matches
+              </p>
+              <p className="mt-3 text-sm leading-7 text-slate-700">
+                {mockRecommendation.reasoning}
+              </p>
+            </div>
 
-              <Link
-                href="/jobs"
-                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-navy-200 hover:text-navy-950"
-              >
-                {t("jobs_back_to_list")}
-              </Link>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                  Strengths
+                </p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-emerald-900">
+                  {mockRecommendation.strengths.map((item) => (
+                    <p key={item}>• {item}</p>
+                  ))}
+                </div>
+              </div>
 
-              <Link
-                href="/interview"
-                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-navy-200 hover:text-navy-950"
-              >
-                {t("jobs_continue_interview")}
-              </Link>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                  Improvements
+                </p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-amber-900">
+                  {mockRecommendation.improvements.map((item) => (
+                    <p key={item}>• {item}</p>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
-        </section>
-      </main>
-    </div>
+
+          <aside className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-navy-950">Apply or Continue</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                You can proceed to the job posting or continue preparing for interviews.
+              </p>
+
+              <div className="mt-5 flex flex-col gap-3">
+                <a
+                  href={mockRecommendation.applyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center rounded-xl bg-navy-950 px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                >
+                  Open Job Listing
+                </a>
+
+                <Link
+                  href="/interview"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Continue to Interview Prep
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-navy-950">Recommendation Notes</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                This page is ready for AI response integration later. When connected to backend,
+                the strengths, improvement points, and reasoning can be rendered directly from AI output.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
   );
 }
