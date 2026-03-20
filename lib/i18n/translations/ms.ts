@@ -305,28 +305,28 @@ jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
 
   interview_back_recommendation: "Kembali ke Cadangan",
   interview_next_question: "Soalan Seterusnya",
-  nav_home: "Laman Utama",
+  
 nav_dashboard: "Papan Pemuka",
-nav_contracts: "Kontrak",
+
 nav_contract_analysis: "Analisis Kontrak",
-nav_compare_contracts: "Bandingkan Kontrak",
+
 nav_career: "Kerjaya",
-nav_resume: "Resume",
+
 nav_review: "Semakan Resume",
 nav_builder: "Pembina Resume",
-jobs_nav: "Pekerjaan",
+
 nav_recommendation: "Cadangan AI",
-nav_interview: "Temuduga",
-nav_home: "Laman Utama",
-nav_resume: "Resume",
+
+
+
 nav_resume_review: "Semakan Resume",
 nav_resume_builder: "Pembina Resume",
 nav_job_matching: "Padanan Kerja",
 nav_contracts: "Kontrak",
-nav_contract_analysis: "Analisis Kontrak",
+
 nav_compare_contracts: "Bandingkan Kontrak",
 nav_interview: "Temuduga",
-nav_dashboard: "Papan Pemuka",
+
 nav_voice_resume: "Resume Suara",
 voice_resume_badge: "Pembina Resume Suara",
 voice_resume_title: "Bina resume anda dengan bercakap",

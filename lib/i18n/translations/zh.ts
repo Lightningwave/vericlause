@@ -287,26 +287,26 @@ jobs_continue_interview: "继续面试准备",
 
   interview_back_recommendation: "返回推荐页面",
   interview_next_question: "下一个问题",
-  nav_home: "首页",
-nav_dashboard: "仪表板",
+ 
+
 nav_contracts: "合同",
 nav_contract_analysis: "合同分析",
 nav_compare_contracts: "合同比较",
 nav_career: "职业发展",
-nav_resume: "简历",
+
 nav_review: "简历评估",
 nav_builder: "简历优化",
-jobs_nav: "职位",
+
 nav_recommendation: "AI 推荐",
-nav_interview: "面试",
-nav_home: "首页",
-nav_resume: "简历",
+
+
+
 nav_resume_review: "简历评估",
 nav_resume_builder: "简历优化",
 nav_job_matching: "职位匹配",
-nav_contracts: "合同",
-nav_contract_analysis: "合同分析",
-nav_compare_contracts: "合同比较",
+
+
+
 nav_interview: "面试",
 nav_dashboard: "仪表板",
 nav_voice_resume: "语音简历",

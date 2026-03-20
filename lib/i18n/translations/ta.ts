@@ -11,6 +11,7 @@ const ta = {
 
   nav_home: "முகப்பு",
   nav_resume: "ரெஸ்யூமே",
+
   nav_features: "அம்சங்கள்",
   nav_how_it_works: "இது எப்படி செயல்படுகிறது",
   nav_faq: "அடிக்கடி கேட்கப்படும் கேள்விகள்",
@@ -200,7 +201,7 @@ const ta = {
     "உங்கள் ரெஸ்யூமே தயாரானதும், வேலை பொருத்தம் மற்றும் பரிந்துரைக்குச் செல்லுங்கள்.",
   resume_builder_back_review: "மதிப்பாய்வுக்கு திரும்பு",
   resume_builder_continue_jobs: "வேலை பொருத்தத்துக்குத் தொடரவும்",
-    jobs_nav: "வேலைகள்",
+  
   jobs_badge: "வேலை தேடல்",
   jobs_title: "உங்கள் ரெஸ்யூமேக்கு பொருந்தும் வேலைகளை கண்டுபிடிக்கவும்",
   jobs_description:
@@ -304,28 +305,29 @@ jobs_continue_interview: "நேர்காணல் தயாரிப்ப�
 
   interview_back_recommendation: "பரிந்துரைக்குத் திரும்பு",
   interview_next_question: "அடுத்த கேள்வி",
-  nav_home: "முகப்பு",
+
 nav_dashboard: "டாஷ்போர்டு",
-nav_contracts: "ஒப்பந்தங்கள்",
+
 nav_contract_analysis: "ஒப்பந்த பகுப்பாய்வு",
-nav_compare_contracts: "ஒப்பந்தங்களை ஒப்பிடு",
+
 nav_career: "வேலைவாய்ப்பு",
-nav_resume: "ரெஸ்யூம்",
+
 nav_review: "ரெஸ்யூம் மதிப்பாய்வு",
 nav_builder: "ரெஸ்யூம் உருவாக்கி",
 jobs_nav: "வேலைகள்",
 nav_recommendation: "AI பரிந்துரை",
 nav_interview: "நேர்காணல்",
-nav_home: "முகப்பு",
-nav_resume: "ரெஸ்யூம்",
+
+
 nav_resume_review: "ரெஸ்யூம் மதிப்பாய்வு",
 nav_resume_builder: "ரெஸ்யூம் உருவாக்கி",
 nav_job_matching: "வேலை பொருத்தம்",
 nav_contracts: "ஒப்பந்தங்கள்",
-nav_contract_analysis: "ஒப்பந்த பகுப்பாய்வு",
+
 nav_compare_contracts: "ஒப்பந்தங்களை ஒப்பிடு",
-nav_interview: "நேர்காணல்",
-nav_dashboard: "டாஷ்போர்டு",
+
+
+
 nav_voice_resume: "குரல் ரெஸ்யூம்",
 voice_resume_badge: "குரல் ரெஸ்யூம் உருவாக்கி",
 voice_resume_title: "பேசி உங்கள் ரெஸ்யூமை உருவாக்குங்கள்",

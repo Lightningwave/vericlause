@@ -199,7 +199,7 @@ const en = {
     "Once your resume is ready, continue to job matching and recommendation.",
   resume_builder_back_review: "Back to Review",
   resume_builder_continue_jobs: "Continue to Job Matching",
-    jobs_nav: "Jobs",
+
   jobs_badge: "Job Discovery",
   jobs_title: "Find jobs that match your resume",
   jobs_description:
@@ -301,28 +301,28 @@ jobs_continue_interview: "Continue to Interview Prep",
 
   interview_back_recommendation: "Back to Recommendation",
   interview_next_question: "Next Question",
-  nav_home: "Home",
+  
 nav_dashboard: "Dashboard",
-nav_contracts: "Contracts",
+
 nav_contract_analysis: "Contract Analysis",
 nav_compare_contracts: "Compare Contracts",
 nav_career: "Career",
-nav_resume: "Resume",
+
 nav_review: "Resume Review",
 nav_builder: "Resume Builder",
 jobs_nav: "Jobs",
 nav_recommendation: "AI Recommendation",
-nav_interview: "Interview",
-nav_home: "Home",
-nav_resume: "Resume",
+
+
+
 nav_resume_review: "Resume Review",
 nav_resume_builder: "Resume Builder",
 nav_job_matching: "Job Matching",
 nav_contracts: "Contracts",
-nav_contract_analysis: "Contract Analysis",
-nav_compare_contracts: "Compare Contracts",
+
+
 nav_interview: "Interview",
-nav_dashboard: "Dashboard",
+
 nav_voice_resume: "Voice Resume",
 voice_resume_badge: "Voice Resume Builder",
 voice_resume_title: "Build your resume by speaking",
