@@ -1,0 +1,44 @@
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const key = process.env.AZURE_SPEECH_KEY;
+  const region = process.env.AZURE_SPEECH_REGION;
+
+  if (!key || !region) {
+    return NextResponse.json(
+      { error: "Missing AZURE_SPEECH_KEY or AZURE_SPEECH_REGION" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const res = await fetch(
+      `https://${region}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`,
+      {
+        method: "GET",
+        headers: {
+          "Ocp-Apim-Subscription-Key": key,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      return NextResponse.json(
+        { error: `Failed to get Azure avatar relay token: ${text}` },
+        { status: 500 }
+      );
+    }
+
+    const json = await res.json();
+    return NextResponse.json(json);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown relay token error",
+      },
+      { status: 500 }
+    );
+  }
+}
