@@ -17,6 +17,8 @@
     "@supabase/supabase-js": "^2.98.0",
     "dotenv": "^17.3.1",
     "groq-sdk": "^0.37.0",
+    "lucide-react": "^0.577.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.48.0",
     "next": "14.2.18",
     "openai": "^6.27.0",
     "pdf-parse": "^2.4.5",
