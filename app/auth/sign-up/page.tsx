@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AuthShell } from "@/components/AuthShell";
-import { AuthForm, type AuthFormValues } from "@/components/AuthForm";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { AuthForm, type AuthFormValues } from "@/components/auth/AuthForm";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
