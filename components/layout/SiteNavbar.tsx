@@ -103,6 +103,13 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
 
   function isPathActive(href: string) {
     if (href === "/") return pathname === "/";
+    /** Analysis vs compare are sibling routes under `/contract/*` — do not let `/contract` match `/contract/compare`. */
+    if (href === "/contract") {
+      return pathname === "/contract" || pathname === "/contract/";
+    }
+    if (href === "/contract/compare") {
+      return pathname === "/contract/compare" || pathname.startsWith("/contract/compare/");
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
