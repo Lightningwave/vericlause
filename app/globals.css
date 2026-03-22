@@ -2,8 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-.pdf-zoom-80 .react-pdf__Page {
-  transform: scale(0.8);
-  transform-origin: top left;
-  width: 125% !important;
+/* Contract viewer: render the whole PDF widget at 80% (toolbar + pages) */
+.pdf-zoom-80 {
+  zoom: 0.8;
 }
