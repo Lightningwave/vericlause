@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SiteNavbar } from "@/components/SiteNavbar";
+import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 
 type SupportedLocale = "en" | "zh" | "ms" | "ta";
@@ -354,7 +354,7 @@ export default function VoiceResumePage() {
       <SiteNavbar
         rightSlot={
           <Link
-            href="/dashboard"
+            href="/resume"
             className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
             {t("nav_dashboard")}
