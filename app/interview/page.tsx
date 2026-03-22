@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
+import { createClient } from "@/lib/supabase/client";
 import AzureAvatarStage from "@/components/interview/AzureAvatarStage";
 
 type InterviewRole =
@@ -136,6 +137,7 @@ function buildMockCoaching(locale: string, messages: ConversationMessage[]) {
 }
 
 export default function InterviewPage() {
+  const router = useRouter();
   const { t, locale } = useLanguage();
   const safeLocale =
     locale === "en" || locale === "zh" || locale === "ms" || locale === "ta"
@@ -204,12 +206,18 @@ export default function InterviewPage() {
     <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
         rightSlot={
-          <Link
-            href="/resume"
-            className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          <button
+            type="button"
+            onClick={async () => {
+              const supabase = createClient();
+              await supabase.auth.signOut();
+              router.push("/");
+              router.refresh();
+            }}
+            className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
           >
-            {t("nav_dashboard")}
-          </Link>
+            {t("dash_sign_out")}
+          </button>
         }
       />
 

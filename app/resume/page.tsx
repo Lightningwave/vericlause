@@ -174,12 +174,18 @@ export default function ResumeOnboardingPage() {
     <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
         rightSlot={
-          <Link
-            href="/contract"
-            className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          <button
+            type="button"
+            onClick={async () => {
+              const supabase = createClient();
+              await supabase.auth.signOut();
+              router.push("/");
+              router.refresh();
+            }}
+            className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
           >
-            {t("nav_dashboard")}
-          </Link>
+            {t("dash_sign_out")}
+          </button>
         }
       />
 

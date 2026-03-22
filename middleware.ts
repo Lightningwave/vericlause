@@ -7,12 +7,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/contract",
-    "/contract/:path*",
-    "/dashboard",
-    "/dashboard/:path*",
-    "/compare",
-    "/compare/:path*",
-    "/auth/:path*",
+    /*
+     * Run session refresh + auth checks on all app paths except Next internals and static assets.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
