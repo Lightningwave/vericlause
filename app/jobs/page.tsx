@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { SiteNavbar } from "@/components/SiteNavbar";
+import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 
 type JobItem = {
@@ -51,7 +51,7 @@ export default function JobsPage() {
       <SiteNavbar
         rightSlot={
           <Link
-            href="/dashboard"
+            href="/contract"
             className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
             {t("nav_dashboard")}
@@ -65,10 +65,10 @@ export default function JobsPage() {
             {t("jobs_nav")}
           </p>
           <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-950 sm:text-5xl">
-            Job Matching
+            {t("jobs_page_hero_title")}
           </h1>
           <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
-            Browse suggested roles and continue to AI-powered matching and recommendation.
+            {t("jobs_page_hero_lead")}
           </p>
         </div>
 
@@ -76,10 +76,8 @@ export default function JobsPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-navy-950">Available Roles</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Review openings and proceed to recommendation.
-                </p>
+                <h2 className="text-xl font-semibold text-navy-950">{t("jobs_available_roles_title")}</h2>
+                <p className="mt-1 text-sm text-slate-600">{t("jobs_available_roles_hint")}</p>
               </div>
 
               <Link
@@ -122,15 +120,13 @@ export default function JobsPage() {
 
           <aside className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-navy-950">Import Job URL</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Paste a job listing link here when your backend import flow is ready.
-              </p>
+              <h2 className="text-xl font-semibold text-navy-950">{t("jobs_import_url_card_title")}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{t("jobs_import_url_card_hint")}</p>
 
               <div className="mt-4">
                 <input
                   type="text"
-                  placeholder="https://..."
+                  placeholder={t("jobs_import_url_placeholder")}
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
                 />
               </div>
@@ -139,21 +135,19 @@ export default function JobsPage() {
                 type="button"
                 className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
-                Import Listing
+                {t("jobs_import_listing_short")}
               </button>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-navy-950">Next Step</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Continue to AI recommendation to see best-fit roles, strengths, and improvement areas.
-              </p>
+              <h2 className="text-xl font-semibold text-navy-950">{t("jobs_next_card_title")}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{t("jobs_next_card_body")}</p>
 
               <Link
                 href="/jobs/recommendation"
                 className="mt-4 inline-flex rounded-xl bg-[#b88a44] px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
               >
-                Go to AI Recommendation
+                {t("jobs_go_ai_recommendation")}
               </Link>
             </div>
           </aside>

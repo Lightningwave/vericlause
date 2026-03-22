@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, useMemo, useState } from "react";
-import { SiteNavbar } from "@/components/SiteNavbar";
+import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 
 type ExperienceItem = {
@@ -197,7 +197,7 @@ export default function ResumeBuilderPage() {
       <SiteNavbar
         rightSlot={
           <Link
-            href="/dashboard"
+            href="/contract"
             className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
             {t("nav_dashboard")}
@@ -211,39 +211,38 @@ export default function ResumeBuilderPage() {
             {t("nav_resume_builder")}
           </p>
           <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-950 sm:text-5xl">
-            Resume Builder
+            {t("resume_builder_page_title")}
           </h1>
           <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
-            Build a more personalized resume with profile photo, multiple job experiences, education history,
-            graphical skills, and optional custom sections.
+            {t("resume_builder_page_lead")}
           </p>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <section className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-8">
+          <section className="min-w-0 space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <h2 className="text-xl font-semibold text-navy-950">Basic Information</h2>
+              <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_section_basic")}</h2>
 
               <div className="mt-5 grid gap-6 md:grid-cols-[160px_1fr]">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Display Picture
+                    {t("resume_builder_label_display_picture")}
                   </label>
                   <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-4">
                     {photoPreview ? (
                       <img
                         src={photoPreview}
-                        alt="Resume profile"
+                        alt={t("resume_builder_photo_alt")}
                         className="h-28 w-28 rounded-full object-cover"
                       />
                     ) : (
                       <div className="flex h-28 w-28 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400">
-                        No photo
+                        {t("resume_builder_no_photo")}
                       </div>
                     )}
 
                     <label className="mt-4 inline-flex cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-                      Upload
+                      {t("resume_builder_upload")}
                       <input
                         type="file"
                         accept="image/*"
@@ -256,7 +255,9 @@ export default function ResumeBuilderPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">Full Name</label>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      {t("resume_builder_label_full_name")}
+                    </label>
                     <input
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
@@ -265,7 +266,9 @@ export default function ResumeBuilderPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">Target Role</label>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      {t("resume_builder_label_target_role")}
+                    </label>
                     <input
                       value={targetRole}
                       onChange={(e) => setTargetRole(e.target.value)}
@@ -274,7 +277,9 @@ export default function ResumeBuilderPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">Email</label>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      {t("resume_builder_label_email")}
+                    </label>
                     <input
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -283,7 +288,9 @@ export default function ResumeBuilderPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">Phone</label>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      {t("resume_builder_label_phone")}
+                    </label>
                     <input
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -304,7 +311,7 @@ export default function ResumeBuilderPage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <h2 className="text-xl font-semibold text-navy-950">Professional Summary</h2>
+              <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_summary_title")}</h2>
               <textarea
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
@@ -314,13 +321,13 @@ export default function ResumeBuilderPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-xl font-semibold text-navy-950">Job Experience</h2>
+                <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_section_job_experience")}</h2>
                 <button
                   type="button"
                   onClick={addExperience}
                   className="rounded-lg bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
                 >
-                  Add Experience
+                  {t("resume_builder_add_experience")}
                 </button>
               </div>
 
@@ -328,21 +335,23 @@ export default function ResumeBuilderPage() {
                 {experiences.map((item, index) => (
                   <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">Experience {index + 1}</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {t("resume_builder_experience_item")} {index + 1}
+                      </p>
                       {experiences.length > 1 ? (
                         <button
                           type="button"
                           onClick={() => removeExperience(item.id)}
                           className="text-sm font-medium text-red-600"
                         >
-                          Remove
+                          {t("resume_builder_remove")}
                         </button>
                       ) : null}
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <input
-                        placeholder="Job Title"
+                        placeholder={t("resume_builder_ph_job_title")}
                         value={item.jobTitle}
                         onChange={(e) => updateExperience(item.id, "jobTitle", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -354,7 +363,7 @@ export default function ResumeBuilderPage() {
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <input
-                        placeholder="Location"
+                        placeholder={t("resume_builder_ph_location")}
                         value={item.location}
                         onChange={(e) => updateExperience(item.id, "location", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -374,7 +383,7 @@ export default function ResumeBuilderPage() {
                         />
                       </div>
                       <textarea
-                        placeholder="Describe responsibilities, achievements, and outcomes"
+                        placeholder={t("resume_builder_ph_experience_body")}
                         value={item.description}
                         onChange={(e) => updateExperience(item.id, "description", e.target.value)}
                         className="min-h-[140px] rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950 md:col-span-2"
@@ -387,13 +396,13 @@ export default function ResumeBuilderPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-xl font-semibold text-navy-950">Skills</h2>
+                <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_skills_title")}</h2>
                 <button
                   type="button"
                   onClick={addSkill}
                   className="rounded-lg bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
                 >
-                  Add Skill
+                  {t("resume_builder_add_skill")}
                 </button>
               </div>
 
@@ -401,20 +410,22 @@ export default function ResumeBuilderPage() {
                 {skills.map((skill, index) => (
                   <div key={skill.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">Skill {index + 1}</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {t("resume_builder_skill_item")} {index + 1}
+                      </p>
                       {skills.length > 1 ? (
                         <button
                           type="button"
                           onClick={() => removeSkill(skill.id)}
                           className="text-sm font-medium text-red-600"
                         >
-                          Remove
+                          {t("resume_builder_remove")}
                         </button>
                       ) : null}
                     </div>
 
                     <input
-                      placeholder="Skill name"
+                      placeholder={t("resume_builder_ph_skill_name")}
                       value={skill.name}
                       onChange={(e) => updateSkill(skill.id, "name", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -422,7 +433,7 @@ export default function ResumeBuilderPage() {
 
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between text-sm text-slate-600">
-                        <span>Proficiency</span>
+                        <span>{t("resume_builder_proficiency")}</span>
                         <span>{skill.level}%</span>
                       </div>
                       <input
@@ -455,14 +466,16 @@ export default function ResumeBuilderPage() {
                 {educations.map((item, index) => (
                   <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">Education {index + 1}</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {t("resume_builder_education_item")} {index + 1}
+                      </p>
                       {educations.length > 1 ? (
                         <button
                           type="button"
                           onClick={() => removeEducation(item.id)}
                           className="text-sm font-medium text-red-600"
                         >
-                          Remove
+                          {t("resume_builder_remove")}
                         </button>
                       ) : null}
                     </div>
@@ -475,13 +488,13 @@ export default function ResumeBuilderPage() {
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <input
-                        placeholder="Qualification"
+                        placeholder={t("resume_builder_ph_qualification")}
                         value={item.qualification}
                         onChange={(e) => updateEducation(item.id, "qualification", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <input
-                        placeholder="Field of Study"
+                        placeholder={t("resume_builder_ph_field_of_study")}
                         value={item.fieldOfStudy}
                         onChange={(e) => updateEducation(item.id, "fieldOfStudy", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -508,13 +521,13 @@ export default function ResumeBuilderPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-xl font-semibold text-navy-950">Optional Additional Sections</h2>
+                <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_optional_sections_title")}</h2>
                 <button
                   type="button"
                   onClick={addExtraSection}
                   className="rounded-lg bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
                 >
-                  Add Section
+                  {t("resume_builder_add_section")}
                 </button>
               </div>
 
@@ -533,7 +546,7 @@ export default function ResumeBuilderPage() {
                     </div>
 
                     <input
-                      placeholder="Section title"
+                      placeholder={t("resume_builder_ph_section_title")}
                       value={section.title}
                       onChange={(e) => updateExtraSection(section.id, "title", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -551,12 +564,10 @@ export default function ResumeBuilderPage() {
             </div>
           </section>
 
-          <aside className="space-y-6">
+          <aside className="min-w-0 space-y-6 lg:sticky lg:top-24 lg:self-start">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-navy-950">Resume Preview</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Preview a more customized resume layout as you edit.
-              </p>
+              <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_preview_heading")}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{t("resume_builder_preview_hint")}</p>
 
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-6">
                 <div className="flex items-start gap-4">
@@ -584,21 +595,22 @@ export default function ResumeBuilderPage() {
                 <div className="mt-6 space-y-6">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Summary
+                      {t("resume_builder_preview_summary")}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-slate-700">{summary}</p>
                   </div>
 
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Experience
+                      {t("resume_builder_preview_experience")}
                     </p>
                     <div className="mt-3 space-y-4">
                       {experiences.map((item) =>
                         item.jobTitle || item.company ? (
                           <div key={item.id}>
                             <p className="text-sm font-semibold text-slate-800">
-                              {item.jobTitle || "Job Title"} {item.company ? `• ${item.company}` : ""}
+                              {item.jobTitle || t("resume_builder_ph_job_title")}
+                              {item.company ? ` • ${item.company}` : ""}
                             </p>
                             <p className="text-xs text-slate-500">
                               {[item.location, item.startDate, item.endDate].filter(Boolean).join(" • ")}
@@ -614,7 +626,7 @@ export default function ResumeBuilderPage() {
 
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Skills
+                      {t("resume_builder_skills_title")}
                     </p>
                     <div className="mt-3 space-y-3">
                       {filledSkills.map((skill) => (
@@ -636,15 +648,17 @@ export default function ResumeBuilderPage() {
 
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Education
+                      {t("resume_builder_preview_education")}
                     </p>
                     <div className="mt-3 space-y-4">
                       {educations.map((item) =>
                         item.school || item.qualification ? (
                           <div key={item.id}>
                             <p className="text-sm font-semibold text-slate-800">
-                              {item.qualification || "Qualification"}
-                              {item.fieldOfStudy ? ` in ${item.fieldOfStudy}` : ""}
+                              {item.qualification || t("resume_builder_ph_qualification")}
+                              {item.fieldOfStudy
+                                ? `${t("resume_builder_preview_in_field")}${item.fieldOfStudy}`
+                                : ""}
                             </p>
                             <p className="text-sm text-slate-700">{item.school}</p>
                             <p className="text-xs text-slate-500">
@@ -661,7 +675,7 @@ export default function ResumeBuilderPage() {
                     .map((section) => (
                       <div key={section.id}>
                         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          {section.title || "Optional Section"}
+                          {section.title || t("resume_builder_optional_section_item")}
                         </p>
                         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                           {section.content}
@@ -673,10 +687,8 @@ export default function ResumeBuilderPage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-navy-950">Next Step</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Continue to job matching after refining your resume.
-              </p>
+              <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_next_title")}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{t("resume_builder_next_description")}</p>
 
               <Link
                 href="/jobs"

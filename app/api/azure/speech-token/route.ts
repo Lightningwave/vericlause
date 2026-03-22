@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/lib/services/db";
+import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 
 export async function GET() {
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!allowRateLimit(user.id, "azure")) {
+    return rateLimitedResponse(60);
+  }
+
   const key = process.env.AZURE_SPEECH_KEY;
   const region = process.env.AZURE_SPEECH_REGION;
 

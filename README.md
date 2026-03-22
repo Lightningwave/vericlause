@@ -2,6 +2,18 @@
 
 Compliance verification for Singapore employment contracts. Grounds every answer in the Singapore Employment Act, Workplace Fairness Act, and Tripartite Guidelines via agentic RAG — minimizing AI hallucination by citing only retrieved legal provisions.
 
+## Contents
+
+1. [Features](#features)  
+2. [Stack](#stack)  
+3. [Database](#database)  
+4. [AI workflow](#ai-workflow)  
+5. [Quick start](#quick-start)  
+6. [Deploy to Vercel](#deploy-to-vercel)  
+7. [Project layout](#project-layout)  
+
+---
+
 ## Features
 
 - **Compliance Analysis** — Upload a contract PDF, extract every clause, and verify each against Singapore employment law using agentic RAG with cited legal provisions
@@ -9,6 +21,9 @@ Compliance verification for Singapore employment contracts. Grounds every answer
 - **Contract Comparison** — Upload two contracts side-by-side, compare key terms and clauses with a better/worse/equal assessment from the employee's perspective
 - **Market Benchmark** — Score contract terms (salary, leave, notice, probation) against typical Singapore market ranges for the role
 - **PDF Viewer with Highlighting** — Split-view with clause-to-PDF location mapping so users can see exactly where each clause appears
+- **Resume Onboarding & Profiling** — Upload PDF/DOCX resumes (integrated PII redaction) to generate structured professional profiles and AI-powered improvement suggestions
+- **AI Interview Agent** — Real-time, voice-first interview preparation powered by Azure AI Avatar and Speech services
+- **Job Discovery & Recommendations** — Personalized job matching based on your professional profile and market data
 
 ## Stack
 
@@ -20,13 +35,113 @@ Compliance verification for Singapore employment contracts. Grounds every answer
 - **PDF Parsing (user contracts)**: LlamaCloud / LlamaParse — agentic tier with OCR
 - **PDF Parsing (law database)**: Docling (local Python) — saves API tokens
 - **Auth**: Supabase Auth
-- **Database**: Supabase PostgreSQL — documents, reports, extracted data
-- **File Storage**: Supabase Storage (S3-compatible) — uploaded PDFs
+- **Database**: Supabase PostgreSQL — documents, reports, resumes, profiling jobs, extracted data
+- **File Storage**: Supabase Storage — `contracts` (PDFs), `resumes` (PDF/DOCX originals)
 - **Security**: PII redaction (NRIC, names, emails, phone), mandatory disclaimer
+
+## Database
+
+All application data lives in **Supabase PostgreSQL** with **Row Level Security (RLS)** enabled. API routes use the Supabase server client with the user’s session; policies ensure each user only reads/writes their own rows.
+
+### PostgreSQL tables
+
+| Table | Purpose |
+|--------|---------|
+| **`documents`** | Uploaded employment contracts: `raw_text`, `extracted` (JSON — `ExtractedContract`), optional `file_path` to Storage |
+| **`reports`** | Compliance results: `verdicts` (JSON array), `compliance_score`, linked to `document_id` |
+| **`analysis_jobs`** | Async contract analysis: `status` (`queued` / `running` / `succeeded` / `failed`), `error`, optional `report_id` — used when analyze exceeds the wait window |
+| **`resumes`** | Resume uploads: `raw_text`, `parsed_profile`, `ai_suggestions`, `image_urls` (JSON), optional `file_path` |
+| **`profiling_jobs`** | Async resume profiling: `status`, `error`, linked to `resume_id` |
+
+Foreign keys tie rows to **`auth.users`**. Indexes exist on `user_id` and key foreign keys (see `supabase/migration.sql`).
+
+### Row Level Security
+
+- Policies use **`auth.uid() = user_id`** (or ownership through joined tables) for `SELECT` / `INSERT` / `UPDATE` / `DELETE` as defined per table.  
+- The app never bypasses RLS for user data in normal operation.
+
+### Storage buckets
+
+| Bucket | Content | Access |
+|--------|---------|--------|
+| **`contracts`** | Original contract PDFs | Private; object path is scoped so the first folder segment is the user id |
+| **`resumes`** | Original resume PDF/DOCX | Same pattern |
+
+### Vector data (not in Postgres)
+
+**Pinecone** holds embedded chunks of Singapore law/guidelines for RAG (`PINECONE_INDEX`, 1536-d embeddings). Ingest via `scripts/ingest-laws.ts` after preparing `data/laws-parsed/`.
+
+### Applying migrations
+
+Run **`supabase/migration.sql`** in the Supabase SQL Editor on a new project. If your project predates resume tables, also apply **`supabase/migration_resume_onboarding.sql`** when present, or merge the resume section from the main migration file.
 
 ## AI Workflow
 
-### Stage 1: Upload (`POST /api/upload`)
+### Long-running jobs — contracts and resumes use the **same** pattern
+
+**Contract analysis** (`POST /api/contracts/analyze`) and **resume profiling** (`POST /api/resumes` / `POST /api/resumes/profile`, via `lib/services/resumeProfiling.ts`) both:
+
+1. Create a **job row** in the database.
+2. Run the LLM work in the background.
+3. **`Promise.race`** that work against a **wait window** (default **25 seconds**).
+4. **Fast path:** respond with `status: "succeeded"` and the full result in one JSON body.
+5. **Slow path:** respond with `status: "running"` and `job_id` — the client **polls** until done:
+   - Contracts: `GET /api/contracts/analyze/[job_id]`
+   - Resumes: `GET /api/resumes/profile/[job_id]`
+
+**Environment variables:** `ANALYZE_TIMEOUT_MS` controls the contract analyze wait. Profiling uses **`RESUME_PROFILE_WAIT_MS`** if set, otherwise the same **`ANALYZE_TIMEOUT_MS`**, otherwise `25000`. Keeping these aligned is intentional so both features behave consistently.
+
+### Resume onboarding (`POST /api/resumes` starts profiling)
+
+```
+PDF / DOCX file
+  │
+  ▼
+LlamaCloud Parse (agentic tier, OCR)
+  │  → markdown text
+  │  → screenshot URLs (for gpt-4o vision in profiling)
+  │
+  ▼
+PII redaction on stored text (NRIC, names, emails, phone)
+  │
+  ▼
+Supabase (resumes row + optional upload to `resumes` bucket)
+  │
+  ▼
+Same request: profiling job (shared logic with POST /api/resumes/profile) — OpenAI gpt-4o structured profile + ai_suggestions
+  │  → fast path: succeeds in RESUME_PROFILE_WAIT_MS / ANALYZE_TIMEOUT_MS
+  │  → slow path: { status: "running", job_id } → poll GET /api/resumes/profile/[job_id]
+  │  → optional: POST /api/resumes/profile to re-profile an existing resume
+  │
+  ▼
+Supabase (update parsed_profile, ai_suggestions)
+```
+
+
+**Resume status (for nav / job gates):** `GET /api/resumes/status` returns `{ has_resume, has_profile, resume_id }` (lightweight; uses `resumes.user_id`). On the client, use `getResumeStatus()` from `lib/api.ts` or `useResumeStatus()` from `components/providers/resume-status-provider.tsx` (provider is wired in `app/layout.tsx`). Call `refetch()` after upload/profiling so UI stays in sync.
+
+**Profiling job polling (`GET /api/resumes/profile/[job_id]`):** Returns `{ job, resume }`. When the job is **succeeded** or **failed**, the latest **resume** row is attached when available so the client can refresh profile data after slow paths or errors.
+
+### AI Interview Agent (`app/interview`)
+
+The interview agent provides a real-time conversational experience for job preparation.
+
+1. **Speech Token (`GET /api/azure/speech-token`):** Fetches a temporary authentication token for Azure Cognitive Services (Speech-to-Text and Text-to-Speech).
+2. **Avatar Relay (`POST /api/azure/avatar-relay`):** Routes interaction data to the Azure AI Avatar service for low-latency visual feedback.
+3. **Voice Interaction:** Uses the `microsoft-cognitiveservices-speech-sdk` for high-fidelity audio transcription and synthesis.
+4. **Contextual Intelligence:** The interviewer agent uses the user's analyzed resume profile to ask relevant, role-specific questions.
+
+### Job Discovery & Matching (`app/jobs`)
+
+Personalized job recommendations are generated by matching the user's extracted profile against market data.
+
+1. **Matching Engine:** Compares skills, experience, and seniority from the resume profile against job requirements.
+2. **Scoring:** Provides a match score (0-100%) with detailed reasoning, strengths, and areas for improvement.
+3. **Actionable Steps:** Direct links to original job listings and integrated "Prepare for Interview" paths.
+
+### Stage 1: Upload (`POST /api/contracts/upload`)
+
+Legacy `POST /api/upload` is rewritten to this route (see `next.config.mjs`).
 
 ```
 PDF file
@@ -53,7 +168,9 @@ Clause Location Mapping
 Supabase (save document + upload PDF to storage)
 ```
 
-### Stage 2: Analyze (`POST /api/analyze`)
+### Stage 2: Analyze (`POST /api/contracts/analyze`)
+
+Poll `GET /api/contracts/analyze/[job_id]` when the POST returns `status: "running"`. Legacy `/api/analyze` URLs are rewritten.
 
 ```
 For each clause (4 concurrent):
@@ -84,10 +201,10 @@ Key design decisions:
 - **Forced verdict**: on the final iteration, `tool_choice` forces `submit_verdict` so the agent always produces a result
 - **Text fallback**: if the agent responds with plain text instead of a tool call, the system attempts to parse a verdict from the text
 
-### Stage 3: Translate (`POST /api/translate`)
+### Stage 3: Translate (`POST /api/contracts/translate`)
 
 ```
-Verdicts array + language code (zh | ta)
+Verdicts array + language code (`zh` | `ta` | `ms`)
   │
   ▼
 OpenAI gpt-4o-mini — Legal Translation
@@ -119,7 +236,7 @@ Assessment from employee's perspective:
   a_better | b_better | equal | different
 ```
 
-### Stage 5: Benchmark (`POST /api/benchmark`)
+### Stage 5: Benchmark (`POST /api/contracts/benchmark`)
 
 ```
 Job title + extracted key terms (salary, leave, notice, probation)
@@ -133,6 +250,19 @@ OpenAI gpt-4o-mini — Market Analysis
   ▼
 Framed as indicative estimates (disclaimer included)
 ```
+
+**Contract API namespace:** list / detail / PDF use `GET /api/contracts`, `GET /api/contracts/[id]`, `GET /api/contracts/[id]/pdf`. Legacy `/api/documents/...` paths are rewritten in `next.config.mjs`. **`lib/api.ts`** calls these contract routes for the dashboard client.
+
+**Resume & Profiling API namespace:**
+- `POST /api/resumes`: Upload PDF/DOCX (redacts PII) -> starts profiling job
+- `GET /api/resumes`: List all resumes for user
+- `GET /api/resumes/status`: Check completion (has_resume, has_profile)
+- `POST /api/resumes/profile`: Manually trigger/re-run profiling
+- `GET /api/resumes/profile/[job_id]`: Poll status (returns status + profile when done)
+
+**Azure AI API namespace:**
+- `GET /api/azure/speech-token`: Azure Speech SDK token
+- `POST /api/azure/avatar-relay`: Azure AI Avatar session relay
 
 ## Quick Start
 
@@ -159,10 +289,13 @@ Fill in your API keys:
 | `PINECONE_INDEX` | — | Index name (default: `vericlause-laws`, 1536 dims) |
 | `NEXT_PUBLIC_SUPABASE_URL` | [Supabase](https://supabase.com/) | Auth + database |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase dashboard | Auth + database |
+| `AZURE_SPEECH_KEY` | [Azure Portal](https://portal.azure.com/) | Azure Speech-to-Text / TTS |
+| `AZURE_SPEECH_REGION` | — | e.g. `southeastasia` |
+| `AZURE_AVATAR_ENDPOINT` | — | Endpoint for Azure AI Avatar |
 
 ### 3. Set up Supabase
 
-Run the migration in `supabase/migration.sql` against your Supabase project to create the required tables (`documents`, `reports`) and enable Row Level Security.
+Run **`supabase/migration.sql`** to create tables, RLS policies, and storage buckets (see [Database](#database)). Add resume-related objects if you use an older project without them.
 
 ### 4. Ingest law database (once)
 
@@ -211,44 +344,32 @@ Push to GitHub and import in Vercel. Set all env vars from the table above in th
 vericlause/
 ├── app/
 │   ├── api/
-│   │   ├── upload/route.ts          ← PDF upload + extraction
-│   │   ├── analyze/route.ts         ← agentic RAG compliance check
-│   │   ├── translate/route.ts       ← verdict translation (Chinese/Tamil)
-│   │   ├── compare/route.ts         ← two-contract comparison
-│   │   ├── benchmark/route.ts       ← market benchmark scoring
-│   │   ├── document/[id]/route.ts   ← document status
-│   │   └── purge/[id]/route.ts      ← data cleanup
-│   ├── dashboard/page.tsx           ← main dashboard (PDF viewer + clause panel + benchmark)
-│   ├── compare/page.tsx             ← dual-upload contract comparison
-│   ├── page.tsx                     ← landing page
-│   ├── layout.tsx, globals.css
+│   │   ├── contracts/               ← upload, analyze, translate, compare, benchmark, [id], pdf, …
+│   │   ├── resumes/                 ← POST/GET resumes, profile, profile/[job_id], [id], status
+│   │   └── azure/                   ← speech-token, avatar-relay
+│   ├── auth/                        ← sign-in, sign-up
+│   ├── contract/                    ← analysis + compare pages (/contract, /contract/compare)
+│   ├── resume/                      ← review, builder, voice
+│   ├── jobs/                        ← discovery, recommendation
+│   ├── interview/
+│   ├── page.tsx                     ← landing
+│   ├── layout.tsx
+│   └── globals.css
 ├── components/
-│   ├── ContractViewer.tsx           ← PDF viewer with text highlighting
-│   ├── ClausePanel.tsx              ← clause list + verdict badges (with translation)
-│   ├── VerdictBadge.tsx             ← individual verdict card (with translation)
-│   ├── BenchmarkPanel.tsx           ← market benchmark results
-│   ├── ComparisonTable.tsx          ← key terms comparison table
-│   ├── ClauseDiff.tsx               ← clause-by-clause comparison cards
-│   ├── SiteNavbar.tsx               ← navigation bar
-│   ├── AuthShell.tsx                ← auth-gated layout wrapper
-│   ├── DisclaimerModal.tsx          ← legal disclaimer
-│   └── ...
+│   ├── layout/                      ← SiteNavbar, language-switcher
+│   ├── auth/                        ← AuthShell, AuthForm
+│   ├── contract/                    ← analysis page, viewer, panels, compare, disclaimer, …
+│   ├── interview/
+│   └── providers/                   ← language, resume-status
 ├── lib/
-│   ├── api.ts                       ← client-side API helpers
-│   ├── types.ts                     ← shared TypeScript interfaces
-│   └── services/
-│       ├── pdf.ts                   ← LlamaCloud PDF parsing
-│       ├── extraction.ts            ← LLM entity/clause extraction
-│       ├── redact.ts                ← PII masking (NRIC, names, emails, phone)
-│       ├── rag.ts                   ← agentic RAG (OpenAI primary, Groq fallback)
-│       └── db.ts                    ← Supabase database + storage operations
-├── scripts/
-│   ├── docling_parse_laws.py        ← parse law PDFs locally with Docling
-│   └── ingest-laws.ts              ← embed + upsert law chunks to Pinecone
-├── data/
-│   ├── laws/                        ← source law PDFs
-│   └── laws-parsed/                 ← Docling markdown output
-├── supabase/
-│   └── migration.sql                ← database schema + RLS policies
-└── public/                          ← logo, favicon
+│   ├── api.ts                       ← browser client (401 → ApiUnauthorizedError)
+│   ├── types.ts
+│   ├── i18n/
+│   └── services/                    ← pdf, resume, resumeProfiling, extraction, redact, rag, db, …
+├── scripts/                       ← docling_parse_laws.py, ingest-laws.ts
+├── data/                          ← laws/, laws-parsed/
+├── supabase/                      ← migration.sql (+ resume onboarding SQL if split)
+├── next.config.mjs                ← rewrites + redirects
+├── middleware.ts
+└── public/
 ```

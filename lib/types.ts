@@ -47,10 +47,55 @@ export interface ComplianceReport {
 }
 
 // ---------------------------------------------------------------------------
+// Resume onboarding
+// ---------------------------------------------------------------------------
+
+export interface ResumeSuggestion {
+  type:
+    | "critical_fix"
+    | "enhancement"
+    | "design_feedback"
+    | "content_gap"
+    | "impact_opportunity"
+    | "ats_optimization";
+  priority: "high" | "medium" | "low";
+  category: "formatting" | "content" | "structure" | "keywords" | "impact";
+  suggestion: string;
+  original_text?: string;
+  suggested_rewrite?: string;
+  rationale?: string;
+  implementation_effort?: "quick" | "moderate" | "significant";
+}
+
+export interface ResumeProfile {
+  headline: string | null;
+  summary: string | null;
+  skills: string[];
+  years_experience: number | null;
+  experiences: {
+    title: string | null;
+    company: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    description: string | null;
+  }[];
+  education: {
+    institution: string | null;
+    qualification: string | null;
+    field_of_study: string | null;
+    graduation_year: number | null;
+  }[];
+  target_roles: string[];
+  target_industries: string[];
+  location_preference: string | null;
+  seniority_level: "junior" | "mid" | "senior" | "lead" | "executive" | null;
+}
+
+// ---------------------------------------------------------------------------
 // Translation
 // ---------------------------------------------------------------------------
 
-export type TranslationLanguage = "zh" | "ta";
+export type TranslationLanguage = "zh" | "ta" | "ms";
 
 // ---------------------------------------------------------------------------
 // Contract Comparison
