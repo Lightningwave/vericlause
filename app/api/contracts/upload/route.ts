@@ -7,6 +7,8 @@ import {
   insertDocument,
   findDuplicateDocument,
 } from "@/lib/services/db";
+import { assertUploadSize, maxUploadBytes } from "@/lib/api/limits";
+import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
@@ -14,11 +16,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
+  if (!allowRateLimit(user.id, "upload")) {
+    return rateLimitedResponse(120);
+  }
+
   const formData = await req.formData();
   const file = formData.get("file");
 
   if (!file || !(file instanceof Blob)) {
     return NextResponse.json({ detail: "No file provided" }, { status: 400 });
+  }
+
+  const maxBytes = maxUploadBytes();
+  const tooLarge = assertUploadSize(file, maxBytes);
+  if (tooLarge) {
+    return tooLarge;
   }
 
   const name = (file as File).name ?? "";

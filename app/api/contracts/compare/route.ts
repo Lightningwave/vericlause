@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUser, getDocument } from "@/lib/services/db";
+import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
+import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 import type { ExtractedContract, ContractComparison, ClauseComparison, KeyTermComparison } from "@/lib/types";
 
 function getOpenAI() {
@@ -30,17 +32,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { document_a_id, document_b_id } = body as {
+  if (!allowRateLimit(user.id, "llm")) {
+    return rateLimitedResponse(60);
+  }
+
+  const jsonIn = await parseJsonBody<{
     document_a_id: string;
     document_b_id: string;
-  };
+  }>(req, maxJsonBodyBytes());
+  if (!jsonIn.ok) {
+    return jsonIn.response;
+  }
+  const { document_a_id, document_b_id } = jsonIn.data;
 
   if (!document_a_id || !document_b_id) {
     return NextResponse.json({ detail: "Both document_a_id and document_b_id are required" }, { status: 400 });
   }
 
   const [docA, docB] = await Promise.all([getDocument(document_a_id), getDocument(document_b_id)]);
+
+  if (!docA || !docB || docA.user_id !== user.id || docB.user_id !== user.id) {
+    return NextResponse.json({ detail: "One or both documents were not found" }, { status: 404 });
+  }
 
   if (!docA?.extracted || !docB?.extracted) {
     return NextResponse.json(

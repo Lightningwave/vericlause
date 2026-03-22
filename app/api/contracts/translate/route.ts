@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUser } from "@/lib/services/db";
+import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
+import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 import type { ComplianceVerdict, TranslationLanguage } from "@/lib/types";
 
 const LANGUAGE_LABELS: Record<TranslationLanguage, string> = {
@@ -21,11 +23,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { verdicts, language } = body as {
+  if (!allowRateLimit(user.id, "llm")) {
+    return rateLimitedResponse(60);
+  }
+
+  const jsonIn = await parseJsonBody<{
     verdicts: ComplianceVerdict[];
     language: TranslationLanguage;
-  };
+  }>(req, maxJsonBodyBytes());
+  if (!jsonIn.ok) {
+    return jsonIn.response;
+  }
+  const { verdicts, language } = jsonIn.data;
 
   if (!verdicts?.length || !language || !LANGUAGE_LABELS[language]) {
     return NextResponse.json(
@@ -62,14 +71,14 @@ export async function POST(req: NextRequest) {
   });
 
   const raw = response.choices[0]?.message?.content ?? "{}";
-  let parsed: { translations?: Array<{ i: number; contract_value: string; law_value: string; explanation: string }> };
+  let llmJson: { translations?: Array<{ i: number; contract_value: string; law_value: string; explanation: string }> };
   try {
-    parsed = JSON.parse(raw);
+    llmJson = JSON.parse(raw);
   } catch {
     return NextResponse.json({ detail: "Translation LLM returned invalid JSON" }, { status: 502 });
   }
 
-  const translations = parsed.translations ?? [];
+  const translations = llmJson.translations ?? [];
 
   const translatedVerdicts: ComplianceVerdict[] = verdicts.map((v, idx) => {
     const t = translations.find((tr) => tr.i === idx);

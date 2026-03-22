@@ -13,7 +13,7 @@ export async function GET(
 
   const { id } = await params;
   const doc = await getDocument(id);
-  if (!doc) {
+  if (!doc || doc.user_id !== user.id) {
     return NextResponse.json({ detail: "Document not found or expired" }, { status: 404 });
   }
 

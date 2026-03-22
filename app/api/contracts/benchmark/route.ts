@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUser } from "@/lib/services/db";
+import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
+import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 import type { BenchmarkResult } from "@/lib/types";
 
 function getOpenAI() {
@@ -15,14 +17,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { job_title, salary, annual_leave_days, notice_period_days, probation_months } = body as {
+  if (!allowRateLimit(user.id, "llm")) {
+    return rateLimitedResponse(60);
+  }
+
+  const jsonIn = await parseJsonBody<{
     job_title: string;
     salary: number | null;
     annual_leave_days: number | null;
     notice_period_days: number | null;
     probation_months: number | null;
-  };
+  }>(req, maxJsonBodyBytes());
+  if (!jsonIn.ok) {
+    return jsonIn.response;
+  }
+  const { job_title, salary, annual_leave_days, notice_period_days, probation_months } = jsonIn.data;
 
   if (!job_title) {
     return NextResponse.json({ detail: "job_title is required" }, { status: 400 });

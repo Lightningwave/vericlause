@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAnalysisJob, getAuthenticatedUser, getDocument, insertReport, updateAnalysisJob } from "@/lib/services/db";
+import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
+import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 import { runComplianceCheck, complianceScore } from "@/lib/services/rag";
 import type { ExtractedContract, EmployeeContext } from "@/lib/types";
 
@@ -9,16 +11,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ detail: "Invalid JSON body" }, { status: 400 });
+  if (!allowRateLimit(user.id, "llm")) {
+    return rateLimitedResponse(60);
   }
-  const { document_id, employee_context } = (body ?? {}) as {
+
+  const jsonIn = await parseJsonBody<{
     document_id?: string;
     employee_context?: EmployeeContext;
-  };
+  }>(req, maxJsonBodyBytes());
+  if (!jsonIn.ok) {
+    return jsonIn.response;
+  }
+  const { document_id, employee_context } = jsonIn.data ?? {};
 
   if (!document_id || typeof document_id !== "string") {
     return NextResponse.json({ detail: "document_id is required" }, { status: 400 });
