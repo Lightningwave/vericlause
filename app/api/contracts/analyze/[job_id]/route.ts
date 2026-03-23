@@ -32,5 +32,12 @@ export async function GET(
     report = data ?? null;
   }
 
-  return NextResponse.json({ job, report });
+  return NextResponse.json({
+    job: {
+      ...job,
+      progress: typeof job.progress === "number" ? job.progress : 0,
+      stage: job.stage ?? null,
+    },
+    report,
+  });
 }

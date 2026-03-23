@@ -80,6 +80,7 @@ async function mapConcurrent<T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T) => Promise<R>,
+  onItemComplete?: () => void | Promise<void>,
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let nextIndex = 0;
@@ -88,6 +89,7 @@ async function mapConcurrent<T, R>(
     while (nextIndex < items.length) {
       const i = nextIndex++;
       results[i] = await fn(items[i]);
+      await onItemComplete?.();
     }
   }
 
@@ -701,14 +703,22 @@ async function directVerdictForClause(
 // Public API
 // ---------------------------------------------------------------------------
 
+export type ComplianceCheckProgressOptions = {
+  /** Called as work advances (0–95 before report persistence). */
+  onProgress?: (progress: number, stage: string | null) => void | Promise<void>;
+};
+
 export async function runComplianceCheck(
   extracted: ExtractedContract,
   _rawText: string,
   ctx: EmployeeContext = { monthly_salary: null, work_type: null },
+  options?: ComplianceCheckProgressOptions,
 ): Promise<ComplianceVerdict[]> {
+  const onProgress = options?.onProgress;
   const allClauses = extracted.clauses ?? [];
 
   if (allClauses.length === 0) {
+    await onProgress?.(90, "empty");
     return [
       {
         clause_type: "general",
@@ -811,8 +821,26 @@ export async function runComplianceCheck(
     }
   }
 
+  await onProgress?.(5, "starting");
+
+  const totalUnits = clauses.length + 1;
+  let completedUnits = 0;
+  /** Serialize bumps — parallel clause completions must not interleave (avoids progress going backwards in DB). */
+  let bumpChain = Promise.resolve();
+  const bump = (stage: string): Promise<void> => {
+    bumpChain = bumpChain.then(async () => {
+      completedUnits += 1;
+      const pct = Math.min(95, Math.round(5 + (90 * completedUnits) / totalUnits));
+      await onProgress?.(pct, stage);
+    });
+    return bumpChain;
+  };
+
   const [clauseVerdicts, ketVerdict] = await Promise.all([
-    mapConcurrent(clauses, CONCURRENCY, async (clause) => {
+    mapConcurrent(
+      clauses,
+      CONCURRENCY,
+      async (clause) => {
       try {
         // Inline a cached variant of the agent loop to reuse retrieval/embedding results within this run.
         const client = getOpenAIClient();
@@ -968,9 +996,17 @@ export async function runComplianceCheck(
           };
         }
       }
-    }),
-    checkKetCompleteness(extracted, ctx),
+      },
+      () => bump("clauses"),
+    ),
+    (async () => {
+      const v = await checkKetCompleteness(extracted, ctx);
+      await bump("ket");
+      return v;
+    })(),
   ]);
+
+  await onProgress?.(95, "finalizing");
 
   return [...clauseVerdicts, ketVerdict];
 }
