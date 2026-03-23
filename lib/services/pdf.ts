@@ -85,40 +85,45 @@ export async function pdfToText(buffer: Buffer): Promise<PdfParseResult> {
   }
 
   const client = new LlamaCloud({ apiKey });
-
   const file = await toFile(buffer, "document.pdf", { type: "application/pdf" });
   const fileObj = await client.files.create({
     file,
     purpose: "parse",
   });
 
-  const result = await client.parsing.parse({
-    file_id: fileObj.id,
-    tier: "agentic",
-    version: "latest",
-
-    input_options: {},
-
-    output_options: {
-      markdown: {
-        tables: {
-          output_tables_as_markdown: false,
-        },
+  const parseWithTier = async (tier: "agentic" | "fast" | "cost_effective" | "agentic_plus") => {
+    return await client.parsing.parse({
+      file_id: fileObj.id,
+      tier,
+      version: "latest",
+      input_options: {},
+      output_options: {
+        markdown: { tables: { output_tables_as_markdown: false } },
+        images_to_save: ["screenshot"],
       },
-      images_to_save: ["screenshot"],
-    },
-
-    processing_options: {
-      ignore: {
-        ignore_diagonal_text: true,
+      processing_options: {
+        ignore: { ignore_diagonal_text: true },
+        ocr_parameters: { languages: ["en"] },
       },
-      ocr_parameters: {
-        languages: ["en"],
-      },
-    },
+      expand: ["text_full", "markdown_full", "items", "images_content_metadata"],
+    });
+  };
 
-    expand: ["text_full", "markdown_full", "items", "images_content_metadata"],
-  });
+  let result;
+  try {
+    result = await parseWithTier("agentic");
+  } catch (err: any) {
+    console.warn("LlamaCloud agentic parse failed, falling back to fast:", err);
+    try {
+      result = await parseWithTier("fast");
+    } catch (finalErr: any) {
+      const msg = finalErr?.message || "Unknown LlamaCloud error";
+      throw new Error(`PDF could not be read (LlamaCloud failure): ${msg}`);
+    }
+  }
+
+  // Re-run for better error message if result is somehow missing
+  if (!result) throw new Error("LlamaCloud parsing failed significantly");
 
   const markdown = result.markdown_full ?? "";
   const text = markdown || result.text_full || "";
@@ -154,21 +159,36 @@ export async function parseDocument(buffer: Buffer, fileName: string): Promise<P
   const file = await toFile(buffer, fileName, { type: mimeType });
   const fileObj = await client.files.create({ file, purpose: "parse" });
 
-  const result = await client.parsing.parse({
-    file_id: fileObj.id,
-    tier: "agentic",
-    version: "latest",
-    input_options: {},
-    output_options: {
-      markdown: { tables: { output_tables_as_markdown: false } },
-      images_to_save: ["screenshot"],
-    },
-    processing_options: {
-      ignore: { ignore_diagonal_text: true },
-      ocr_parameters: { languages: ["en"] },
-    },
-    expand: ["text_full", "markdown_full", "items", "images_content_metadata"],
-  });
+  const parseWithTier = async (tier: "agentic" | "fast" | "cost_effective" | "agentic_plus") => {
+    return await client.parsing.parse({
+      file_id: fileObj.id,
+      tier,
+      version: "latest",
+      input_options: {},
+      output_options: {
+        markdown: { tables: { output_tables_as_markdown: false } },
+        images_to_save: ["screenshot"],
+      },
+      processing_options: {
+        ignore: { ignore_diagonal_text: true },
+        ocr_parameters: { languages: ["en"] },
+      },
+      expand: ["text_full", "markdown_full", "items", "images_content_metadata"],
+    });
+  };
+
+  let result;
+  try {
+    result = await parseWithTier("agentic");
+  } catch (err: any) {
+    console.warn("LlamaCloud agentic parse failed, falling back to fast:", err);
+    try {
+      result = await parseWithTier("fast");
+    } catch (finalErr: any) {
+      const msg = finalErr?.message || "Unknown LlamaCloud error";
+      throw new Error(`Document could not be read (LlamaCloud failure): ${msg}`);
+    }
+  }
 
   const markdown = result.markdown_full ?? "";
   const text = markdown || result.text_full || "";

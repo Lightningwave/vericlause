@@ -38,7 +38,13 @@ export async function POST(req: NextRequest) {
   }
 
   const job = await createAnalysisJob(document_id, user.id);
-  await updateAnalysisJob(job.id, user.id, { status: "running", error: null, report_id: null });
+  await updateAnalysisJob(job.id, user.id, {
+    status: "running",
+    error: null,
+    report_id: null,
+    progress: 0,
+    stage: null,
+  });
 
   if (!doc.extracted) {
     await updateAnalysisJob(job.id, user.id, {
@@ -61,15 +67,33 @@ export async function POST(req: NextRequest) {
 
   // Define the analysis task as a self-completing promise
   const analysisTask = (async () => {
+    let lastProgressWritten = -1;
     try {
-      const verdicts = await runComplianceCheck(extracted, doc.raw_text, ctx);
+      const verdicts = await runComplianceCheck(extracted, doc.raw_text, ctx, {
+        onProgress: async (progress, stage) => {
+          if (progress < lastProgressWritten) return;
+          lastProgressWritten = progress;
+          await updateAnalysisJob(job.id, user.id, {
+            status: "running",
+            progress,
+            stage,
+          });
+        },
+      });
       const score = complianceScore(verdicts);
+      await updateAnalysisJob(job.id, user.id, {
+        status: "running",
+        progress: 97,
+        stage: "saving",
+      });
       const saved = await insertReport(document_id, user.id, verdicts, score);
 
       await updateAnalysisJob(job.id, user.id, {
         status: "succeeded",
         error: null,
         report_id: saved.id,
+        progress: 100,
+        stage: null,
       });
 
       return {

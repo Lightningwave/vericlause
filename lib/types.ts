@@ -107,6 +107,8 @@ export interface ClauseComparison {
   contract_b_value: string | null;
   assessment: "a_better" | "b_better" | "equal" | "different";
   explanation: string;
+  verdict_a?: "compliant" | "caution" | "violated";
+  verdict_b?: "compliant" | "caution" | "violated";
 }
 
 export interface KeyTermComparison {
@@ -114,6 +116,8 @@ export interface KeyTermComparison {
   contract_a_value: string | null;
   contract_b_value: string | null;
   assessment: "a_better" | "b_better" | "equal" | "different";
+  verdict_a?: "compliant" | "caution" | "violated";
+  verdict_b?: "compliant" | "caution" | "violated";
 }
 
 export interface ContractComparison {
@@ -140,4 +144,22 @@ export interface BenchmarkResult {
   job_title: string;
   items: BenchmarkItem[];
   overall_summary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+export type ComparisonJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface ComparisonJobRow {
+  id: string;
+  user_id: string;
+  document_a_id: string;
+  document_b_id: string;
+  status: ComparisonJobStatus;
+  error: string | null;
+  result: ContractComparison | null;
+  created_at: string;
+  updated_at: string;
 }

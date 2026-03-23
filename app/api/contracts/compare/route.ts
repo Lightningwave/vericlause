@@ -1,29 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { getAuthenticatedUser, getDocument } from "@/lib/services/db";
+import {
+  createComparisonJob,
+  getAuthenticatedUser,
+  getDocument,
+  getReportsByDocument,
+  insertReport,
+  updateComparisonJob,
+} from "@/lib/services/db";
 import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
 import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
-import type { ExtractedContract, ContractComparison, ClauseComparison, KeyTermComparison } from "@/lib/types";
+import { runComplianceCheck, complianceScore } from "@/lib/services/rag";
+import { buildCompareUserPrompt, COMPARE_SYSTEM_MESSAGE } from "@/lib/services/compare";
+import type { ExtractedContract, ContractComparison, EmployeeContext } from "@/lib/types";
 
 function getOpenAI() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
   return new OpenAI({ apiKey });
-}
-
-function extractKeyTermsSummary(e: ExtractedContract): string {
-  return [
-    `Job Title: ${e.job_title ?? "N/A"}`,
-    `Salary: ${e.salary != null ? `SGD ${e.salary}` : "N/A"}`,
-    `Annual Leave: ${e.annual_leave_days != null ? `${e.annual_leave_days} days` : "N/A"}`,
-    `Notice Period: ${e.notice_period_days != null ? `${e.notice_period_days} days` : e.notice_period_weeks != null ? `${e.notice_period_weeks} weeks` : e.notice_period_months != null ? `${e.notice_period_months} months` : "N/A"}`,
-    `Probation: ${e.probation_months != null ? `${e.probation_months} months` : "N/A"}`,
-    `Retirement Age: ${e.retirement_age ?? "N/A"}`,
-  ].join("\n");
-}
-
-function extractClausesSummary(e: ExtractedContract): string {
-  return (e.clauses ?? []).map((c) => `[${c.clause_title}]: ${c.clause_text}`).join("\n\n");
 }
 
 export async function POST(req: NextRequest) {
@@ -46,80 +40,106 @@ export async function POST(req: NextRequest) {
   const { document_a_id, document_b_id } = jsonIn.data;
 
   if (!document_a_id || !document_b_id) {
-    return NextResponse.json({ detail: "Both document_a_id and document_b_id are required" }, { status: 400 });
+    return NextResponse.json(
+      { detail: "Both document_a_id and document_b_id are required" },
+      { status: 400 },
+    );
   }
 
-  const [docA, docB] = await Promise.all([getDocument(document_a_id), getDocument(document_b_id)]);
+  const [docA, docB] = await Promise.all([
+    getDocument(document_a_id),
+    getDocument(document_b_id),
+  ]);
 
   if (!docA || !docB || docA.user_id !== user.id || docB.user_id !== user.id) {
     return NextResponse.json({ detail: "One or both documents were not found" }, { status: 404 });
   }
 
-  if (!docA?.extracted || !docB?.extracted) {
+  if (!docA.extracted || !docB.extracted) {
     return NextResponse.json(
       { detail: "Both documents must have extracted data. Re-upload if extraction failed." },
       { status: 422 },
     );
   }
 
-  const extA = docA.extracted as ExtractedContract;
-  const extB = docB.extracted as ExtractedContract;
+  const job = await createComparisonJob(user.id, document_a_id, document_b_id);
+  await updateComparisonJob(job.id, user.id, { status: "running" });
 
-  const prompt = `Compare these two employment contracts and return a JSON object.
+  const ANALYZE_TIMEOUT_MS = Number(process.env.ANALYZE_TIMEOUT_MS ?? 25000);
 
-CONTRACT A - Key Terms:
-${extractKeyTermsSummary(extA)}
+  const comparisonTask = (async () => {
+    try {
+      // 1. Ensure both documents have reports (verdicts)
+      const fetchOrAnalyze = async (doc: typeof docA) => {
+        const reports = await getReportsByDocument(doc.id);
+        if (reports.length > 0) return reports[0].verdicts;
 
-CONTRACT A - Clauses:
-${extractClausesSummary(extA)}
+        // Run analysis if no report exists
+        const extracted = doc.extracted as ExtractedContract;
+        const ctx: EmployeeContext = { monthly_salary: extracted.salary, work_type: null };
+        const verdicts = await runComplianceCheck(extracted, doc.raw_text, ctx);
+        const score = complianceScore(verdicts);
+        await insertReport(doc.id, user.id, verdicts, score);
+        return verdicts;
+      };
 
----
+      const [verdictsA, verdictsB] = await Promise.all([
+        fetchOrAnalyze(docA),
+        fetchOrAnalyze(docB),
+      ]);
 
-CONTRACT B - Key Terms:
-${extractKeyTermsSummary(extB)}
+      const openai = getOpenAI();
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: COMPARE_SYSTEM_MESSAGE },
+          { role: "user", content: buildCompareUserPrompt(verdictsA, verdictsB) },
+        ],
+      });
 
-CONTRACT B - Clauses:
-${extractClausesSummary(extB)}
+      const raw = response.choices[0]?.message?.content ?? "{}";
+      const parsed = JSON.parse(raw);
 
----
+      const result: ContractComparison = {
+        document_a_id,
+        document_b_id,
+        key_terms: parsed.key_terms ?? [],
+        clauses: parsed.clauses ?? [],
+        summary: parsed.summary ?? "",
+      };
 
-Return a JSON object with:
-1. "key_terms": array of objects { "term": string, "contract_a_value": string|null, "contract_b_value": string|null, "assessment": "a_better"|"b_better"|"equal"|"different" } comparing salary, leave, notice, probation, retirement age.
-2. "clauses": array of objects { "clause_topic": string, "contract_a_value": string|null, "contract_b_value": string|null, "assessment": "a_better"|"b_better"|"equal"|"different", "explanation": string } comparing each clause topic found in either contract. If a clause exists in one but not the other, set the missing side to null.
-3. "summary": a brief 2-3 sentence overall comparison.
+      await updateComparisonJob(job.id, user.id, {
+        status: "succeeded",
+        result,
+      });
 
-Assess from the employee's perspective — "a_better" means Contract A is more favorable for the employee.`;
+      return result;
+    } catch (err) {
+      console.error("Comparison background task failed:", err);
+      await updateComparisonJob(job.id, user.id, {
+        status: "failed",
+        error: err instanceof Error ? err.message : "Comparison failed",
+      });
+      throw err;
+    }
+  })();
 
-  const openai = getOpenAI();
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: "You are a Singapore employment law expert. Compare two employment contracts objectively. Return valid JSON only.",
-      },
-      { role: "user", content: prompt },
-    ],
+  const result = await Promise.race([
+    comparisonTask,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ANALYZE_TIMEOUT_MS)),
+  ]).catch((err: unknown) => {
+    throw err;
   });
 
-  const raw = response.choices[0]?.message?.content ?? "{}";
-  let parsed: { key_terms?: KeyTermComparison[]; clauses?: ClauseComparison[]; summary?: string };
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return NextResponse.json({ detail: "Comparison LLM returned invalid JSON" }, { status: 502 });
+  if (result === null) {
+    return NextResponse.json({ job_id: job.id, status: "running" });
   }
 
-  const result: ContractComparison = {
-    document_a_id,
-    document_b_id,
-    key_terms: parsed.key_terms ?? [],
-    clauses: parsed.clauses ?? [],
-    summary: parsed.summary ?? "",
-  };
-
-  return NextResponse.json(result);
+  return NextResponse.json({
+    job_id: job.id,
+    status: "succeeded",
+    result,
+  });
 }

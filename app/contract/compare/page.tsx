@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { ComparisonTable } from "@/components/contract/ComparisonTable";
 import { ClauseDiff } from "@/components/contract/ClauseDiff";
 import { createClient } from "@/lib/supabase/client";
-import { uploadPdf, compareContracts, listDocuments, type DocumentSummary } from "@/lib/api";
+import { uploadPdf, compareContracts, getComparisonJob, listDocuments, type DocumentSummary } from "@/lib/api";
 import type { ContractComparison } from "@/lib/types";
 import { useLanguage } from "@/components/providers/language-provider";
 import type { Locale } from "@/lib/i18n/types";
@@ -104,6 +104,7 @@ export default function ComparePage() {
   const [comparison, setComparison] = useState<ContractComparison | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CompareTab>("summary");
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -115,6 +116,10 @@ export default function ComparePage() {
         listDocuments().then(setUserDocs);
       }
     });
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, [router]);
 
   const labelA = slotA.fileName ?? t("compare_default_contract_a");
@@ -184,10 +189,32 @@ export default function ComparePage() {
     setCompareState("comparing");
 
     try {
-      const result = await compareContracts(slotA.documentId, slotB.documentId);
-      setComparison(result);
-      setCompareState("ready");
-      setActiveTab("summary");
+      const response = await compareContracts(slotA.documentId, slotB.documentId);
+      
+      if (response.status === "succeeded" && response.result) {
+        setComparison(response.result);
+        setCompareState("ready");
+        setActiveTab("summary");
+      } else if (response.status === "running") {
+        const jobId = response.job_id;
+        pollingRef.current = setInterval(async () => {
+          try {
+            const { job } = await getComparisonJob(jobId);
+            if (job.status === "succeeded" && job.result) {
+              setComparison(job.result);
+              setCompareState("ready");
+              setActiveTab("summary");
+              if (pollingRef.current) clearInterval(pollingRef.current);
+            } else if (job.status === "failed") {
+              setCompareError(job.error || t("compare_error_compare"));
+              setCompareState("error");
+              if (pollingRef.current) clearInterval(pollingRef.current);
+            }
+          } catch (err) {
+            console.error("Polling error:", err);
+          }
+        }, 2000);
+      }
     } catch (error) {
       setCompareError(error instanceof Error ? error.message : t("compare_error_compare"));
       setCompareState("error");

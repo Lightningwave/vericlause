@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { ExtractedContract, ComplianceVerdict, ResumeProfile, ResumeSuggestion } from "@/lib/types";
+import type { ExtractedContract, ComplianceVerdict, ResumeProfile, ResumeSuggestion, ComparisonJobRow, ContractComparison } from "@/lib/types";
 
 export interface DocumentRow {
   id: string;
@@ -29,6 +29,10 @@ export interface AnalysisJobRow {
   status: AnalysisJobStatus;
   error: string | null;
   report_id: string | null;
+  /** 0–100: server-reported progress while status is running */
+  progress?: number;
+  /** Optional stage label for UI (e.g. clauses, ket) */
+  stage?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +145,8 @@ export async function createAnalysisJob(
       status: "queued",
       error: null,
       report_id: null,
+      progress: 0,
+      stage: null,
     })
     .select()
     .single();
@@ -152,7 +158,7 @@ export async function createAnalysisJob(
 export async function updateAnalysisJob(
   jobId: string,
   userId: string,
-  patch: Partial<Pick<AnalysisJobRow, "status" | "error" | "report_id">>,
+  patch: Partial<Pick<AnalysisJobRow, "status" | "error" | "report_id" | "progress" | "stage">>,
 ): Promise<AnalysisJobRow> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -469,4 +475,68 @@ export async function getProfilingJob(jobId: string, userId: string): Promise<Pr
 
   if (error || !data) return null;
   return data as ProfilingJobRow;
+}
+
+// ---------------------------------------------------------------------------
+// Comparison jobs
+// ---------------------------------------------------------------------------
+
+export async function createComparisonJob(
+  userId: string,
+  documentAId: string,
+  documentBId: string,
+): Promise<ComparisonJobRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("comparison_jobs")
+    .insert({
+      user_id: userId,
+      document_a_id: documentAId,
+      document_b_id: documentBId,
+      status: "queued",
+      error: null,
+      result: null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create comparison job: ${error.message}`);
+  return data as ComparisonJobRow;
+}
+
+export async function updateComparisonJob(
+  jobId: string,
+  userId: string,
+  patch: Partial<Pick<ComparisonJobRow, "status" | "error" | "result">>,
+): Promise<ComparisonJobRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("comparison_jobs")
+    .update({
+      ...patch,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update comparison job: ${error.message}`);
+  return data as ComparisonJobRow;
+}
+
+export async function getComparisonJob(
+  jobId: string,
+  userId: string,
+): Promise<ComparisonJobRow | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("comparison_jobs")
+    .select("*")
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) return null;
+  return data as ComparisonJobRow;
 }
