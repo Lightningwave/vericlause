@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -60,81 +60,6 @@ function getOpeningLine(locale: string, role: InterviewRole, interviewType: Inte
   return `Hi, I’ll be your AI interviewer. We’re starting a ${interviewType} interview practice session for a ${roleLabel} role. Please begin by introducing yourself.`;
 }
 
-function buildMockCoaching(locale: string, messages: ConversationMessage[]) {
-  const userTurns = messages.filter((m) => m.speaker === "user");
-  const totalLength = userTurns.map((m) => m.text).join(" ").length;
-  const score = userTurns.length === 0 ? 0 : Math.max(58, Math.min(91, 58 + Math.floor(totalLength / 20)));
-
-  if (locale === "zh") {
-    return {
-      score,
-      strengths:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["回答更加完整", "表达更清晰", "结构逐渐改善"]
-          : ["愿意作答", "基础表达清楚"],
-      improvements:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["加入量化成果", "强化岗位相关性", "结尾更有说服力"]
-          : ["加入真实例子", "说明行动与结果", "补充更多细节"],
-    };
-  }
-
-  if (locale === "ms") {
-    return {
-      score,
-      strengths:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["Jawapan semakin lengkap", "Penyampaian lebih jelas", "Struktur semakin baik"]
-          : ["Sedia menjawab", "Asas jawapan boleh difahami"],
-      improvements:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["Tambah hasil yang boleh diukur", "Kaitkan lebih rapat dengan jawatan", "Penutup boleh lebih kuat"]
-          : ["Tambah contoh sebenar", "Terangkan tindakan dan hasil", "Tambah lebih banyak perincian"],
-    };
-  }
-
-  if (locale === "ta") {
-    return {
-      score,
-      strengths:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["பதில்கள் மேலும் முழுமையாக உள்ளன", "விளக்கம் தெளிவாக உள்ளது", "அமைப்பு மேம்படுகிறது"]
-          : ["பதிலளிக்கும் முனைப்பு உள்ளது", "அடிப்படை கருத்து புரிகிறது"],
-      improvements:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["அளவிடக்கூடிய முடிவுகளைச் சேர்க்கவும்", "பதவியுடன் தொடர்பை வலுப்படுத்தவும்", "முடிவை வலுப்படுத்தவும்"]
-          : ["உண்மையான உதாரணத்தைச் சேர்க்கவும்", "நடவடிக்கை மற்றும் முடிவை விளக்கவும்", "மேலும் விவரம் சேர்க்கவும்"],
-    };
-  }
-
-  return {
-    score,
-    strengths:
-      userTurns.length === 0
-        ? []
-        : totalLength > 180
-        ? ["Answers are becoming more complete", "Communication is clearer", "Structure is improving"]
-        : ["Willing to engage", "Basic ideas are understandable"],
-    improvements:
-      userTurns.length === 0
-        ? []
-        : totalLength > 180
-        ? ["Add measurable outcomes", "Tie answers closer to the role", "End more strongly"]
-        : ["Use a real example", "Explain actions and results", "Add more detail"],
-  };
-}
 
 export default function InterviewPage() {
   const router = useRouter();
@@ -152,10 +77,11 @@ export default function InterviewPage() {
   const [textInput, setTextInput] = useState("");
   const [sessionStarted, setSessionStarted] = useState(false);
 
-  const coaching = useMemo(
-    () => buildMockCoaching(safeLocale, conversation),
-    [safeLocale, conversation]
-  );
+  const [coaching, setCoaching] = useState<{
+    score: number;
+    strengths: string[];
+    improvements: string[];
+  }>({ score: 0, strengths: [], improvements: [] });
 
   function startSession() {
     setSessionStarted(true);
@@ -188,7 +114,7 @@ export default function InterviewPage() {
     ]);
   }
 
-  function sendTextReply() {
+  async function sendTextReply() {
     if (!textInput.trim()) return;
 
     const userMessage: ConversationMessage = {
@@ -198,8 +124,23 @@ export default function InterviewPage() {
       timestamp: formatTime(),
     };
 
-    setConversation((prev) => [...prev, userMessage]);
+    const updatedConversation = [...conversation, userMessage];
+    setConversation(updatedConversation);
     setTextInput("");
+
+    try {
+      const res = await fetch("/api/interview/coaching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation: updatedConversation }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCoaching(data);
+      }
+    } catch {
+      // silently keep existing coaching if the request fails
+    }
   }
 
   return (
