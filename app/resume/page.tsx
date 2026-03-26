@@ -24,6 +24,11 @@ export default function ResumeOnboardingPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [lastResumeId, setLastResumeId] = useState<string | null>(null);
   const [userResumes, setUserResumes] = useState<ResumeSummary[]>([]);
+  const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
+  const [voiceText, setVoiceText] = useState("");
+  const recognizerRef = useRef<{
+    stopContinuousRecognitionAsync: (cb?: () => void, err?: (e: string) => void) => void;
+  } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -165,6 +170,48 @@ export default function ResumeOnboardingPage() {
     }
   }, [router, selectedFile, refetchResumeStatus, t]);
 
+  async function handleMicClick() {
+    if (micState === "listening") {
+      recognizerRef.current?.stopContinuousRecognitionAsync(
+        () => setMicState("idle"),
+        () => setMicState("idle"),
+      );
+      return;
+    }
+
+    setMicState("processing");
+    try {
+      const res = await fetch("/api/speech");
+      if (!res.ok) throw new Error("Failed to get speech token");
+      const { token, region } = await res.json();
+
+      const SpeechSDK = await import("microsoft-cognitiveservices-speech-sdk");
+      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
+      speechConfig.speechRecognitionLanguage = "en-SG";
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+      recognizerRef.current = recognizer;
+
+      recognizer.recognized = (_: unknown, e: { result: { reason: number; text: string } }) => {
+        if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) {
+          setVoiceText((prev) => (prev ? prev + " " + e.result.text : e.result.text));
+        }
+      };
+
+      recognizer.startContinuousRecognitionAsync(
+        () => setMicState("listening"),
+        (err: string) => {
+          console.error("Speech recognition error:", err);
+          setMicState("idle");
+        },
+      );
+    } catch (err) {
+      console.error("Mic setup failed:", err);
+      setMicState("idle");
+    }
+  }
+
   const reviewHref =
     lastResumeId != null
       ? `/resume/review?resume_id=${encodeURIComponent(lastResumeId)}`
@@ -223,13 +270,39 @@ export default function ResumeOnboardingPage() {
                 void handleUpload();
               }}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100"
-              />
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={handleFileChange}
+                  className="block flex-1 text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleMicClick()}
+                  title={micState === "listening" ? "Stop recording" : "Start voice input"}
+                  className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition ${
+                    micState === "listening"
+                      ? "animate-pulse border-red-300 bg-red-50 text-red-600"
+                      : micState === "processing"
+                      ? "border-slate-200 bg-slate-50 text-slate-400"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {micState === "processing" ? (
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="2" width="6" height="12" rx="3" />
+                      <path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6" />
+                    </svg>
+                  )}
+                </button>
+              </div>
 
               {selectedFileName ? (
                 <p className="mt-3 text-sm font-medium text-navy-950">
@@ -254,6 +327,19 @@ export default function ResumeOnboardingPage() {
                 {uploading || profiling ? t("resume_processing") : t("resume_upload_button")}
               </button>
             </form>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Or describe your experience verbally
+              </label>
+              <textarea
+                value={voiceText}
+                onChange={(e) => setVoiceText(e.target.value)}
+                placeholder="Your spoken input will appear here..."
+                rows={4}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
+              />
+            </div>
 
             <div className="mt-3 flex flex-wrap gap-3">
               <button

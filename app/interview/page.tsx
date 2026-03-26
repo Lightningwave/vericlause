@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -82,6 +82,53 @@ export default function InterviewPage() {
     strengths: string[];
     improvements: string[];
   }>({ score: 0, strengths: [], improvements: [] });
+
+  const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
+  const recognizerRef = useRef<{
+    stopContinuousRecognitionAsync: (cb?: () => void, err?: (e: string) => void) => void;
+  } | null>(null);
+
+  async function handleMicClick() {
+    if (micState === "listening") {
+      recognizerRef.current?.stopContinuousRecognitionAsync(
+        () => setMicState("idle"),
+        () => setMicState("idle"),
+      );
+      return;
+    }
+
+    setMicState("processing");
+    try {
+      const res = await fetch("/api/speech");
+      if (!res.ok) throw new Error("Failed to get speech token");
+      const { token, region } = await res.json();
+
+      const SpeechSDK = await import("microsoft-cognitiveservices-speech-sdk");
+      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
+      speechConfig.speechRecognitionLanguage = "en-SG";
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+      recognizerRef.current = recognizer;
+
+      recognizer.recognized = (_: unknown, e: { result: { reason: number; text: string } }) => {
+        if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) {
+          setTextInput((prev) => (prev ? prev + " " + e.result.text : e.result.text));
+        }
+      };
+
+      recognizer.startContinuousRecognitionAsync(
+        () => setMicState("listening"),
+        (err: string) => {
+          console.error("Speech recognition error:", err);
+          setMicState("idle");
+        },
+      );
+    } catch (err) {
+      console.error("Mic setup failed:", err);
+      setMicState("idle");
+    }
+  }
 
   function startSession() {
     setSessionStarted(true);
@@ -346,9 +393,19 @@ export default function InterviewPage() {
                     </button>
                     <button
                       type="button"
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700"
+                      onClick={() => void handleMicClick()}
+                      disabled={!sessionStarted || micState === "processing"}
+                      className={`rounded-xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        micState === "listening"
+                          ? "border-red-300 bg-red-50 text-red-600"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
                     >
-                      Mic
+                      {micState === "listening"
+                        ? "Listening..."
+                        : micState === "processing"
+                        ? "Processing..."
+                        : "Mic"}
                     </button>
                   </div>
                 </div>
