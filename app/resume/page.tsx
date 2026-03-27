@@ -10,6 +10,7 @@ import { useResumeStatus } from "@/components/providers/resume-status-provider";
 import { createClient } from "@/lib/supabase/client";
 import { getProfileJob, listResumes, profileResume, uploadResume, type ResumeSummary } from "@/lib/api";
 import type { ResumeProfile } from "@/lib/types";
+import type { ResumeFeedback } from "@/app/api/resume/route";
 
 export default function ResumeOnboardingPage() {
   const { t } = useLanguage();
@@ -24,6 +25,16 @@ export default function ResumeOnboardingPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [lastResumeId, setLastResumeId] = useState<string | null>(null);
   const [userResumes, setUserResumes] = useState<ResumeSummary[]>([]);
+
+  // AI feedback state
+  const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
+  const [analysing, setAnalysing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+  // Voice-to-text state
+  const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
+  const [voiceText, setVoiceText] = useState("");
+  const recognizerRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -48,6 +59,8 @@ export default function ResumeOnboardingPage() {
     setSelectedFileName(file?.name ?? "");
     setError(null);
     setSuccessMessage(null);
+    setFeedback(null);
+    setAnalysisError(null);
   }, []);
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -165,6 +178,64 @@ export default function ResumeOnboardingPage() {
     }
   }, [router, selectedFile, refetchResumeStatus, t]);
 
+  async function handleAnalyse() {
+    if (!selectedFile) return;
+    setAnalysing(true);
+    setAnalysisError(null);
+    setFeedback(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const res = await fetch("/api/resume", { method: "POST", body: formData });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setAnalysisError(json.detail ?? "Something went wrong. Please try again.");
+        return;
+      }
+
+      setFeedback(json.feedback as ResumeFeedback);
+    } catch {
+      setAnalysisError("Network error. Please check your connection and try again.");
+    } finally {
+      setAnalysing(false);
+    }
+  }
+
+  function handleMicClick() {
+    if (micState === "listening") {
+      recognizerRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported in this browser");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      setVoiceText((prev) => (prev ? prev + " " + transcript : transcript));
+    };
+
+    recognition.onerror = () => setMicState("idle");
+    recognition.onend = () => setMicState("idle");
+
+    recognition.start();
+    recognizerRef.current = recognition;
+    setMicState("listening");
+  }
+
   const reviewHref =
     lastResumeId != null
       ? `/resume/review?resume_id=${encodeURIComponent(lastResumeId)}`
@@ -223,13 +294,39 @@ export default function ResumeOnboardingPage() {
                 void handleUpload();
               }}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100"
-              />
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={handleFileChange}
+                  className="block flex-1 text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleMicClick()}
+                  title={micState === "listening" ? "Stop recording" : "Start voice input"}
+                  className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition ${
+                    micState === "listening"
+                      ? "animate-pulse border-red-300 bg-red-50 text-red-600"
+                      : micState === "processing"
+                      ? "border-slate-200 bg-slate-50 text-slate-400"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {micState === "processing" ? (
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="2" width="6" height="12" rx="3" />
+                      <path d="M5 10a7 7 0 0014 0M12 19v3M9 22h6" />
+                    </svg>
+                  )}
+                </button>
+              </div>
 
               {selectedFileName ? (
                 <p className="mt-3 text-sm font-medium text-navy-950">
@@ -254,6 +351,34 @@ export default function ResumeOnboardingPage() {
                 {uploading || profiling ? t("resume_processing") : t("resume_upload_button")}
               </button>
             </form>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Or describe your experience verbally
+              </label>
+              <textarea
+                value={voiceText}
+                onChange={(e) => setVoiceText(e.target.value)}
+                placeholder="Your spoken input will appear here..."
+                rows={4}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void handleAnalyse()}
+              disabled={!selectedFile || analysing}
+              className="mt-4 w-full rounded-xl border border-[#b88a44] px-4 py-3 text-sm font-medium text-[#b88a44] transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {analysing ? "Analysing..." : "Analyse My Resume"}
+            </button>
+
+            {analysisError ? (
+              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {analysisError}
+              </p>
+            ) : null}
 
             <div className="mt-3 flex flex-wrap gap-3">
               <button
@@ -296,6 +421,93 @@ export default function ResumeOnboardingPage() {
               </div>
             </div>
           </aside>
+        </div>
+
+        {/* AI Feedback section */}
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-navy-950">AI Feedback</h2>
+            {feedback && (
+              <span className="text-sm font-semibold text-navy-950">
+                Score: <span className="text-2xl">{feedback.score}</span>
+                <span className="font-normal text-slate-400"> / 10</span>
+              </span>
+            )}
+          </div>
+
+          {!feedback ? (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-slate-500">
+                Upload a file and click &ldquo;Analyse My Resume&rdquo; to see AI-powered feedback here.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {["Overall Impression", "Key Strengths", "Areas to Improve", "Suggested Edits"].map((section) => (
+                  <div key={section} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{section}</p>
+                    <div className="mt-2 h-3 w-3/4 rounded bg-slate-200" />
+                    <div className="mt-1.5 h-3 w-1/2 rounded bg-slate-200" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Overall Impression
+                </p>
+                <p className="text-sm leading-6 text-slate-700">{feedback.overallImpression}</p>
+              </div>
+
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-600">
+                  Key Strengths
+                </p>
+                <ul className="space-y-1.5">
+                  {feedback.keyStrengths.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-slate-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                        {i + 1}
+                      </span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-600">
+                  Areas to Improve
+                </p>
+                <ul className="space-y-1.5">
+                  {feedback.areasToImprove.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-slate-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700">
+                        {i + 1}
+                      </span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Suggested Edits
+                </p>
+                <ul className="space-y-1.5">
+                  {feedback.suggestedEdits.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-slate-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-navy-100 text-[10px] font-bold text-navy-700">
+                        {i + 1}
+                      </span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-10 max-w-3xl">
