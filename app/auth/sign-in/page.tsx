@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { AuthShell } from "@/components/AuthShell";
-import { AuthForm, type AuthFormValues } from "@/components/AuthForm";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { AuthForm, type AuthFormValues } from "@/components/auth/AuthForm";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
-export default function SignInPage() {
+function SignInContent() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleSubmit = async (values: AuthFormValues) => {
     setError(null);
@@ -24,14 +26,15 @@ export default function SignInPage() {
       return;
     }
 
-    router.push("/dashboard");
+    const dest = safeNextPath(searchParams.get("next"));
+    router.push(dest);
     router.refresh();
   };
 
   return (
     <AuthShell
       title="Sign in to VeriClause"
-      subtitle="Access your compliance dashboard"
+      subtitle="Start with your resume, then open contract analysis from the nav"
       footer={
         <>
           Don&apos;t have an account?{" "}
@@ -43,5 +46,21 @@ export default function SignInPage() {
     >
       <AuthForm mode="sign-in" onSubmit={handleSubmit} error={error} />
     </AuthShell>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthShell title="Sign in to VeriClause" subtitle="Loading…">
+          <div className="flex justify-center py-8">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-navy-950" />
+          </div>
+        </AuthShell>
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }

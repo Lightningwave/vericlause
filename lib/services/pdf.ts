@@ -19,63 +19,32 @@ export interface PdfParseResult {
   text: string;
   markdown: string;
   pages: PdfPage[];
+  /** LlamaParse presigned screenshot URLs for vision / layout context */
+  images: string[];
 }
 
-/**
- * Extract markdown-first content and structured per-page items from a PDF
- * using LlamaCloud. Markdown is the canonical contract representation for
- * downstream extraction and analysis, while items provide location metadata.
- */
-export async function pdfToText(buffer: Buffer): Promise<PdfParseResult> {
-  const apiKey = process.env.LLAMA_CLOUD_API_KEY ?? process.env.LLAMA_PARSE_API_KEY;
-  if (!apiKey) {
-    throw new Error("LLAMA_CLOUD_API_KEY or LLAMA_PARSE_API_KEY is not set");
+function extractImagesFromResult(result: unknown): string[] {
+  const images: string[] = [];
+  const imgMetadata =
+    result &&
+    typeof result === "object" &&
+    "images_content_metadata" in result &&
+    (result as { images_content_metadata?: unknown }).images_content_metadata != null
+      ? (result as { images_content_metadata: { images?: Array<{ presigned_url?: string | null }> } })
+          .images_content_metadata
+      : undefined;
+  if (imgMetadata?.images && Array.isArray(imgMetadata.images)) {
+    for (const img of imgMetadata.images) {
+      if (typeof img.presigned_url === "string") {
+        images.push(img.presigned_url);
+      }
+    }
   }
+  return images;
+}
 
-  const client = new LlamaCloud({ apiKey });
-
-  const file = await toFile(buffer, "document.pdf", { type: "application/pdf" });
-  const fileObj = await client.files.create({
-    file,
-    purpose: "parse",
-  });
-
-  const result = await client.parsing.parse({
-    file_id: fileObj.id,
-    tier: "agentic",
-    version: "latest",
-
-    input_options: {},
-
-    output_options: {
-      markdown: {
-        tables: {
-          output_tables_as_markdown: false,
-        },
-      },
-      images_to_save: ["screenshot"],
-    },
-
-    processing_options: {
-      ignore: {
-        ignore_diagonal_text: true,
-      },
-      ocr_parameters: {
-        languages: ["en"],
-      },
-    },
-
-    expand: ["text_full", "markdown_full", "items"],
-  });
-
-  const markdown = result.markdown_full ?? "";
-  const text = markdown || result.text_full || "";
-  if (!text.trim()) {
-    throw new Error("LlamaCloud parsing produced no text");
-  }
-
+function parsePagesFromItems(rawItems: { pages?: unknown[] } | undefined): PdfPage[] {
   const pages: PdfPage[] = [];
-  const rawItems = result.items as { pages?: unknown[] } | undefined;
   if (rawItems?.pages && Array.isArray(rawItems.pages)) {
     for (const page of rawItems.pages) {
       const p = page as Record<string, unknown>;
@@ -92,7 +61,7 @@ export async function pdfToText(buffer: Buffer): Promise<PdfParseResult> {
             value: typeof it.value === "string" ? it.value : (typeof it.md === "string" ? it.md : ""),
             md: typeof it.md === "string" ? it.md : undefined,
             b_box: Array.isArray(it.b_box) && it.b_box.length === 4
-              ? it.b_box as [number, number, number, number]
+              ? (it.b_box as [number, number, number, number])
               : undefined,
           });
         }
@@ -101,6 +70,134 @@ export async function pdfToText(buffer: Buffer): Promise<PdfParseResult> {
       pages.push({ page_number: pageNum, page_width: pageW, page_height: pageH, items });
     }
   }
+  return pages;
+}
 
-  return { text, markdown, pages };
+/**
+ * Extract markdown-first content and structured per-page items from a PDF
+ * using LlamaCloud. Markdown is the canonical contract representation for
+ * downstream extraction and analysis, while items provide location metadata.
+ */
+export async function pdfToText(buffer: Buffer): Promise<PdfParseResult> {
+  const apiKey = process.env.LLAMA_CLOUD_API_KEY ?? process.env.LLAMA_PARSE_API_KEY;
+  if (!apiKey) {
+    throw new Error("LLAMA_CLOUD_API_KEY or LLAMA_PARSE_API_KEY is not set");
+  }
+
+  const client = new LlamaCloud({ apiKey });
+  const file = await toFile(buffer, "document.pdf", { type: "application/pdf" });
+  const fileObj = await client.files.create({
+    file,
+    purpose: "parse",
+  });
+
+  const parseWithTier = async (tier: "agentic" | "fast" | "cost_effective" | "agentic_plus") => {
+    return await client.parsing.parse({
+      file_id: fileObj.id,
+      tier,
+      version: "latest",
+      input_options: {},
+      output_options: {
+        markdown: { tables: { output_tables_as_markdown: false } },
+        images_to_save: ["screenshot"],
+      },
+      processing_options: {
+        ignore: { ignore_diagonal_text: true },
+        ocr_parameters: { languages: ["en"] },
+      },
+      expand: ["text_full", "markdown_full", "items", "images_content_metadata"],
+    });
+  };
+
+  let result;
+  try {
+    result = await parseWithTier("agentic");
+  } catch (err: any) {
+    console.warn("LlamaCloud agentic parse failed, falling back to fast:", err);
+    try {
+      result = await parseWithTier("fast");
+    } catch (finalErr: any) {
+      const msg = finalErr?.message || "Unknown LlamaCloud error";
+      throw new Error(`PDF could not be read (LlamaCloud failure): ${msg}`);
+    }
+  }
+
+  // Re-run for better error message if result is somehow missing
+  if (!result) throw new Error("LlamaCloud parsing failed significantly");
+
+  const markdown = result.markdown_full ?? "";
+  const text = markdown || result.text_full || "";
+  if (!text.trim()) {
+    throw new Error("LlamaCloud parsing produced no text");
+  }
+
+  const pages = parsePagesFromItems(result.items as { pages?: unknown[] } | undefined);
+  const images = extractImagesFromResult(result);
+
+  return { text, markdown, pages, images };
+}
+
+/**
+ * Parse any supported document (PDF or DOCX) via LlamaCloud.
+ * The fileName extension tells LlamaCloud which parser to use.
+ */
+export async function parseDocument(buffer: Buffer, fileName: string): Promise<PdfParseResult> {
+  const apiKey = process.env.LLAMA_CLOUD_API_KEY ?? process.env.LLAMA_PARSE_API_KEY;
+  if (!apiKey) {
+    throw new Error("LLAMA_CLOUD_API_KEY or LLAMA_PARSE_API_KEY is not set");
+  }
+
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "pdf";
+  const mimeMap: Record<string, string> = {
+    pdf: "application/pdf",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    doc: "application/msword",
+  };
+  const mimeType = mimeMap[ext] ?? "application/octet-stream";
+
+  const client = new LlamaCloud({ apiKey });
+  const file = await toFile(buffer, fileName, { type: mimeType });
+  const fileObj = await client.files.create({ file, purpose: "parse" });
+
+  const parseWithTier = async (tier: "agentic" | "fast" | "cost_effective" | "agentic_plus") => {
+    return await client.parsing.parse({
+      file_id: fileObj.id,
+      tier,
+      version: "latest",
+      input_options: {},
+      output_options: {
+        markdown: { tables: { output_tables_as_markdown: false } },
+        images_to_save: ["screenshot"],
+      },
+      processing_options: {
+        ignore: { ignore_diagonal_text: true },
+        ocr_parameters: { languages: ["en"] },
+      },
+      expand: ["text_full", "markdown_full", "items", "images_content_metadata"],
+    });
+  };
+
+  let result;
+  try {
+    result = await parseWithTier("agentic");
+  } catch (err: any) {
+    console.warn("LlamaCloud agentic parse failed, falling back to fast:", err);
+    try {
+      result = await parseWithTier("fast");
+    } catch (finalErr: any) {
+      const msg = finalErr?.message || "Unknown LlamaCloud error";
+      throw new Error(`Document could not be read (LlamaCloud failure): ${msg}`);
+    }
+  }
+
+  const markdown = result.markdown_full ?? "";
+  const text = markdown || result.text_full || "";
+  if (!text.trim()) {
+    throw new Error("LlamaCloud parsing produced no text");
+  }
+
+  const pages = parsePagesFromItems(result.items as { pages?: unknown[] } | undefined);
+  const images = extractImagesFromResult(result);
+
+  return { text, markdown, pages, images };
 }

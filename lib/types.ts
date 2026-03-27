@@ -47,10 +47,55 @@ export interface ComplianceReport {
 }
 
 // ---------------------------------------------------------------------------
+// Resume onboarding
+// ---------------------------------------------------------------------------
+
+export interface ResumeSuggestion {
+  type:
+    | "critical_fix"
+    | "enhancement"
+    | "design_feedback"
+    | "content_gap"
+    | "impact_opportunity"
+    | "ats_optimization";
+  priority: "high" | "medium" | "low";
+  category: "formatting" | "content" | "structure" | "keywords" | "impact";
+  suggestion: string;
+  original_text?: string;
+  suggested_rewrite?: string;
+  rationale?: string;
+  implementation_effort?: "quick" | "moderate" | "significant";
+}
+
+export interface ResumeProfile {
+  headline: string | null;
+  summary: string | null;
+  skills: string[];
+  years_experience: number | null;
+  experiences: {
+    title: string | null;
+    company: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    description: string | null;
+  }[];
+  education: {
+    institution: string | null;
+    qualification: string | null;
+    field_of_study: string | null;
+    graduation_year: number | null;
+  }[];
+  target_roles: string[];
+  target_industries: string[];
+  location_preference: string | null;
+  seniority_level: "junior" | "mid" | "senior" | "lead" | "executive" | null;
+}
+
+// ---------------------------------------------------------------------------
 // Translation
 // ---------------------------------------------------------------------------
 
-export type TranslationLanguage = "zh" | "ta";
+export type TranslationLanguage = "zh" | "ta" | "ms";
 
 // ---------------------------------------------------------------------------
 // Contract Comparison
@@ -62,6 +107,8 @@ export interface ClauseComparison {
   contract_b_value: string | null;
   assessment: "a_better" | "b_better" | "equal" | "different";
   explanation: string;
+  verdict_a?: "compliant" | "caution" | "violated";
+  verdict_b?: "compliant" | "caution" | "violated";
 }
 
 export interface KeyTermComparison {
@@ -69,6 +116,8 @@ export interface KeyTermComparison {
   contract_a_value: string | null;
   contract_b_value: string | null;
   assessment: "a_better" | "b_better" | "equal" | "different";
+  verdict_a?: "compliant" | "caution" | "violated";
+  verdict_b?: "compliant" | "caution" | "violated";
 }
 
 export interface ContractComparison {
@@ -95,4 +144,22 @@ export interface BenchmarkResult {
   job_title: string;
   items: BenchmarkItem[];
   overall_summary: string;
+}
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+export type ComparisonJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface ComparisonJobRow {
+  id: string;
+  user_id: string;
+  document_a_id: string;
+  document_b_id: string;
+  status: ComparisonJobStatus;
+  error: string | null;
+  result: ContractComparison | null;
+  created_at: string;
+  updated_at: string;
 }

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { ExtractedContract, ComplianceVerdict } from "@/lib/types";
+import type { ExtractedContract, ComplianceVerdict, ResumeProfile, ResumeSuggestion, ComparisonJobRow, ContractComparison } from "@/lib/types";
 
 export interface DocumentRow {
   id: string;
@@ -29,6 +29,34 @@ export interface AnalysisJobRow {
   status: AnalysisJobStatus;
   error: string | null;
   report_id: string | null;
+  /** 0–100: server-reported progress while status is running */
+  progress?: number;
+  /** Optional stage label for UI (e.g. clauses, ket) */
+  stage?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResumeRow {
+  id: string;
+  user_id: string;
+  file_name: string;
+  file_path: string | null;
+  raw_text: string;
+  image_urls?: string[] | null;
+  parsed_profile: ResumeProfile | null;
+  ai_suggestions: ResumeSuggestion[] | null;
+  created_at: string;
+}
+
+export type ProfilingJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface ProfilingJobRow {
+  id: string;
+  resume_id: string;
+  user_id: string;
+  status: ProfilingJobStatus;
+  error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -117,6 +145,8 @@ export async function createAnalysisJob(
       status: "queued",
       error: null,
       report_id: null,
+      progress: 0,
+      stage: null,
     })
     .select()
     .single();
@@ -128,7 +158,7 @@ export async function createAnalysisJob(
 export async function updateAnalysisJob(
   jobId: string,
   userId: string,
-  patch: Partial<Pick<AnalysisJobRow, "status" | "error" | "report_id">>,
+  patch: Partial<Pick<AnalysisJobRow, "status" | "error" | "report_id" | "progress" | "stage">>,
 ): Promise<AnalysisJobRow> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -272,4 +302,241 @@ export async function findDuplicateDocument(
 
   if (error || !data) return null;
   return data as DocumentRow;
+}
+
+// ---------------------------------------------------------------------------
+// Resume onboarding
+// ---------------------------------------------------------------------------
+
+export async function insertResume(
+  userId: string,
+  fileName: string,
+  rawText: string,
+  profile: ResumeProfile | null,
+  filePath?: string,
+  imageUrls?: string[],
+): Promise<ResumeRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("resumes")
+    .insert({
+      user_id: userId,
+      file_name: fileName,
+      file_path: filePath ?? null,
+      raw_text: rawText,
+      parsed_profile: profile,
+      image_urls: imageUrls?.length ? imageUrls : null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to save resume: ${error.message}`);
+  return data as ResumeRow;
+}
+
+export async function listResumes(userId: string): Promise<ResumeRow[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("resumes")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error || !data) return [];
+  return data as ResumeRow[];
+}
+
+/** Lightweight flags for gating UI (jobs, onboarding) without loading full resume rows. */
+export interface ResumeStatusSummary {
+  has_resume: boolean;
+  has_profile: boolean;
+  /** Prefer latest resume that has parsed_profile; otherwise latest upload id. */
+  resume_id: string | null;
+}
+
+export async function getResumeStatusForUser(userId: string): Promise<ResumeStatusSummary> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("resumes")
+    .select("id, parsed_profile")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error || !data?.length) {
+    return { has_resume: false, has_profile: false, resume_id: null };
+  }
+
+  const withProfile = data.find((r) => r.parsed_profile != null);
+  const has_profile = !!withProfile;
+  const resume_id = (withProfile ?? data[0]).id as string;
+  return {
+    has_resume: true,
+    has_profile,
+    resume_id,
+  };
+}
+
+export async function getResume(resumeId: string, userId: string): Promise<ResumeRow | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("resumes")
+    .select("*")
+    .eq("id", resumeId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) return null;
+  return data as ResumeRow;
+}
+
+export async function deleteResume(resumeId: string, userId: string): Promise<void> {
+  const supabase = createClient();
+  const resume = await getResume(resumeId, userId);
+  if (!resume) {
+    throw new Error("Resume not found");
+  }
+  if (resume.file_path) {
+    const { error: storageErr } = await supabase.storage.from("resumes").remove([resume.file_path]);
+    if (storageErr) {
+      console.warn("Failed to remove resume file from storage", storageErr);
+    }
+  }
+  const { error } = await supabase.from("resumes").delete().eq("id", resumeId).eq("user_id", userId);
+  if (error) throw new Error(`Failed to delete resume: ${error.message}`);
+}
+
+export async function updateResumeProfile(
+  resumeId: string,
+  userId: string,
+  profile: ResumeProfile,
+  suggestions: ResumeSuggestion[] = [],
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("resumes")
+    .update({
+      parsed_profile: profile,
+      ai_suggestions: suggestions.length > 0 ? suggestions : null,
+    })
+    .eq("id", resumeId)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(`Failed to update resume profile: ${error.message}`);
+}
+
+export async function createProfilingJob(resumeId: string, userId: string): Promise<ProfilingJobRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("profiling_jobs")
+    .insert({
+      resume_id: resumeId,
+      user_id: userId,
+      status: "queued",
+      error: null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create profiling job: ${error.message}`);
+  return data as ProfilingJobRow;
+}
+
+export async function updateProfilingJob(
+  jobId: string,
+  userId: string,
+  patch: Partial<Pick<ProfilingJobRow, "status" | "error">>,
+): Promise<ProfilingJobRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("profiling_jobs")
+    .update({
+      ...patch,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update profiling job: ${error.message}`);
+  return data as ProfilingJobRow;
+}
+
+export async function getProfilingJob(jobId: string, userId: string): Promise<ProfilingJobRow | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("profiling_jobs")
+    .select("*")
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) return null;
+  return data as ProfilingJobRow;
+}
+
+// ---------------------------------------------------------------------------
+// Comparison jobs
+// ---------------------------------------------------------------------------
+
+export async function createComparisonJob(
+  userId: string,
+  documentAId: string,
+  documentBId: string,
+): Promise<ComparisonJobRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("comparison_jobs")
+    .insert({
+      user_id: userId,
+      document_a_id: documentAId,
+      document_b_id: documentBId,
+      status: "queued",
+      error: null,
+      result: null,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create comparison job: ${error.message}`);
+  return data as ComparisonJobRow;
+}
+
+export async function updateComparisonJob(
+  jobId: string,
+  userId: string,
+  patch: Partial<Pick<ComparisonJobRow, "status" | "error" | "result">>,
+): Promise<ComparisonJobRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("comparison_jobs")
+    .update({
+      ...patch,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update comparison job: ${error.message}`);
+  return data as ComparisonJobRow;
+}
+
+export async function getComparisonJob(
+  jobId: string,
+  userId: string,
+): Promise<ComparisonJobRow | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("comparison_jobs")
+    .select("*")
+    .eq("id", jobId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) return null;
+  return data as ComparisonJobRow;
 }

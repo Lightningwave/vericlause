@@ -6,6 +6,7 @@ import type { ComplianceVerdict, TranslationLanguage } from "@/lib/types";
 const LANGUAGE_LABELS: Record<TranslationLanguage, string> = {
   zh: "Simplified Chinese (简体中文)",
   ta: "Tamil (தமிழ்)",
+  ms: "Malay (Bahasa Melayu, standard formal register suitable for legal text)",
 };
 
 function getOpenAI() {
