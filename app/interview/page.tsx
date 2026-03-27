@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
+import { createClient } from "@/lib/supabase/client";
 import AzureAvatarStage from "@/components/interview/AzureAvatarStage";
 
 type InterviewRole =
@@ -136,6 +137,7 @@ function buildMockCoaching(locale: string, messages: ConversationMessage[]) {
 }
 
 export default function InterviewPage() {
+  const router = useRouter();
   const { t, locale } = useLanguage();
   const safeLocale =
     locale === "en" || locale === "zh" || locale === "ms" || locale === "ta"
@@ -154,6 +156,41 @@ export default function InterviewPage() {
     () => buildMockCoaching(safeLocale, conversation),
     [safeLocale, conversation]
   );
+
+  const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
+  const recognizerRef = useRef<{ stop: () => void } | null>(null);
+
+  function handleMicClick() {
+    if (micState === "listening") {
+      recognizerRef.current?.stop();
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported in this browser");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      setTextInput((prev) => (prev ? prev + " " + transcript : transcript));
+    };
+
+    recognition.onerror = () => setMicState("idle");
+    recognition.onend = () => setMicState("idle");
+
+    recognition.start();
+    recognizerRef.current = recognition;
+    setMicState("listening");
+  }
 
   function startSession() {
     setSessionStarted(true);
@@ -204,12 +241,18 @@ export default function InterviewPage() {
     <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
         rightSlot={
-          <Link
-            href="/resume"
-            className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          <button
+            type="button"
+            onClick={async () => {
+              const supabase = createClient();
+              await supabase.auth.signOut();
+              router.push("/");
+              router.refresh();
+            }}
+            className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
           >
-            {t("nav_dashboard")}
-          </Link>
+            {t("dash_sign_out")}
+          </button>
         }
       />
 
@@ -397,9 +440,19 @@ export default function InterviewPage() {
                     </button>
                     <button
                       type="button"
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700"
+                      onClick={() => void handleMicClick()}
+                      disabled={!sessionStarted || micState === "processing"}
+                      className={`rounded-xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                        micState === "listening"
+                          ? "border-red-300 bg-red-50 text-red-600"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
                     >
-                      Mic
+                      {micState === "listening"
+                        ? "Listening..."
+                        : micState === "processing"
+                        ? "Processing..."
+                        : "Mic"}
                     </button>
                   </div>
                 </div>

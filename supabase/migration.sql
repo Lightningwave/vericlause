@@ -147,6 +147,36 @@ create policy "Users can update their own profiling jobs"
 create index idx_profiling_jobs_resume_id on public.profiling_jobs(resume_id);
 create index idx_profiling_jobs_user_id on public.profiling_jobs(user_id);
 
+-- 3c. Comparison jobs (async polling for POST /api/contracts/compare)
+create table public.comparison_jobs (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  document_a_id  uuid not null references public.documents(id) on delete cascade,
+  document_b_id  uuid not null references public.documents(id) on delete cascade,
+  status         text not null default 'queued', -- queued | running | succeeded | failed
+  error          text,
+  result         jsonb, -- ContractComparison JSON
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+alter table public.comparison_jobs enable row level security;
+
+create policy "Users can insert their own comparison jobs"
+  on public.comparison_jobs for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can view their own comparison jobs"
+  on public.comparison_jobs for select
+  using (auth.uid() = user_id);
+
+create policy "Users can update their own comparison jobs"
+  on public.comparison_jobs for update
+  using (auth.uid() = user_id);
+
+create index idx_comparison_jobs_user_id on public.comparison_jobs(user_id);
+create index idx_comparison_jobs_docs on public.comparison_jobs(document_a_id, document_b_id);
+
 -- 4. Storage bucket for contract PDFs
 insert into storage.buckets (id, name, public)
 values ('contracts', 'contracts', false)

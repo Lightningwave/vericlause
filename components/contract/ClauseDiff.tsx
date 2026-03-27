@@ -33,6 +33,12 @@ const ASSESSMENT_STYLES: Record<
   },
 };
 
+const VERDICT_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  compliant: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  caution: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
+  violated: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" },
+};
+
 const DEFAULT_STYLE = ASSESSMENT_STYLES.equal;
 
 export function ClauseDiff({
@@ -78,18 +84,33 @@ export function ClauseDiff({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-3">
-              <div className="bg-white/60 p-3 rounded border border-current/5">
-                <span className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1 font-medium">
-                  {labelA}
-                </span>
-                <span className="text-slate-700">{c.contract_a_value ?? t("compare_not_found")}</span>
-              </div>
-              <div className="bg-white/60 p-3 rounded border border-current/5">
-                <span className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1 font-medium">
-                  {labelB}
-                </span>
-                <span className="text-slate-700">{c.contract_b_value ?? t("compare_not_found")}</span>
-              </div>
+              {(() => {
+                const vA = c.verdict_a ? VERDICT_STYLES[c.verdict_a] : null;
+                const vB = c.verdict_b ? VERDICT_STYLES[c.verdict_b] : null;
+
+                return (
+                  <>
+                    <div className={`${vA ? vA.bg + ' ' + vA.text : 'bg-white/60 text-slate-700'} p-3 rounded border border-current/5`}>
+                      <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-1 font-medium italic">
+                        {labelA} {vA ? `(${c.verdict_a})` : ''}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {vA && <span className={`h-1.5 w-1.5 rounded-full ${vA.dot}`} />}
+                        <span>{c.contract_a_value ?? t("compare_not_found")}</span>
+                      </div>
+                    </div>
+                    <div className={`${vB ? vB.bg + ' ' + vB.text : 'bg-white/60 text-slate-700'} p-3 rounded border border-current/5`}>
+                      <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-1 font-medium italic">
+                        {labelB} {vB ? `(${c.verdict_b})` : ''}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {vB && <span className={`h-1.5 w-1.5 rounded-full ${vB.dot}`} />}
+                        <span>{c.contract_b_value ?? t("compare_not_found")}</span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">{c.explanation}</p>

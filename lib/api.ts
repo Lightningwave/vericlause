@@ -63,6 +63,9 @@ export async function getAnalyzeJob(jobId: string): Promise<{
     status: string;
     error: string | null;
     report_id: string | null;
+    /** 0–100 from analysis_jobs while running */
+    progress?: number;
+    stage?: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -104,7 +107,7 @@ export async function translateVerdicts(
 export async function compareContracts(
   documentAId: string,
   documentBId: string,
-): Promise<import("./types").ContractComparison> {
+): Promise<{ job_id: string; status: string; result?: import("./types").ContractComparison }> {
   const res = await fetch("/api/contracts/compare", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -113,6 +116,17 @@ export async function compareContracts(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || res.statusText || "Comparison failed");
+  }
+  return res.json();
+}
+
+export async function getComparisonJob(jobId: string): Promise<{
+  job: import("./types").ComparisonJobRow;
+}> {
+  const res = await fetch(`/api/contracts/compare/${encodeURIComponent(jobId)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || res.statusText || "Failed to fetch comparison job");
   }
   return res.json();
 }

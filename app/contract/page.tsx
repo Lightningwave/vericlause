@@ -31,6 +31,7 @@ import type {
 } from "@/lib/types";
 import type { Locale } from "@/lib/i18n/types";
 import { useLanguage } from "@/components/providers/language-provider";
+import { ContractAnalysisProgress } from "@/components/contract/ContractAnalysisProgress";
 import { ContractFlowStepper, type ContractFlowStep } from "@/components/contract/contract-flow-stepper";
 import { SummaryCard } from "@/components/contract/summary-card";
 
@@ -158,7 +159,34 @@ export default function ContractPage() {
   const [benchmarkResult, setBenchmarkResult] = useState<BenchmarkResult | null>(null);
   const [benchmarking, setBenchmarking] = useState(false);
 
+  /** Heuristic ETA for upload+analyze — from selected file size, or default when re-analyzing from library. */
+  const [bytesForFlowEta, setBytesForFlowEta] = useState(350 * 1024);
+  const [contractLoadStartedAt, setContractLoadStartedAt] = useState<number | null>(null);
+  const [, setContractLoadTick] = useState(0);
+  /** From analysis_jobs while polling (null until first GET). */
+  const [analysisJobProgress, setAnalysisJobProgress] = useState<number | null>(null);
+  const [analysisJobStage, setAnalysisJobStage] = useState<string | null>(null);
+
   const verdictTargetLang = useMemo(() => verdictLangFromLocale(locale), [locale]);
+
+  useEffect(() => {
+    if (workspaceState === "uploading" || workspaceState === "analyzing") {
+      setContractLoadStartedAt((prev) => prev ?? Date.now());
+    } else {
+      setContractLoadStartedAt(null);
+    }
+  }, [workspaceState]);
+
+  useEffect(() => {
+    if (workspaceState !== "uploading" && workspaceState !== "analyzing") return;
+    const id = setInterval(() => setContractLoadTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [workspaceState]);
+
+  const contractLoadElapsedSec =
+    contractLoadStartedAt != null
+      ? Math.floor((Date.now() - contractLoadStartedAt) / 1000)
+      : 0;
 
   useEffect(() => {
     const supabase = createClient();
@@ -236,6 +264,8 @@ export default function ContractPage() {
   const handleAnalyze = useCallback(
     async (docId: string) => {
       setAnalyzeError(null);
+      setAnalysisJobProgress(null);
+      setAnalysisJobStage(null);
       setWorkspaceState("analyzing");
 
       try {
@@ -247,6 +277,8 @@ export default function ContractPage() {
         setAnalyzeJobId(started.job_id);
 
         if (started.report) {
+          setAnalysisJobProgress(null);
+          setAnalysisJobStage(null);
           setReport(started.report);
           setWorkspaceState("ready");
           setActiveTab("overview");
@@ -256,6 +288,8 @@ export default function ContractPage() {
         const deadline = Date.now() + 180_000;
         while (Date.now() < deadline) {
           const { job } = await getAnalyzeJob(started.job_id);
+          setAnalysisJobProgress(typeof job.progress === "number" ? job.progress : 0);
+          setAnalysisJobStage(job.stage ?? null);
 
           if (job.status === "succeeded") {
             const result = await getDocumentWithReport(docId);
@@ -269,6 +303,8 @@ export default function ContractPage() {
               });
               setWorkspaceState("ready");
               setActiveTab("overview");
+              setAnalysisJobProgress(null);
+              setAnalysisJobStage(null);
               return;
             }
             break;
@@ -283,6 +319,8 @@ export default function ContractPage() {
 
         throw new Error(t("dash_error_analysis_timeout"));
       } catch (error) {
+        setAnalysisJobProgress(null);
+        setAnalysisJobStage(null);
         setAnalyzeError(
           error instanceof Error ? error.message : t("dash_error_analysis_failed"),
         );
@@ -294,6 +332,9 @@ export default function ContractPage() {
 
   const handleUpload = useCallback(
     async (selectedFile: File) => {
+      setBytesForFlowEta(selectedFile.size);
+      setAnalysisJobProgress(null);
+      setAnalysisJobStage(null);
       setFlowStep("workspace");
       setFile(selectedFile);
       setUploadError(null);
@@ -364,6 +405,7 @@ export default function ContractPage() {
         setActiveTab("overview");
       } else if (result.document.extracted) {
         setReport(null);
+        setBytesForFlowEta(350 * 1024);
         await handleAnalyze(doc.id);
       } else {
         setReport(null);
@@ -762,7 +804,7 @@ export default function ContractPage() {
 
             <div className="h-[664px] overflow-auto p-5">
               {(workspaceState === "uploading" || workspaceState === "analyzing") && (
-                <div className="flex h-full flex-col items-center justify-center text-center">
+                <div className="flex h-full flex-col items-center justify-center px-2 text-center">
                   <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-navy-950" />
                   <h3 className="mt-5 font-serif text-xl font-semibold text-navy-950">
                     {t("dash_ai_reviewing_title")}
@@ -770,6 +812,15 @@ export default function ContractPage() {
                   <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
                     {t("dash_ai_reviewing_desc")}
                   </p>
+                  <div className="mt-8 flex w-full justify-center">
+                    <ContractAnalysisProgress
+                      phase={workspaceState === "uploading" ? "uploading" : "analyzing"}
+                      fileSizeBytes={bytesForFlowEta}
+                      elapsedSeconds={contractLoadElapsedSec}
+                      serverProgress={workspaceState === "analyzing" ? analysisJobProgress : null}
+                      serverStage={workspaceState === "analyzing" ? analysisJobStage : null}
+                    />
+                  </div>
                 </div>
               )}
 

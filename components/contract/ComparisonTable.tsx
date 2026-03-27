@@ -10,6 +10,12 @@ const ASSESSMENT_STYLES: Record<string, { bg: string; text: string }> = {
   different: { bg: "bg-amber-100", text: "text-amber-800" },
 };
 
+const VERDICT_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  compliant: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  caution: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
+  violated: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" },
+};
+
 export function ComparisonTable({
   terms,
   labelA,
@@ -56,11 +62,24 @@ export function ComparisonTable({
         <tbody>
           {terms.map((row, i) => {
             const style = ASSESSMENT_STYLES[row.assessment] ?? ASSESSMENT_STYLES.equal;
+            const vA = row.verdict_a ? VERDICT_STYLES[row.verdict_a] : null;
+            const vB = row.verdict_b ? VERDICT_STYLES[row.verdict_b] : null;
+
             return (
               <tr key={i} className="border-b border-slate-100 last:border-none">
                 <td className="px-4 py-3 font-medium text-slate-800">{row.term}</td>
-                <td className="px-4 py-3 text-slate-700">{row.contract_a_value ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-700">{row.contract_b_value ?? "—"}</td>
+                <td className={`px-4 py-3 ${vA ? vA.bg + ' ' + vA.text : 'text-slate-700'}`}>
+                  <div className="flex items-center gap-2">
+                    {vA && <span className={`h-1.5 w-1.5 rounded-full ${vA.dot}`} />}
+                    {row.contract_a_value ?? "—"}
+                  </div>
+                </td>
+                <td className={`px-4 py-3 ${vB ? vB.bg + ' ' + vB.text : 'text-slate-700'}`}>
+                  <div className="flex items-center gap-2">
+                    {vB && <span className={`h-1.5 w-1.5 rounded-full ${vB.dot}`} />}
+                    {row.contract_b_value ?? "—"}
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${style.bg} ${style.text}`}

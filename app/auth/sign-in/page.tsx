@@ -4,13 +4,9 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthForm, type AuthFormValues } from "@/components/auth/AuthForm";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-
-function safeNextPath(next: string | null): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/resume";
-  return next;
-}
 
 function SignInContent() {
   const [error, setError] = useState<string | null>(null);

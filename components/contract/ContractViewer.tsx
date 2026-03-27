@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import type { ClauseLocation } from "@/lib/types";
 import "@llamaindex/pdf-viewer/index.css";
@@ -208,9 +208,13 @@ export function ContractViewer({
     };
   }, [highlightText, highlightLocations, clearHighlights]);
 
-  if (!fileUrl) return null;
+  /** Stable reference — parent re-renders often (polling/timers); a new object each time can reload the PDF. */
+  const pdfFile = useMemo(
+    () => (fileUrl ? { id: FILE_ID, url: fileUrl } : null),
+    [fileUrl],
+  );
 
-  const pdfFile = { id: FILE_ID, url: fileUrl };
+  if (!fileUrl || !pdfFile) return null;
 
   return (
     <div ref={containerRef} className="h-full pdf-zoom-80">

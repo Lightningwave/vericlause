@@ -582,6 +582,19 @@ jobs_continue_interview: "நேர்காணல் தயாரிப்ப�
   dash_ai_reviewing_title: "AI ஒப்பந்தத்தைப் பரிசீலிக்கிறது",
   dash_ai_reviewing_desc:
     "விதிமுறைகளை எடுத்து, இணக்கத்தைச் சோதித்து, இந்தப் பக்கத்திற்கு பகுப்பாய்வைத் தயாரிக்கிறோம்.",
+  dash_contract_progress_uploading: "PDF பதிவேற்றம் மற்றும் செயலாக்கம்",
+  dash_contract_progress_analyzing: "இணக்க பகுப்பாய்வு இயங்குகிறது",
+  dash_contract_progress_hint:
+    "நேரம் நெட்வொர்க் மற்றும் சேவையக சுமையைப் பொறுத்து மாறும். கீழுள்ள டைமர் தோராயமானது.",
+  dash_contract_progress_elapsed: "கழிந்த நேரம்",
+  dash_contract_progress_eta: "~{{s}} வி நொடி மீதம் (மதிப்பீடு)",
+  dash_contract_progress_eta_last: "முடிவடைகிறது…",
+  dash_contract_progress_stage_starting: "பகுப்பாய்வைத் தொடங்குகிறது",
+  dash_contract_progress_stage_clauses: "ஒப்பந்த விதிமுறைகளைப் பரிசீலிக்கிறது",
+  dash_contract_progress_stage_ket: "முக்கிய வேலை விதிமுறைகளைச் சரிபார்க்கிறது",
+  dash_contract_progress_stage_empty: "விதிமுறைகள் எதுவும் எடுக்கப்படவில்லை — விரைவுச் சோதனை",
+  dash_contract_progress_stage_finalizing: "முடிவுகளை இறுதிசெய்கிறது",
+  dash_contract_progress_stage_saving: "அறிக்கையைச் சேமிக்கிறது",
   dash_waiting_badge: "பகுப்பாய்வுக்காக காத்திருக்கிறது",
   dash_waiting_title: "உங்கள் AI முடிவுகள் இங்கே தோன்றும்",
   dash_waiting_desc:

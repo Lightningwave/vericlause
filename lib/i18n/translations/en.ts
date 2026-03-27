@@ -580,6 +580,19 @@ jobs_continue_interview: "Continue to Interview Prep",
   dash_ai_reviewing_title: "AI is reviewing the contract",
   dash_ai_reviewing_desc:
     "We are extracting clauses, checking compliance, and preparing the analysis for this page.",
+  dash_contract_progress_uploading: "Uploading and processing PDF",
+  dash_contract_progress_analyzing: "Running compliance analysis",
+  dash_contract_progress_hint:
+    "Time varies with network and server load. The timer below is a rough estimate.",
+  dash_contract_progress_elapsed: "Elapsed",
+  dash_contract_progress_eta: "~{{s}}s remaining (estimate)",
+  dash_contract_progress_eta_last: "Finishing up…",
+  dash_contract_progress_stage_starting: "Initializing analysis",
+  dash_contract_progress_stage_clauses: "Reviewing contract clauses",
+  dash_contract_progress_stage_ket: "Checking key employment terms",
+  dash_contract_progress_stage_empty: "No clauses extracted — quick check",
+  dash_contract_progress_stage_finalizing: "Finalizing results",
+  dash_contract_progress_stage_saving: "Saving report",
   dash_waiting_badge: "Waiting for analysis",
   dash_waiting_title: "Your AI results will appear here",
   dash_waiting_desc:
@@ -645,7 +658,7 @@ jobs_continue_interview: "Continue to Interview Prep",
   compare_tab_clauses: "Clauses",
   compare_loading_title: "AI is comparing the contracts",
   compare_loading_desc:
-    "We are reviewing key terms, clause differences, and the overall balance between both contracts.",
+    "We are analyzing legal compliance for both contracts and comparing them side-by-side. This may take up to a minute.",
   compare_empty_badge: "Waiting for comparison",
   compare_empty_title: "Your AI comparison will appear here",
   compare_empty_desc:
