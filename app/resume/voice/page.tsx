@@ -42,9 +42,6 @@ const browserLangMap: Record<SupportedLocale, string> = {
   ta: "ta-IN",
 };
 
-function ChevronDownFallback() {
-  return null;
-}
 
 function getBestVoice(locale: SupportedLocale) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
@@ -388,8 +385,10 @@ export default function VoiceResumePage() {
         setGenerateError(json.detail ?? "Generation failed. Please try again.");
         return;
       }
-      sessionStorage.setItem("vericlause.voiceBuilderResult", JSON.stringify(json));
-      router.push("/resume/review");
+      const destination = json.resume_id
+        ? `/resume/review?resume_id=${json.resume_id}`
+        : "/resume/review";
+      router.push(destination);
     } catch {
       setGenerateError("Network error. Please check your connection and try again.");
     } finally {

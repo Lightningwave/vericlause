@@ -3,7 +3,8 @@ export const runtime = "nodejs";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import Groq from "groq-sdk";
-import { getAuthenticatedUser } from "@/lib/services/db";
+import { getAuthenticatedUser, insertResume } from "@/lib/services/db";
+import type { ResumeProfile } from "@/lib/types";
 
 const OPENAI_MODEL = "gpt-4o-mini";
 const GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant";
@@ -89,7 +90,42 @@ export async function POST(req: NextRequest) {
       throw new Error("No JSON returned from AI");
     }
     const result = JSON.parse(raw.slice(braceStart, braceEnd + 1));
-    return NextResponse.json(result);
+
+    // Build a ResumeProfile from the AI output and save to Supabase
+    const profile: ResumeProfile = {
+      headline: result.targetRole || null,
+      summary: result.summary || null,
+      skills: result.skills
+        ? result.skills.split(/,|\n/).map((s: string) => s.trim()).filter(Boolean)
+        : [],
+      years_experience: null,
+      experiences: result.experience
+        ? [{ title: result.targetRole || null, company: null, start_date: null, end_date: null, description: result.experience }]
+        : [],
+      education: result.education
+        ? [{ institution: null, qualification: result.education, field_of_study: null, graduation_year: null }]
+        : [],
+      target_roles: result.targetRole ? [result.targetRole] : [],
+      target_industries: [],
+      location_preference: null,
+      seniority_level: null,
+    };
+
+    // Build a raw_text representation so the resume is searchable/readable in Supabase
+    const rawText = [
+      result.name ? `Name: ${result.name}` : "",
+      result.targetRole ? `Target Role: ${result.targetRole}` : "",
+      result.summary ? `Summary:\n${result.summary}` : "",
+      result.experience ? `Experience:\n${result.experience}` : "",
+      result.education ? `Education:\n${result.education}` : "",
+      result.skills ? `Skills:\n${result.skills}` : "",
+      result.certifications ? `Certifications:\n${result.certifications}` : "",
+    ].filter(Boolean).join("\n\n");
+
+    const fileName = result.name ? `${result.name} - Voice Resume` : "Voice Resume";
+    const saved = await insertResume(user.id, fileName, rawText, profile);
+
+    return NextResponse.json({ ...result, resume_id: saved.id });
   } catch (e) {
     return NextResponse.json(
       { detail: `Resume generation failed: ${e instanceof Error ? e.message : e}` },

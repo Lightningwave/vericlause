@@ -5,6 +5,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 import { listResumes, getResumeById } from "@/lib/api";
+import { createClient } from "@/lib/supabase/client";
 
 type ExperienceItem = {
   id: string;
@@ -98,13 +99,44 @@ export default function ResumeBuilderPage() {
   useEffect(() => {
     async function prefillFromResume() {
       try {
-        const { resumes } = await listResumes();
-        const analyzed = resumes.find((r) => r.parsed_profile);
-        if (!analyzed) return;
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) setEmail(user.email);
 
+        console.log("[ResumeBuilder] Fetching resumes from GET /api/resumes …");
+        const { resumes } = await listResumes();
+        console.log("[ResumeBuilder] listResumes response:", resumes);
+
+        const analyzed = resumes.find((r) => r.parsed_profile);
+        if (!analyzed) {
+          console.log("[ResumeBuilder] No resume with parsed_profile found. Resumes returned:", resumes.length);
+          return;
+        }
+        console.log("[ResumeBuilder] Found analyzed resume:", analyzed.id, analyzed.file_name);
+
+        console.log(`[ResumeBuilder] Fetching resume detail from GET /api/resumes/${analyzed.id} …`);
         const data = await getResumeById(analyzed.id);
+        console.log("[ResumeBuilder] getResumeById response:", data);
+
         const profile = data?.resume?.parsed_profile;
-        if (!profile) return;
+        if (!profile) {
+          console.log("[ResumeBuilder] parsed_profile is null on the fetched resume.");
+          return;
+        }
+        console.log("[ResumeBuilder] parsed_profile:", profile);
+
+        // full_name is not in the ResumeProfile schema — extract from the first
+        // non-empty line of raw_text, which is almost always the candidate's name.
+        const rawText = data?.resume?.raw_text ?? "";
+        const firstLine = rawText.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+        const looksLikeName =
+          firstLine.length > 0 &&
+          firstLine.length < 60 &&
+          !/^\s*(email|phone|mobile|address|resume|curriculum|cv|summary|profile|objective)\b/i.test(firstLine) &&
+          !firstLine.includes("@") &&
+          !firstLine.includes("|");
+        console.log("[ResumeBuilder] Name candidate from raw_text first line:", JSON.stringify(firstLine), "→ using:", looksLikeName);
+        if (looksLikeName) setFullName(firstLine);
 
         if (profile.summary) setSummary(profile.summary);
 
@@ -146,8 +178,10 @@ export default function ResumeBuilderPage() {
         }
 
         if (profile.headline) setTargetRole(profile.headline);
-      } catch {
-        // Silently skip — user may not be logged in or have no resume yet
+
+        console.log("[ResumeBuilder] Pre-fill complete.");
+      } catch (err) {
+        console.error("[ResumeBuilder] prefillFromResume error:", err);
       } finally {
         setPrefillLoading(false);
       }
