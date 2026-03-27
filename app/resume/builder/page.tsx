@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
+import { listResumes, getResumeById } from "@/lib/api";
 
 type ExperienceItem = {
   id: string;
@@ -91,6 +92,69 @@ export default function ResumeBuilderPage() {
       content: "Add certifications, awards, volunteer work, languages, or any other optional section here.",
     },
   ]);
+
+  const [prefillLoading, setPrefillLoading] = useState(true);
+
+  useEffect(() => {
+    async function prefillFromResume() {
+      try {
+        const { resumes } = await listResumes();
+        const analyzed = resumes.find((r) => r.parsed_profile);
+        if (!analyzed) return;
+
+        const data = await getResumeById(analyzed.id);
+        const profile = data?.resume?.parsed_profile;
+        if (!profile) return;
+
+        if (profile.summary) setSummary(profile.summary);
+
+        if (profile.experiences?.length) {
+          setExperiences(
+            profile.experiences.map((e) => ({
+              id: createId(),
+              jobTitle: e.title ?? "",
+              company: e.company ?? "",
+              location: "",
+              startDate: e.start_date ?? "",
+              endDate: e.end_date ?? "",
+              description: e.description ?? "",
+            })),
+          );
+        }
+
+        if (profile.education?.length) {
+          setEducations(
+            profile.education.map((ed) => ({
+              id: createId(),
+              school: ed.institution ?? "",
+              qualification: ed.qualification ?? "",
+              fieldOfStudy: ed.field_of_study ?? "",
+              startDate: "",
+              endDate: ed.graduation_year != null ? String(ed.graduation_year) : "",
+            })),
+          );
+        }
+
+        if (profile.skills?.length) {
+          setSkills(
+            profile.skills.slice(0, 12).map((name) => ({
+              id: createId(),
+              name,
+              level: 75,
+            })),
+          );
+        }
+
+        if (profile.headline) setTargetRole(profile.headline);
+      } catch {
+        // Silently skip — user may not be logged in or have no resume yet
+      } finally {
+        setPrefillLoading(false);
+      }
+    }
+
+    void prefillFromResume();
+  }, []);
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -216,6 +280,12 @@ export default function ResumeBuilderPage() {
           <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
             {t("resume_builder_page_lead")}
           </p>
+          {prefillLoading ? (
+            <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-navy-950" />
+              Loading your resume data…
+            </p>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-8">

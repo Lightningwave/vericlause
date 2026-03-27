@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
@@ -82,6 +82,47 @@ const SUGGESTION_TYPE_LABEL: Record<ResumeSuggestion["type"], string> = {
   ats_optimization: "ATS",
 };
 
+function parseImprovedResume(text: string): {
+  summary: string;
+  experience: string;
+  skills: string;
+  education: string;
+} {
+  const lines = text.split("\n");
+  const sections: Record<string, string[]> = { summary: [], experience: [], skills: [], education: [] };
+  let current = "summary";
+
+  for (const line of lines) {
+    // Strip markdown bold markers for header detection: **Work Experience** → work experience
+    const stripped = line.replace(/\*\*/g, "").trim();
+
+    if (/^(summary|professional summary|profile|about me|objective)\s*:?\s*$/i.test(stripped)) {
+      current = "summary"; continue;
+    }
+    if (/^(experience|work experience|employment|career|professional experience)\s*:?\s*$/i.test(stripped)) {
+      current = "experience"; continue;
+    }
+    if (/^(skills|technical skills|core competencies|key competencies|competencies|areas of expertise)\s*:?\s*$/i.test(stripped)) {
+      current = "skills"; continue;
+    }
+    if (/^(education|academic|qualifications|certifications?)\s*:?\s*$/i.test(stripped)) {
+      current = "education"; continue;
+    }
+
+    // Also skip lines that are only decorators like "---" or "==="
+    if (/^[-=]{3,}$/.test(stripped)) continue;
+
+    sections[current].push(line);
+  }
+
+  return {
+    summary: sections.summary.join("\n").trim(),
+    experience: sections.experience.join("\n").trim(),
+    skills: sections.skills.join("\n").trim(),
+    education: sections.education.join("\n").trim(),
+  };
+}
+
 function ResumeReviewContent() {
   const { t } = useLanguage();
   const { refetch: refetchResumeStatus } = useResumeStatus();
@@ -95,6 +136,17 @@ function ResumeReviewContent() {
   const [profile, setProfile] = useState<ResumeProfile | null>(null);
   const [suggestions, setSuggestions] = useState<ResumeSuggestion[] | null>(null);
   const [resumeId, setResumeId] = useState<string | null>(null);
+  const [improving, setImproving] = useState(false);
+  const [improvedResume, setImprovedResume] = useState<string | null>(null);
+  const [improveError, setImproveError] = useState<string | null>(null);
+  const [rescoring, setRescoring] = useState(false);
+  const [rescoreScore, setRescoreScore] = useState<number | null>(null);
+  const [overrideSummary, setOverrideSummary] = useState<string | null>(null);
+  const [overrideExperience, setOverrideExperience] = useState<string | null>(null);
+  const [overrideSkills, setOverrideSkills] = useState<string | null>(null);
+  const [overrideEducation, setOverrideEducation] = useState<string | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
 
   const loadResume = useCallback(async (id: string) => {
     try {
@@ -147,6 +199,49 @@ function ResumeReviewContent() {
           router.replace("/auth/sign-in?next=/resume/review");
         }
         return;
+      }
+
+      // Check for a voice-generated resume first
+      try {
+        const voiceRaw = sessionStorage.getItem("vericlause.voiceBuilderResult");
+        if (voiceRaw) {
+          sessionStorage.removeItem("vericlause.voiceBuilderResult");
+          const v = JSON.parse(voiceRaw);
+          const syntheticProfile = {
+            headline: v.targetRole ?? null,
+            summary: v.summary ?? null,
+            skills: v.skills
+              ? v.skills.split(/,|\n/).map((s: string) => s.trim()).filter(Boolean)
+              : [],
+            years_experience: null,
+            experiences: v.experience
+              ? [{ title: null, company: null, start_date: null, end_date: null, description: v.experience }]
+              : [],
+            education: v.education
+              ? [{ institution: null, qualification: v.education, field_of_study: null, graduation_year: null }]
+              : [],
+            target_roles: v.targetRole ? [v.targetRole] : [],
+            target_industries: [],
+            location_preference: null,
+            seniority_level: null,
+          };
+          if (!cancelled) {
+            setFileName("Voice Resume");
+            setProfile(syntheticProfile as any);
+            setOverrideSummary(v.summary ?? null);
+            setOverrideExperience(
+              [v.experience, v.achievement ? `Achievement: ${v.achievement}` : ""].filter(Boolean).join("\n\n") || null,
+            );
+            setOverrideSkills(v.skills ?? null);
+            setOverrideEducation(
+              [v.education, v.certifications].filter(Boolean).join("\n") || null,
+            );
+            setLoading(false);
+          }
+          return;
+        }
+      } catch {
+        // sessionStorage unavailable or parse error — fall through to normal load
       }
 
       const fromQuery = searchParams.get("resume_id");
@@ -236,7 +331,305 @@ function ResumeReviewContent() {
     }
   }
 
-  const score = deriveIndicatorScore(suggestions);
+  async function handleGenerateImproved() {
+    if (!profile) return;
+    setImproving(true);
+    setImproveError(null);
+    setImprovedResume(null);
+
+    const resumeText = [
+      profile.summary,
+      formatExperiencesText(profile),
+      profile.skills?.length ? `Skills: ${profile.skills.join(", ")}` : "",
+      formatEducationText(profile),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const feedback = suggestions?.map((s) =>
+      s.suggested_rewrite ? `${s.suggestion} → ${s.suggested_rewrite}` : s.suggestion,
+    ) ?? [];
+
+    try {
+      const res = await fetch("/api/resume/improve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText, feedback }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setImproveError(json.detail ?? "Something went wrong. Please try again.");
+        return;
+      }
+      setImprovedResume(json.improvedResume);
+    } catch {
+      setImproveError("Network error. Please check your connection and try again.");
+    } finally {
+      setImproving(false);
+    }
+  }
+
+  function getDownloadContent() {
+    if (improvedResume) return improvedResume;
+    return [
+      profile?.summary ?? "",
+      profile ? formatExperiencesText(profile) : "",
+      profile?.skills?.length ? `Skills: ${profile.skills.join(", ")}` : "",
+      profile ? formatEducationText(profile) : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  async function handleDownloadPdf() {
+    const { pdf, Document, Page, Text, View, StyleSheet } = await import("@react-pdf/renderer");
+
+    // 2 cm margins (1 pt ≈ 0.0353 cm → 2 cm ≈ 56.7 pt)
+    const MARGIN = 56.7;
+
+    const styles = StyleSheet.create({
+      page: {
+        paddingHorizontal: MARGIN,
+        paddingVertical: MARGIN,
+        fontFamily: "Helvetica",
+        backgroundColor: "#ffffff",
+      },
+      name: {
+        fontSize: 18,
+        fontFamily: "Helvetica-Bold",
+        color: "#0f172a",
+        marginBottom: 4,
+      },
+      contact: {
+        fontSize: 9,
+        color: "#6b7280",
+        marginBottom: 10,
+      },
+      divider: {
+        borderBottomWidth: 1,
+        borderBottomColor: "#d1d5db",
+        marginBottom: 14,
+      },
+      sectionHeader: {
+        fontSize: 11,
+        fontFamily: "Helvetica-Bold",
+        color: "#0f172a",
+        textTransform: "uppercase" as const,
+        marginTop: 16,
+        marginBottom: 6,
+        paddingBottom: 2,
+        borderBottomWidth: 0.5,
+        borderBottomColor: "#e5e7eb",
+      },
+      bodyText: {
+        fontSize: 10,
+        color: "#374151",
+        lineHeight: 1.55,
+        marginBottom: 3,
+      },
+      expBlock: { marginBottom: 8 },
+      expTitle: {
+        fontSize: 10,
+        fontFamily: "Helvetica-Bold",
+        color: "#0f172a",
+        marginBottom: 1,
+      },
+      expDates: {
+        fontSize: 9,
+        color: "#6b7280",
+        marginBottom: 3,
+      },
+      bulletRow: {
+        flexDirection: "row" as const,
+        marginBottom: 2,
+        paddingLeft: 8,
+      },
+      bulletDot: { width: 10, fontSize: 10, color: "#374151" },
+      bulletText: { flex: 1, fontSize: 10, color: "#374151", lineHeight: 1.55 },
+    });
+
+    const candidateName = (profile as any)?.full_name || profile?.headline || "Resume";
+    const safeFileName =
+      candidateName.replace(/[^a-zA-Z0-9\s]/g, "").trim().replace(/\s+/g, "_") ||
+      "resume";
+    const fileName = `${safeFileName}_vericlause_resume.pdf`;
+
+    const contactParts = [
+      (profile as any)?.email,
+      (profile as any)?.phone,
+      (profile as any)?.location,
+    ].filter(Boolean);
+    const contactLine = contactParts.join("  |  ");
+
+    // Parse experience text into structured blocks separated by blank lines.
+    // Within each block: first line = role/company header, second line = dates if it
+    // contains a year or "present", remaining lines = bullet points.
+    function buildExperienceNodes() {
+      if (!experienceValue) return [];
+      const datePattern = /\d{4}|present|current/i;
+      return experienceValue
+        .split(/\n{2,}/)
+        .map((block) => block.trim())
+        .filter(Boolean)
+        .map((block, bi) => {
+          const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+          const [headerLine, ...rest] = lines;
+          let datesLine = "";
+          let bulletLines = rest;
+          if (rest.length > 0 && datePattern.test(rest[0])) {
+            datesLine = rest[0];
+            bulletLines = rest.slice(1);
+          }
+          const cleanText = (s: string) => s.replace(/\*\*/g, "").replace(/^[-•*]\s*/, "");
+          return React.createElement(
+            View,
+            { key: bi, style: styles.expBlock },
+            React.createElement(Text, { style: styles.expTitle }, cleanText(headerLine)),
+            datesLine
+              ? React.createElement(Text, { style: styles.expDates }, cleanText(datesLine))
+              : null,
+            ...bulletLines.map((line, li) =>
+              React.createElement(
+                View,
+                { key: li, style: styles.bulletRow },
+                React.createElement(Text, { style: styles.bulletDot }, "•"),
+                React.createElement(Text, { style: styles.bulletText }, cleanText(line)),
+              ),
+            ),
+          );
+        });
+    }
+
+    const strip = (s: string) => s.replace(/\*\*/g, "");
+
+    const doc = React.createElement(
+      Document,
+      null,
+      React.createElement(
+        Page,
+        { size: "A4", style: styles.page },
+        React.createElement(
+          View,
+          null,
+          // ── Header ──────────────────────────────────────────
+          React.createElement(Text, { style: styles.name }, candidateName),
+          contactLine
+            ? React.createElement(Text, { style: styles.contact }, contactLine)
+            : null,
+          React.createElement(View, { style: styles.divider }),
+
+          // ── Summary ─────────────────────────────────────────
+          summaryValue
+            ? React.createElement(
+                View,
+                null,
+                React.createElement(Text, { style: styles.sectionHeader }, "Summary"),
+                React.createElement(Text, { style: styles.bodyText }, strip(summaryValue)),
+              )
+            : null,
+
+          // ── Experience ──────────────────────────────────────
+          experienceValue
+            ? React.createElement(
+                View,
+                null,
+                React.createElement(Text, { style: styles.sectionHeader }, "Experience"),
+                ...buildExperienceNodes(),
+              )
+            : null,
+
+          // ── Skills ──────────────────────────────────────────
+          skillsValue
+            ? React.createElement(
+                View,
+                null,
+                React.createElement(Text, { style: styles.sectionHeader }, "Skills"),
+                React.createElement(Text, { style: styles.bodyText }, strip(skillsValue)),
+              )
+            : null,
+
+          // ── Education ───────────────────────────────────────
+          educationValue
+            ? React.createElement(
+                View,
+                null,
+                React.createElement(Text, { style: styles.sectionHeader }, "Education"),
+                React.createElement(Text, { style: styles.bodyText }, strip(educationValue)),
+              )
+            : null,
+        ),
+      ),
+    );
+
+    const blob = await pdf(doc).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleDownloadDocx() {
+    const content = getDownloadContent();
+    const { Document, Packer, Paragraph, TextRun } = await import("docx");
+    const children = content.split("\n").map(
+      (line) => new Paragraph({ children: [new TextRun(line)] }),
+    );
+    const doc = new Document({ sections: [{ properties: {}, children }] });
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "resume_improved.docx";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleApplyImproved() {
+    if (!improvedResume) return;
+    const parsed = parseImprovedResume(improvedResume);
+
+    // If section parsing found nothing useful, fall back to putting
+    // the entire improved text into the experience field as a single block.
+    const hasAnySections = parsed.summary || parsed.experience || parsed.skills || parsed.education;
+
+    if (hasAnySections) {
+      if (parsed.summary) setOverrideSummary(parsed.summary);
+      if (parsed.experience) setOverrideExperience(parsed.experience);
+      if (parsed.skills) setOverrideSkills(parsed.skills);
+      if (parsed.education) setOverrideEducation(parsed.education);
+    } else {
+      setOverrideExperience(improvedResume);
+    }
+
+    setUpdateSuccess(true);
+    setTimeout(() => setUpdateSuccess(false), 3000);
+    sectionRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function handleRescore() {
+    const text = getDownloadContent();
+    if (!text.trim()) return;
+    setRescoring(true);
+    try {
+      const res = await fetch("/api/resume/rescore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const json = await res.json();
+      if (res.ok && typeof json.score === "number") {
+        setRescoreScore(json.score * 10);
+      }
+    } catch {
+      // silently keep current score
+    } finally {
+      setRescoring(false);
+    }
+  }
+
+  const score = rescoreScore ?? deriveIndicatorScore(suggestions);
   const { toImprove, positiveHints } = splitSuggestions(suggestions);
 
   const strengthsDisplay =
@@ -258,10 +651,10 @@ function ResumeReviewContent() {
     ...(profile?.target_roles ?? []).slice(0, 4),
   ].slice(0, 12);
 
-  const summaryValue = profile?.summary ?? "";
-  const experienceValue = profile ? formatExperiencesText(profile) : "";
-  const skillsValue = profile?.skills?.length ? profile.skills.join(", ") : "";
-  const educationValue = profile ? formatEducationText(profile) : "";
+  const summaryValue = overrideSummary ?? profile?.summary ?? "";
+  const experienceValue = overrideExperience ?? (profile ? formatExperiencesText(profile) : "");
+  const skillsValue = overrideSkills ?? (profile?.skills?.length ? profile.skills.join(", ") : "");
+  const educationValue = overrideEducation ?? (profile ? formatEducationText(profile) : "");
 
   return (
     <div className="min-h-screen bg-white">
@@ -341,8 +734,26 @@ function ResumeReviewContent() {
                     <span className="ml-1 text-xl text-slate-400">/100</span>
                   </h2>
                 </div>
-                <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                  {t("resume_review_score_status")}
+                <div className="flex flex-col items-end gap-2">
+                  <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                    {t("resume_review_score_status")}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleRescore()}
+                    disabled={rescoring || !profile}
+                    className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {rescoring ? (
+                      <>
+                        <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        Rescoring…
+                      </>
+                    ) : "Rescore Resume"}
+                  </button>
                 </div>
               </div>
 
@@ -436,12 +847,14 @@ function ResumeReviewContent() {
                 >
                   {profiling ? "Re-analyzing…" : t("resume_review_apply_ai")}
                 </button>
-                <Link
-                  href="/resume"
-                  className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800"
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateImproved()}
+                  disabled={improving || !profile}
+                  className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {t("resume_review_generate_new")}
-                </Link>
+                  {improving ? "Generating…" : t("resume_review_generate_new")}
+                </button>
               </div>
             </div>
 
@@ -468,17 +881,17 @@ function ResumeReviewContent() {
               </div>
             ) : null}
 
-            <div className="mt-8 space-y-6">
+            <div ref={sectionRef} className="mt-8 space-y-6">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
                   {t("resume_review_summary")}
                 </label>
                 <textarea
                   rows={5}
-                  readOnly
                   value={summaryValue}
+                  onChange={(e) => setOverrideSummary(e.target.value)}
                   placeholder="No summary extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none focus:border-navy-300 focus:bg-white"
                 />
               </div>
 
@@ -488,10 +901,10 @@ function ResumeReviewContent() {
                 </label>
                 <textarea
                   rows={8}
-                  readOnly
                   value={experienceValue}
+                  onChange={(e) => setOverrideExperience(e.target.value)}
                   placeholder="No experience extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap focus:border-navy-300 focus:bg-white"
                 />
               </div>
 
@@ -501,10 +914,10 @@ function ResumeReviewContent() {
                 </label>
                 <textarea
                   rows={4}
-                  readOnly
                   value={skillsValue}
+                  onChange={(e) => setOverrideSkills(e.target.value)}
                   placeholder="No skills extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none focus:border-navy-300 focus:bg-white"
                 />
               </div>
 
@@ -514,27 +927,63 @@ function ResumeReviewContent() {
                 </label>
                 <textarea
                   rows={3}
-                  readOnly
                   value={educationValue}
+                  onChange={(e) => setOverrideEducation(e.target.value)}
                   placeholder="No education extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap focus:border-navy-300 focus:bg-white"
                 />
               </div>
             </div>
+
+            {improveError ? (
+              <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {improveError}
+              </div>
+            ) : null}
+
+            {improvedResume ? (
+              <div className="mt-6">
+                <label className="mb-2 block text-sm font-semibold text-navy-950">
+                  Improved Resume
+                </label>
+                <textarea
+                  rows={20}
+                  readOnly
+                  value={improvedResume}
+                  className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap"
+                />
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleApplyImproved}
+                    className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    Update Resume with Improved Version
+                  </button>
+                  {updateSuccess ? (
+                    <span className="text-sm font-medium text-emerald-600">
+                      Resume updated — review and adjust the fields as needed
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-8 flex flex-col gap-3 border-t border-slate-100 pt-6 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  disabled
-                  className="cursor-not-allowed rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400"
+                  disabled={!profile}
+                  onClick={handleDownloadPdf}
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("resume_review_download_pdf")}
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="cursor-not-allowed rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400"
+                  disabled={!profile}
+                  onClick={() => void handleDownloadDocx()}
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t("resume_review_download_docx")}
                 </button>
