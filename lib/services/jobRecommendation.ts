@@ -8,13 +8,14 @@ import type { ResumeProfile } from "@/lib/types";
 export interface MCFJob {
   uuid: string;
   title: string;
-  company: { name: string };
+  postedCompany: { name: string } | null;
+  company?: { name: string } | null;
   salary: { minimum: number | null; maximum: number | null };
-  employmentTypes: { jobType: string }[];
+  employmentTypes: { employmentType: string }[];
   categories: { category: string }[];
   skills: { skill: string }[];
   positionLevels: { position: string }[];
-  metadata: { jobPostId: string; originalPostUrl?: string };
+  metadata: { jobPostId: string; jobDetailsUrl?: string; originalPostUrl?: string };
   description?: string;
 }
 
@@ -108,16 +109,18 @@ For each job return:
 - improvements: 2–3 bullet points on gaps to address
 - reasoning: 1–2 sentence overall reasoning
 
-Return ONLY a JSON array in this exact shape, no extra text:
-[
-  {
-    "id": "<job uuid>",
-    "matchScore": 85,
-    "strengths": ["...", "..."],
-    "improvements": ["...", "..."],
-    "reasoning": "..."
-  }
-]
+Return ONLY a JSON object in this exact shape, no extra text:
+{
+  "matches": [
+    {
+      "id": "<job uuid>",
+      "matchScore": 85,
+      "strengths": ["...", "..."],
+      "improvements": ["...", "..."],
+      "reasoning": "..."
+    }
+  ]
+}
 
 Consider: skills overlap, seniority level, industry match, years of experience, target roles.
 Singapore job market context applies.`;
@@ -151,7 +154,7 @@ export async function scoreJobsWithAI(
   const jobSummaries = jobs.map((j) => ({
     id: j.uuid,
     title: j.title,
-    company: j.company?.name,
+    company: j.postedCompany?.name ?? j.company?.name ?? "Unknown",
     skills: j.skills?.map((s) => s.skill).slice(0, 10),
     categories: j.categories?.map((c) => c.category),
     positionLevel: j.positionLevels?.[0]?.position ?? null,
@@ -172,10 +175,7 @@ export async function scoreJobsWithAI(
   const raw = response.choices[0]?.message?.content ?? "{}";
   try {
     const parsed = JSON.parse(raw);
-    // Handle both array and wrapped object responses
-    const results: MatchResult[] = Array.isArray(parsed)
-      ? parsed
-      : (parsed.results ?? parsed.jobs ?? []);
+    const results: MatchResult[] = parsed.matches ?? parsed.results ?? parsed.jobs ?? [];
     return results;
   } catch {
     return [];
@@ -197,20 +197,17 @@ export async function getJobRecommendations(
 
   const recommendations: JobRecommendation[] = jobs.map((job) => {
     const score = scoreMap.get(job.uuid);
-    const applyUrl =
-      job.metadata?.originalPostUrl ??
-      `https://www.mycareersfuture.gov.sg/job/${job.metadata?.jobPostId ?? job.uuid}`;
 
     return {
       id: job.uuid,
       title: job.title,
-      company: job.company?.name ?? "Unknown",
+      company: job.postedCompany?.name ?? job.company?.name ?? "Unknown",
       matchScore: score?.matchScore ?? 50,
       salaryMin: job.salary?.minimum ?? null,
       salaryMax: job.salary?.maximum ?? null,
-      employmentType: job.employmentTypes?.[0]?.jobType ?? null,
+      employmentType: job.employmentTypes?.[0]?.employmentType ?? null,
       skills: job.skills?.map((s) => s.skill).slice(0, 8) ?? [],
-      applyUrl,
+      applyUrl: job.metadata?.jobDetailsUrl ?? `https://www.mycareersfuture.gov.sg/job/${job.metadata?.jobPostId ?? job.uuid}`,
       strengths: score?.strengths ?? [],
       improvements: score?.improvements ?? [],
       reasoning: score?.reasoning ?? "This role matches your profile.",
@@ -270,13 +267,13 @@ export async function extractJobFromUrl(url: string): Promise<ScrapedJob> {
         if (job) {
           return {
             title: job.title ?? null,
-            company: job.company?.name ?? null,
+            company: job.postedCompany?.name ?? job.company?.name ?? null,
             description: job.description ?? null,
             salary: job.salary?.minimum
               ? `$${job.salary.minimum.toLocaleString()} – $${job.salary.maximum?.toLocaleString() ?? "?"} / month`
               : null,
             location: "Singapore",
-            employmentType: job.employmentTypes?.[0]?.jobType ?? null,
+            employmentType: job.employmentTypes?.[0]?.employmentType ?? null,
             skills: job.skills?.map((s) => s.skill) ?? [],
             applyUrl: url,
             source: "MyCareersFuture",
