@@ -15,6 +15,20 @@ const zh = {
   nav_how_it_works: "使用方式",
   nav_faq: "常见问题",
   nav_get_started: "开始使用",
+  nav_contracts: "合同",
+  nav_contract_analysis: "合同分析",
+  nav_compare_contracts: "合同比较",
+  nav_career: "职业发展",
+  nav_review: "简历评估",
+  nav_builder: "简历优化",
+  nav_recommendation: "AI 推荐",
+  nav_resume_review: "简历评估",
+  nav_resume_builder: "简历优化器",
+  nav_interview: "面试",
+  nav_dashboard: "仪表板",
+  nav_voice_resume: "语音简历",
+  nav_pricing: "价格方案",
+  nav_job_matching: "职位匹配",
 
   hero_badge: "新加坡雇佣法",
   hero_title: "在签署之前，先了解你将要签什么。",
@@ -55,7 +69,6 @@ const zh = {
 
   process_badge: "流程",
   process_title: "三步完成合规分析",
-
   step_1_title: "上传你的合同",
   step_1_desc: "上传任何雇佣合同 PDF，包括电子版、打印版或扫描版。",
   step_2_title: "AI 对照法律",
@@ -85,14 +98,78 @@ const zh = {
   cta_title: "准备好验证你的合同了吗？",
   cta_description: "上传你的雇佣合同，几分钟内获得详细的合规报告。",
   cta_create_account: "创建免费账户",
-
   footer_tagline: "新加坡雇佣法合规分析",
+
+  home_hero_badge: "VeriClause",
+  home_hero_title: "AI 驱动的合同与职业发展一体化工作空间",
+  home_hero_description:
+    "审查合同、比较条款、创建简历、匹配职位，并通过多语言 AI 辅助准备面试。",
+
+  home_card_contracts_badge: "合同",
+  home_card_contracts_title: "分析与比较",
+  home_card_contracts_description:
+    "识别高风险条款、比较关键条件，并审查多份合同。",
+
+  home_card_career_badge: "职业发展",
+  home_card_career_title: "创建并优化",
+  home_card_career_description:
+    "上传简历、使用语音简历创建功能，并获得职位推荐。",
+
+  home_card_interview_badge: "面试",
+  home_card_interview_title: "与 AI 一起练习",
+  home_card_interview_description:
+    "通过 AI 面试官进行训练，为真实面试场景做好准备。",
+
+  home_card_languages_badge: "语言",
+  home_card_languages_title: "多语言支持",
+  home_card_languages_description:
+    "专为英语、中文、马来语和泰米尔语体验而设计。",
+
+  home_features_badge: "功能",
+  home_features_title: "为合同清晰度与职业成长而打造",
+  home_features_description:
+    "VeriClause 将合同智能与职业辅助整合在一个前端体验中，让用户更容易审查文件并进行专业准备。",
+
+  home_feature_1_title: "合同分析",
+  home_feature_1_description:
+    "审查条款、识别问题，并在同一页面查看 AI 洞察。",
+  home_feature_2_title: "合同对比",
+  home_feature_2_description:
+    "通过 AI 摘要、条款和差异比较多份合同。",
+  home_feature_3_title: "简历与职位",
+  home_feature_3_description:
+    "创建简历、审查内容，并匹配适合的岗位。",
+  home_feature_4_title: "AI 面试助手",
+  home_feature_4_description:
+    "通过基于头像的 AI 场景练习面试回答。",
+
+  home_process_badge: "使用方式",
+  home_process_title: "引导式 AI 工作流程",
+  home_process_step_1_title: "上传或开始",
+  home_process_step_1_description:
+    "根据你的目标，选择合同、简历或面试路径。",
+  home_process_step_2_title: "查看 AI 输出",
+  home_process_step_2_description:
+    "在同一工作空间中查看分析、建议和辅导内容。",
+  home_process_step_3_title: "采取行动",
+  home_process_step_3_description:
+    "优化文件、比较决策，并自信地准备面试。",
+
+  home_faq_badge: "常见问题",
+  home_faq_title: "常见问题",
+  home_faq_1_q: "我可以同时用 VeriClause 处理合同和职业准备吗？",
+  home_faq_1_a: "可以。该平台旨在同时支持合同审查和职业发展流程。",
+  home_faq_2_q: "平台支持多语言吗？",
+  home_faq_2_a:
+    "支持。界面支持多种语言，AI 输出也可以根据所选语言进行显示。",
+  home_faq_3_q: "用户可以用说的而不是打字吗？",
+  home_faq_3_a:
+    "可以。平台已包含语音简历流程，面试体验也在为更深层的语音整合做准备。",
 
   resume_onboarding_badge: "简历入门",
   resume_onboarding_title: "从你的简历开始",
   resume_onboarding_description:
     "上传现有简历或从零开始创建。我们会帮助你为职位匹配和面试准备做好准备。",
-
   resume_upload_title: "上传你的简历",
   resume_upload_description: "上传你当前的简历，以开始分析和优化建议。",
   resume_upload_dropzone_title: "将简历拖放到这里",
@@ -101,45 +178,32 @@ const zh = {
   resume_selected_file: "已选择文件",
   resume_upload_button: "上传简历",
   resume_clear_button: "清除",
-
   resume_build_title: "从零开始创建",
   resume_build_description:
     "还没有简历？使用引导式创建器逐步建立你的简历。",
   resume_build_button: "开始创建简历",
-
   resume_voice_title: "语音输入",
   resume_voice_description:
     "更喜欢说话而不是打字？语音转文字功能可帮助你更快填写简历。",
   resume_voice_button: "语音输入即将推出",
-
   resume_tip_title: "小提示",
   resume_tip_description:
     "结构清晰、使用强动词并包含可量化成果的简历，在 AI 评估和职位匹配中会表现更好。",
-
   resume_continue_note: "你可以先完成界面流程，后续再接入后端处理。",
   resume_back_home: "返回首页",
   resume_continue_button: "继续",
 
   resume_review_nav: "审查",
-  resume_review_badge: "简历审查",
-  resume_review_title: "查看 AI 在你的简历中发现了什么",
-  resume_review_description:
-    "查看已上传简历的优点、差距和改进建议。你可以编辑内容、应用 AI 建议，或生成更强版本。",
   resume_review_score_label: "简历评分",
   resume_review_score_status: "需要改进",
   resume_review_score_note:
     "你的简历基础不错，但如果加入更清晰的成果和更强的关键词，将更有利于职位匹配。",
-  resume_review_strengths_title: "优点",
   resume_review_strength_1: "工作经历结构清晰，容易阅读。",
   resume_review_strength_2: "具有相关的行政和协调经验。",
   resume_review_strength_3: "技能部分已经包含一些实用核心工具。",
-  resume_review_improvements_title: "建议改进",
   resume_review_improvement_1: "在工作经历中加入可量化成果。",
   resume_review_improvement_2: "在职业简介中加入目标岗位关键词。",
   resume_review_improvement_3: "补充更多岗位相关技能以提升匹配度。",
-  resume_review_keywords_title: "缺失或较弱的关键词",
-  resume_review_keywords_description:
-    "这些关键词可能有助于提高你的简历与职位列表的匹配度。",
   resume_review_editor_badge: "可编辑简历",
   resume_review_editor_title: "优化你的简历",
   resume_review_editor_description:
@@ -154,10 +218,11 @@ const zh = {
   resume_review_download_docx: "下载 DOCX",
   resume_review_back: "返回",
   resume_review_edit_builder: "到编辑器修改",
-    resume_builder_badge: "简历编辑器",
+
+  resume_builder_badge: "简历优化器",
   resume_builder_title: "创建并优化你的简历",
   resume_builder_description:
-    "从零开始创建简历，或按部分优化已上传的简历，并结合 AI 辅助编辑。",
+    "通过头像、多段工作经历、教育背景、图形化技能和自定义附加部分，创建更完整的简历。",
   resume_builder_section: "部分",
   resume_builder_summary_title: "职业简介",
   resume_builder_experience_title: "工作经历",
@@ -180,34 +245,64 @@ const zh = {
   resume_builder_tip_title: "编辑提示",
   resume_builder_tip_description:
     "重点加入可量化成果、强动词和岗位关键词，以提升简历质量。",
-  resume_builder_next_title: "下一步",
-  resume_builder_next_description:
-    "简历准备好后，继续进入职位匹配和推荐。",
   resume_builder_back_review: "返回审查",
   resume_builder_continue_jobs: "继续职位匹配",
-    jobs_nav: "职位",
+  resume_builder_basic_info_title: "基本信息",
+  resume_builder_display_picture: "头像",
+  resume_builder_profile_alt: "简历头像",
+  resume_builder_no_photo: "暂无照片",
+  resume_builder_upload: "上传",
+  resume_builder_full_name: "姓名",
+  resume_builder_target_role: "目标职位",
+  resume_builder_email: "邮箱",
+  resume_builder_phone: "电话",
+  resume_builder_location: "地点",
+  resume_builder_add_skill: "添加技能",
+  resume_builder_add_education: "添加教育经历",
+  resume_builder_optional_sections_title: "可选附加部分",
+  resume_builder_add_section: "添加部分",
+  resume_builder_experience_item: "经历",
+  resume_builder_job_title_placeholder: "职位名称",
+  resume_builder_company_placeholder: "公司",
+  resume_builder_location_placeholder: "地点",
+  resume_builder_start_placeholder: "开始",
+  resume_builder_end_placeholder: "结束",
+  resume_builder_experience_description_placeholder: "描述职责、成就与成果",
+  resume_builder_skill_item: "技能",
+  resume_builder_skill_name_placeholder: "技能名称",
+  resume_builder_proficiency: "熟练度",
+  resume_builder_education_item: "教育经历",
+  resume_builder_school_placeholder: "学校",
+  resume_builder_qualification_placeholder: "学历 / 资格",
+  resume_builder_field_of_study_placeholder: "专业",
+  resume_builder_section_title_placeholder: "部分标题",
+  resume_builder_section_content_placeholder: "添加部分内容",
+  resume_builder_optional_section_item: "可选部分",
+  resume_builder_preview_title: "简历预览",
+  resume_builder_preview_description: "在编辑时预览更完整的简历版式。",
+  resume_builder_photo: "照片",
+  resume_builder_default_name: "你的名字",
+  resume_builder_preview_summary_label: "简介",
+  resume_builder_preview_experience_label: "经历",
+  resume_builder_preview_skills_label: "技能",
+  resume_builder_preview_education_label: "教育背景",
+  resume_builder_job_title_fallback: "职位名称",
+  resume_builder_qualification_fallback: "学历 / 资格",
+  resume_builder_in: "于",
+  resume_builder_optional_section_fallback: "可选部分",
+  resume_builder_next_title: "下一步",
+  resume_builder_next_description: "优化简历后，继续前往职位匹配。",
+
+  jobs_nav: "职位",
   jobs_badge: "职位发现",
-  jobs_title: "查找与你的简历匹配的职位",
-  jobs_description:
-    "根据你的简历资料搜索推荐职位，或通过链接导入职位信息，在同一处比较机会。",
-
-  jobs_import_title: "导入职位信息",
-  jobs_import_description:
-    "粘贴外部招聘网站的职位链接，并将其加入你的比较清单。",
-  jobs_import_label: "职位链接",
-  jobs_import_button: "导入职位",
-
   jobs_filter_title: "筛选来源",
-  jobs_filter_description:
-    "查看所有职位，或按推荐来源筛选结果。",
+  jobs_filter_description: "查看所有职位，或按推荐来源筛选结果。",
   jobs_filter_all: "全部职位",
   jobs_filter_mcf: "MyCareersFuture",
   jobs_filter_imported: "导入链接",
-
   jobs_tip_title: "发现提示",
   jobs_tip_description:
     "先筛选匹配分数较高的职位，再比较要求和薪资后决定申请。",
-
   jobs_results_badge: "推荐职位",
   jobs_results_title: "你的职位清单",
   jobs_results_description:
@@ -216,55 +311,88 @@ const zh = {
   jobs_match_label: "匹配度",
   jobs_save_button: "保存职位",
   jobs_compare_button: "比较",
-  jobs_footer_note:
-    "你最多可以选择五个职位用于比较和推荐。",
+  jobs_footer_note: "你最多可以选择五个职位用于比较和推荐。",
   jobs_back_resume: "返回简历",
   jobs_continue_recommendation: "继续推荐",
   jobs_recommendation_badge: "AI 推荐",
-jobs_recommendation_title: "最适合你的职位",
-jobs_recommendation_description:
-  "根据你的简历和已选择的职位，我们为你推荐了最匹配的工作机会。",
+  jobs_recommendation_title: "最适合你的职位",
+  jobs_recommendation_description:
+    "根据你的简历和已选择的职位，我们为你推荐了最匹配的工作机会。",
+  jobs_recommendation_score: "匹配评分",
+  jobs_recommendation_score_note:
+    "该评分反映了你的简历与职位要求之间的匹配程度。",
+  jobs_recommendation_strengths: "与你匹配的优势",
+  jobs_recommendation_improve: "建议改进的部分",
+  jobs_recommendation_best_match: "最佳匹配职位",
+  jobs_recommendation_why: "为什么这个职位适合你",
+  jobs_recommendation_reason:
+    "你的简历显示你在协调、文档管理和沟通方面具有相关经验，这些能力与该职位的核心要求高度匹配。",
+  jobs_view_listing: "查看职位详情",
+  jobs_back_to_list: "返回职位列表",
+  jobs_continue_interview: "继续面试准备",
 
-jobs_recommendation_score: "匹配评分",
-jobs_recommendation_score_note:
-  "该评分反映了你的简历与职位要求之间的匹配程度。",
+  jobs_primary_cta: "开始 AI 职位匹配",
+  jobs_primary_cta_hint: "这是开始职位匹配分析的主要按钮。",
+  jobs_title: "职位匹配",
+  jobs_description:
+    "上传你的简历，选择一个职位，然后点击 AI 职位匹配，发现最适合你的机会。",
+  jobs_step_1_title: "步骤 1：上传简历",
+  jobs_step_1_description:
+    "添加你的简历，以便系统使用你的个人资料进行匹配分析。",
+  jobs_step_2_title: "步骤 2：选择职位",
+  jobs_step_2_description:
+    "选择一个你想与自己的背景和经验进行比较的职位。",
+  jobs_step_3_title: "步骤 3：开始 AI 匹配",
+  jobs_step_3_description:
+    "点击 AI 职位匹配，查看职位匹配度、优势和待提升之处。",
+  jobs_ai_card_badge: "推荐下一步",
+  jobs_ai_card_title: "上传简历后开始 AI 职位匹配",
+  jobs_ai_card_description:
+    "为了获得更好的推荐，请先上传简历并选择目标职位。然后点击 AI 职位匹配按钮开始分析。",
+  jobs_ai_card_point_1: "基于简历的匹配分析",
+  jobs_ai_card_point_2: "职位匹配度、优势和差距",
+  jobs_ai_card_point_3: "清晰的下一步建议",
+  jobs_resume_title: "上传简历",
+  jobs_resume_description:
+    "上传你的简历，以便系统将你的个人资料用于职位匹配和推荐分析。",
+  jobs_resume_upload_label: "简历文件",
+  jobs_resume_supported_formats: "支持格式：PDF、DOC、DOCX",
+  jobs_resume_upload_button: "上传简历",
+  jobs_resume_selected: "已选择文件",
+  jobs_roles_title: "可选职位",
+  jobs_roles_description: "选择一个职位，以聚焦你的 AI 职位匹配结果。",
+  jobs_selected_badge: "已选择",
+  jobs_selected_role_title: "已选职位",
+  jobs_selected_role_description:
+    "继续进入 AI 职位匹配时，将使用这个职位进行分析。",
+  jobs_import_title: "导入职位链接",
+  jobs_import_description:
+    "当你的后端导入流程准备好后，可在此粘贴职位列表链接。",
+  jobs_import_button: "导入职位",
+  jobs_next_step_badge: "下一步",
+  jobs_next_step_title: "准备开始匹配了吗？",
+  jobs_next_step_description:
+    "上传简历并选择职位后，点击下方按钮继续进入 AI 驱动的推荐分析。",
+  jobs_next_step_tip: "提示：AI 职位匹配按钮就是用户开始匹配流程的入口。",
 
-jobs_recommendation_strengths: "与你匹配的优势",
-jobs_recommendation_improve: "建议改进的部分",
-
-jobs_recommendation_best_match: "最佳匹配职位",
-jobs_recommendation_why: "为什么这个职位适合你",
-jobs_recommendation_reason:
-  "你的简历显示你在协调、文档管理和沟通方面具有相关经验，这些能力与该职位的核心要求高度匹配。",
-
-jobs_view_listing: "查看职位详情",
-jobs_back_to_list: "返回职位列表",
-jobs_continue_interview: "继续面试准备",
   interview_badge: "面试准备",
   interview_title: "为你的面试做好准备",
   interview_description:
     "根据你的简历和推荐职位生成针对性的面试问题，并通过 AI 反馈优化你的回答。",
-
   interview_questions_title: "面试问题",
-  interview_questions_description:
-    "从下面选择一个问题并练习你的回答。",
+  interview_questions_description: "从下面选择一个问题并练习你的回答。",
   interview_type_behavioral: "行为题",
   interview_type_role: "岗位相关",
   interview_type_situational: "情境题",
-
-  interview_question_1:
-    "请介绍一次你在紧迫期限内同时处理多项任务的经历。",
-  interview_question_2:
-    "为什么你适合这个以运营为重点的职位？",
+  interview_question_1: "请介绍一次你在紧迫期限内同时处理多项任务的经历。",
+  interview_question_2: "为什么你适合这个以运营为重点的职位？",
   interview_question_3:
     "如果利益相关者急需更新，而你还在等待其他团队提供信息，你会如何处理？",
-
   interview_answer_instruction:
     "请像面对真实面试官一样作答。之后这里可以接入 Zack 的 AI 评分流程。",
   interview_answer_label: "你的回答",
   interview_submit_answer: "提交回答",
   interview_voice_button: "语音练习即将推出",
-
   interview_feedback_badge: "AI 反馈",
   interview_feedback_title: "回答评估",
   interview_feedback_score: "评分",
@@ -272,66 +400,213 @@ jobs_continue_interview: "继续面试准备",
   interview_feedback_improve: "可改进的地方",
   interview_feedback_strength_1: "你的回答清晰，易于理解。",
   interview_feedback_strength_2: "你展示了有条理的思考方式。",
-  interview_feedback_strength_3:
-    "你的回答与岗位相关，并体现了责任感。",
-  interview_feedback_improve_1:
-    "加入一个更具体的真实经历作为例子。",
-  interview_feedback_improve_2:
-    "尽量加入可量化的成果或结果。",
+  interview_feedback_strength_3: "你的回答与岗位相关，并体现了责任感。",
+  interview_feedback_improve_1: "加入一个更具体的真实经历作为例子。",
+  interview_feedback_improve_2: "尽量加入可量化的成果或结果。",
   interview_feedback_improve_3:
     "用更有力的结尾将回答与职位要求联系起来。",
-
   interview_tip_title: "面试提示",
   interview_tip_description:
     "强有力的面试回答通常是具体的、有结构的，并且与目标职位紧密相关。",
-
   interview_back_recommendation: "返回推荐页面",
   interview_next_question: "下一个问题",
- 
 
-nav_contracts: "合同",
-nav_contract_analysis: "合同分析",
-nav_compare_contracts: "合同比较",
-nav_career: "职业发展",
+  voice_resume_badge: "语音简历建立",
+  voice_resume_title: "通过语音建立你的简历",
+  voice_resume_description:
+    "通过语音回答引导问题，VeriClause 会记录你的内容并整理成简历资料。",
+  voice_resume_step: "问题",
+  voice_resume_repeat: "重复问题",
+  voice_resume_browser_warning:
+    "此浏览器不支持语音输入。你仍然可以手动输入答案。",
+  voice_resume_your_answer: "你的回答",
+  voice_resume_start_recording: "开始录音",
+  voice_resume_stop_recording: "停止录音",
+  voice_resume_save_answer: "保存回答",
+  voice_resume_back: "返回",
+  voice_resume_next: "下一步",
+  voice_resume_finish: "完成",
+  voice_resume_preview_title: "简历预览",
+  voice_resume_preview_description:
+    "你的语音回答会汇总在这里，之后可整理成结构化简历。",
+  voice_resume_preview_empty: "你的回答会随着步骤显示在这里。",
+  voice_resume_help_title: "使用方式",
+  voice_resume_help_1: "点击开始录音，然后自然回答问题。",
+  voice_resume_help_2: "检查文字内容，并在需要时编辑。",
+  voice_resume_help_3: "继续直到所有部分完成。",
+  voice_resume_switch_manual: "切换到手动简历流程",
+  voice_input_error: "无法获取语音输入，请再试一次。",
 
-nav_review: "简历评估",
-nav_builder: "简历优化",
+  pricing_badge: "价格",
+  pricing_title: "AI 合同审查的灵活方案",
+  pricing_description:
+    "选择适合你合同审查频率、报价比较需求，以及在求职流程中使用 AI 工具频率的方案。",
+  pricing_plan_period: "/月",
+  pricing_plan_free_name: "免费",
+  pricing_plan_free_price: "S$0",
+  pricing_plan_free_description:
+    "适合首次使用、想先体验合同分析功能的用户。",
+  pricing_plan_free_cta: "免费开始",
+  pricing_plan_free_feature_1: "总共可分析 1 份合同",
+  pricing_plan_free_feature_2: "每天 2 次 AI 审查",
+  pricing_plan_free_feature_3: "基础条款风险识别",
+  pricing_plan_free_feature_4: "标准仪表板访问",
+  pricing_plan_free_feature_5: "社区支持",
+  pricing_plan_pro_name: "Pro",
+  pricing_plan_pro_price: "S$19",
+  pricing_plan_pro_description:
+    "最适合经常审查合同的活跃求职者和专业人士。",
+  pricing_plan_pro_cta: "开始 Pro",
+  pricing_plan_pro_feature_1: "每月最多分析 15 份合同",
+  pricing_plan_pro_feature_2: "每天 20 次 AI 审查",
+  pricing_plan_pro_feature_3: "合同对比工具",
+  pricing_plan_pro_feature_4: "优先 AI 处理",
+  pricing_plan_pro_feature_5: "包含简历、职位和面试工具",
+  pricing_plan_pro_feature_6: "导出摘要报告",
+  pricing_plan_business_name: "Business",
+  pricing_plan_business_price: "S$49",
+  pricing_plan_business_description:
+    "适合需要更高额度和更快处理速度的人力资源团队、顾问和高频用户。",
+  pricing_plan_business_cta: "联系销售",
+  pricing_plan_business_feature_1: "每月最多分析 60 份合同",
+  pricing_plan_business_feature_2: "每日 AI 审查不限次数",
+  pricing_plan_business_feature_3: "高级基准分析与对比",
+  pricing_plan_business_feature_4: "共享团队工作空间",
+  pricing_plan_business_feature_5: "优先支持",
+  pricing_plan_business_feature_6: "抢先体验新 AI 功能",
+  pricing_guidance_badge: "方案指南",
+  pricing_guidance_title: "选择适合你工作流程的方案",
+  pricing_guidance_description:
+    "与其展示冗长的价格说明，这一部分能帮助用户快速判断哪一个方案最适合自己。",
+  pricing_guidance_free_title: "免费",
+  pricing_guidance_free_description:
+    "最适合首次使用、想先试用一份真实合同后再决定的用户。",
+  pricing_guidance_pro_title: "Pro",
+  pricing_guidance_pro_description:
+    "最适合需要在合同、简历审查和面试准备中持续使用 AI 支持的个人用户。",
+  pricing_guidance_business_title: "Business",
+  pricing_guidance_business_description:
+    "最适合需要更高用量、协作和支持的顾问、招聘人员或团队。",
+  pricing_common_title: "所有方案均包含",
+  pricing_common_feature_1: "安全的合同上传流程",
+  pricing_common_feature_2: "AI 辅助条款分析",
+  pricing_common_feature_3: "清晰的结论式体验",
+  pricing_common_feature_4: "核心产品更新访问权限",
+  pricing_faq_badge: "常见问题",
+  pricing_faq_title: "用户可能会问的问题",
+  pricing_faq_1_q: "之后可以更换方案吗？",
+  pricing_faq_1_a:
+    "可以。你可以先从免费方案开始，当你需要更多合同分析次数或更高每日 AI 使用量时，再升级到付费方案。",
+  pricing_faq_2_q: "为什么推荐 Pro 方案？",
+  pricing_faq_2_a:
+    "对于常规用户来说，Pro 是最平衡的选择，因为它提供更多使用量、更多工具，以及更流畅的体验，同时又不会进入团队级定价。",
+  pricing_faq_3_q: "Business 适合谁？",
+  pricing_faq_3_a:
+    "Business 适合招聘人员、顾问、人力资源团队，或任何需要更高额度、协作功能和更快支持的高频用户。",
 
-nav_recommendation: "AI 推荐",
-
-
-
-nav_resume_review: "简历评估",
-nav_resume_builder: "简历优化",
-nav_job_matching: "职位匹配",
-
-
-
-nav_interview: "面试",
-nav_dashboard: "仪表板",
-nav_voice_resume: "语音简历",
-voice_resume_badge: "语音简历建立",
-voice_resume_title: "通过语音建立你的简历",
-voice_resume_description: "通过语音回答引导问题，VeriClause 会记录你的内容并整理成简历资料。",
-voice_resume_step: "问题",
-voice_resume_repeat: "重复问题",
-voice_resume_browser_warning: "此浏览器不支持语音输入。你仍然可以手动输入答案。",
-voice_resume_your_answer: "你的回答",
-voice_resume_start_recording: "开始录音",
-voice_resume_stop_recording: "停止录音",
-voice_resume_save_answer: "保存回答",
-voice_resume_back: "返回",
-voice_resume_next: "下一步",
-voice_resume_finish: "完成",
-voice_resume_preview_title: "简历预览",
-voice_resume_preview_description: "你的语音回答会汇总在这里，之后可整理成结构化简历。",
-voice_resume_preview_empty: "你的回答会随着步骤显示在这里。",
-voice_resume_help_title: "使用方式",
-voice_resume_help_1: "点击开始录音，然后自然回答问题。",
-voice_resume_help_2: "检查文字内容，并在需要时编辑。",
-voice_resume_help_3: "继续直到所有部分完成。",
-voice_resume_switch_manual: "切换到手动简历流程",
-voice_input_error: "无法获取语音输入，请再试一次。",
+  resume_review_badge: "简历评估",
+  resume_review_title: "简历评估",
+  resume_review_description:
+    "查看你当前简历的质量，了解哪些部分做得好，并在编辑或进入职位匹配前找出需要改进的地方。",
+  resume_review_action_badge: "推荐下一步",
+  resume_review_action_title: "利用这些洞察优化简历并提升匹配效果",
+  resume_review_action_description:
+    "你现在可以继续前往 Resume Builder 优化你的简历，或前往 Job Matching 将你的个人资料与相关职位进行比较。",
+  resume_review_action_point_1: "了解你的简历目前做得好的地方",
+  resume_review_action_point_2: "在申请前改善较弱部分",
+  resume_review_action_point_3: "以更强的定位进入职位匹配",
+  resume_review_score_title: "简历分数",
+  resume_review_score_label_strong: "优秀",
+  resume_review_score_label_good: "良好",
+  resume_review_score_label_needs_work: "需要改进",
+  resume_review_score_description:
+    "这个分数可根据清晰度、结构、相关性和关键词强度，快速反映你当前简历的整体质量。",
+  resume_review_strengths_title: "优势",
+  resume_review_improvements_title: "可改进之处",
+  resume_review_keywords_title: "缺失关键词",
+  resume_review_keywords_description:
+    "这些是有助于提升你的简历在相关职位和 ATS 筛选中表现的关键词和短语。",
+  resume_review_next_steps_title: "下一步",
+  resume_review_next_steps_description:
+    "选择你想继续的方向。你可以先优化简历，或直接进入职位匹配。",
+  resume_review_tip_badge: "提示",
+  resume_review_tip_title: "最佳做法",
+  resume_review_tip_description:
+    "通常先优化简历，再进入职位匹配会更好，这样推荐结果能更准确地反映更强的个人资料。",
+  resume_review_future_title: "此页面后续将实现的功能",
+  resume_review_future_description:
+    "此页面已为后续 AI 集成做好准备。分数、优势、改进建议和关键词缺口都可以直接根据你的后端响应进行渲染。",
+  resume_review_summary_title: "评估摘要",
+  resume_review_summary_description:
+    "在继续编辑或进入职位匹配前，快速查看你的简历目前表现如何。",
+  resume_review_summary_score_label: "总体分数",
+  resume_review_summary_strengths_label: "优势",
+  resume_review_summary_strengths_text: "目前表现较好的部分",
+  resume_review_summary_improvements_label: "改进项",
+  resume_review_summary_improvements_text: "接下来需要加强的部分",
+  resume_review_summary_keywords_label: "关键词缺口",
+  resume_review_summary_keywords_text: "可考虑补充的缺失术语",
+  resume_review_priority_title: "优化优先级",
+  resume_review_priority_description:
+    "先完成这些优化动作，让你的简历在进入职位匹配前更有竞争力。",
+  resume_review_priority_1_label: "优先级 1",
+  resume_review_priority_1_title: "加入可量化的成果",
+  resume_review_priority_1_description:
+    "使用数字、结果或具体影响说明，让你的经历更有说服力。",
+  resume_review_priority_2_label: "优先级 2",
+  resume_review_priority_2_title: "补齐关键词缺口",
+  resume_review_priority_2_description:
+    "加入当前简历中缺少的相关岗位关键词。",
+  resume_review_priority_3_label: "优先级 3",
+  resume_review_priority_3_title: "强化职业总结",
+  resume_review_priority_3_description:
+    "让你的职业总结更清晰，帮助招聘方更快理解你的价值。",
+  resume_review_priority_next_label: "下一步",
+  resume_review_priority_next_title: "先更新，再匹配",
+  resume_review_priority_next_description:
+    "先在 Resume Builder 中优化简历，再前往 Job Matching 获得更好的推荐质量。",
+  resume_review_tip_2_badge: "提示",
+  resume_review_tip_2_title: "使用更有力的行动表达",
+  resume_review_tip_2_description:
+    "用有力的动词开头每个要点，并保持表达直接清晰，让你的影响更容易被理解。",
+  resume_review_tip_3_badge: "提示",
+  resume_review_tip_3_title: "每次申请前都做针对性调整",
+  resume_review_tip_3_description:
+    "根据不同岗位调整关键词和成就内容，让你的简历对招聘方和筛选系统更具相关性。",
+  resume_review_job_matching_button: "前往职位匹配",
+  resume_review_builder_button: "简历优化器",
+  resume_review_upload_title: "上传简历以开始评估",
+  resume_review_upload_description:
+    "请先上传你的简历，系统才能开始评估和分析流程。",
+  resume_review_upload_button: "上传简历",
+  resume_review_upload_supported_formats: "支持格式：PDF、DOC、DOCX",
+  resume_review_upload_selected: "已选择文件",
+  resume_review_step_1_label: "步骤 1",
+  resume_review_step_1_title: "上传你的简历",
+  resume_review_step_1_description:
+    "先上传你的简历，系统才能开始审查你的内容。",
+  resume_review_step_2_label: "步骤 2",
+  resume_review_step_2_title: "查看分析结果",
+  resume_review_step_2_description:
+    "查看你的分数、优势、关键词缺口，以及下一步需要改进的地方。",
+  resume_review_step_3_label: "步骤 3",
+  resume_review_step_3_title: "进行下一步",
+  resume_review_step_3_description:
+    "前往简历优化器优化你的简历，或继续进入职位匹配。",
+  resume_review_upload_badge: "从这里开始",
+  resume_review_upload_card_title: "简历文件",
+  resume_review_upload_hint: "请先上传，才能开始评估流程。",
+  resume_review_upload_point_1: "立即开始你的简历评估",
+  resume_review_upload_point_2: "查看优势、改进点和关键词缺口",
+  resume_review_upload_point_3: "评估后继续前往优化器或职位匹配",
+  resume_review_top_right_title: "上传后你将获得什么",
+  resume_review_top_right_description:
+    "上传简历后，系统会审查你的内容，并引导你了解接下来应改进的地方。",
+  resume_review_top_right_note:
+    "请先上传，然后利用评估结果优化简历或继续进入职位匹配。",
+  resume_review_dropzone_title: "将你的简历拖放到这里",
+  resume_review_dropzone_description: "或点击此处浏览并上传文件。",
+  resume_review_start_button: "开始简历评估",
 };
 
 export default zh;

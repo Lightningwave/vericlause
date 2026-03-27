@@ -79,11 +79,11 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
         href: "/resume",
         label: "nav_resume",
         items: [
-  { href: "/resume", label: "nav_resume_review" },
-  { href: "/resume/voice", label: "nav_voice_resume" },
-  { href: "/resume/builder", label: "nav_resume_builder" },
-  { href: "/jobs", label: "nav_job_matching" },
-],
+          { href: "/resume", label: "nav_resume_review" },
+          { href: "/resume/voice", label: "nav_voice_resume" },
+          { href: "/resume/builder", label: "nav_resume_builder" },
+          { href: "/jobs", label: "nav_job_matching" },
+        ],
       },
       {
         href: "/dashboard",
@@ -96,6 +96,10 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
       {
         href: "/interview",
         label: "nav_interview",
+      },
+      {
+        href: "/pricing",
+        label: "nav_pricing",
       },
     ],
     [],
@@ -221,60 +225,46 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
 
                 return (
                   <div key={group.label} className="rounded-lg border border-slate-200">
-                    <div className="flex items-center justify-between p-2">
-                      <Link
-                        href={group.href}
-                        className={topLinkClasses(active)}
-                        onClick={() => setMobileOpen(false)}
-                      >
-                        {t(group.label)}
-                      </Link>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenMobileGroup((prev) =>
-                            prev === group.label ? null : group.label,
-                          )
-                        }
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
-                        aria-label={`Toggle ${t(group.label)} submenu`}
-                      >
-                        <ChevronDownIcon
-                          className={`h-4 w-4 transition-transform ${
-                            expanded ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className={[
+                        "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium transition-all",
+                        active ? "bg-slate-50 text-navy-950" : "text-slate-700 hover:bg-slate-50",
+                      ].join(" ")}
+                      onClick={() =>
+                        setOpenMobileGroup((prev) => (prev === group.label ? null : group.label))
+                      }
+                    >
+                      <span>{t(group.label)}</span>
+                      <ChevronDownIcon
+                        className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+                      />
+                    </button>
 
                     {expanded && (
-                      <div className="border-t border-slate-200 p-2">
-                        <div className="flex flex-col gap-1">
-                          {group.items.map((item) => (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className={subLinkClasses(isPathActive(item.href))}
-                              onClick={() => setMobileOpen(false)}
-                            >
-                              {t(item.label)}
-                            </Link>
-                          ))}
-                        </div>
+                      <div className="flex flex-col gap-1 px-2 pb-2">
+                        {group.items.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={subLinkClasses(isPathActive(item.href))}
+                            onClick={() => setMobileOpen(false)}
+                          >
+                            {t(item.label)}
+                          </Link>
+                        ))}
                       </div>
                     )}
                   </div>
                 );
               })}
-            </nav>
 
-            <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4">
-              <div className="w-fit">
+              <div className="pt-2">
                 <LanguageSwitcher />
               </div>
-              {rightSlot}
-            </div>
+
+              {rightSlot ? <div className="pt-2">{rightSlot}</div> : null}
+            </nav>
           </div>
         )}
       </div>
