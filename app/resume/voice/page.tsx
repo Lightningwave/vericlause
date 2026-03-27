@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
@@ -41,9 +42,6 @@ const browserLangMap: Record<SupportedLocale, string> = {
   ta: "ta-IN",
 };
 
-function ChevronDownFallback() {
-  return null;
-}
 
 function getBestVoice(locale: SupportedLocale) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
@@ -76,6 +74,7 @@ function getBestVoice(locale: SupportedLocale) {
 
 export default function VoiceResumePage() {
   const { t, locale } = useLanguage();
+  const router = useRouter();
   const safeLocale: SupportedLocale =
     locale === "en" || locale === "zh" || locale === "ms" || locale === "ta" ? locale : "en";
 
@@ -85,8 +84,14 @@ export default function VoiceResumePage() {
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [finished, setFinished] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionType | null>(null);
+  const isRecordingRef = useRef(false);
+  const accumulatedTextRef = useRef("");
+  const currentTranscriptRef = useRef("");
 
   const questions = useMemo<VoiceQuestion[]>(
     () => [
@@ -104,6 +109,22 @@ export default function VoiceResumePage() {
           zh: "请说出你的全名",
           ms: "Sebut nama penuh anda",
           ta: "உங்கள் முழுப் பெயரைச் சொல்லுங்கள்",
+        },
+      },
+      {
+        id: "age",
+        section: "basics",
+        prompt: {
+          en: "How old are you?",
+          zh: "你今年几岁？",
+          ms: "Berapakah umur anda?",
+          ta: "உங்கள் வயது என்ன?",
+        },
+        placeholder: {
+          en: "Say your age",
+          zh: "请说出你的年龄",
+          ms: "Sebut umur anda",
+          ta: "உங்கள் வயதைச் சொல்லுங்கள்",
         },
       },
       {
@@ -236,25 +257,42 @@ export default function VoiceResumePage() {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = browserLangMap[safeLocale];
 
     recognition.onresult = (event) => {
-      let transcript = "";
-
-      for (let i = 0; i < event.results.length; i += 1) {
-        transcript += event.results[i][0].transcript;
-      }
-
-      setDraft(transcript.trim());
+      const transcript = Array.from(event.results as any[])
+        .map((r: any) => r[0].transcript as string)
+        .join("");
+      currentTranscriptRef.current = transcript;
+      const prefix = accumulatedTextRef.current;
+      setDraft(prefix ? `${prefix} ${transcript}` : transcript);
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      if (isRecordingRef.current) {
+        // Commit the transcript from this session before restarting
+        if (currentTranscriptRef.current) {
+          accumulatedTextRef.current = accumulatedTextRef.current
+            ? `${accumulatedTextRef.current} ${currentTranscriptRef.current}`
+            : currentTranscriptRef.current;
+          currentTranscriptRef.current = "";
+        }
+        try {
+          recognition.start();
+        } catch {
+          // Already starting — ignore
+        }
+      } else {
+        setIsListening(false);
+      }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      // "no-speech" is harmless — onend will restart automatically
+      if (event.error === "no-speech") return;
+      isRecordingRef.current = false;
       setIsListening(false);
       setError(t("voice_input_error"));
     };
@@ -290,19 +328,27 @@ export default function VoiceResumePage() {
   function startListening() {
     if (!recognitionRef.current) return;
     setError(null);
-    setDraft("");
+    // Preserve any text already in the textarea as the base for accumulation
+    accumulatedTextRef.current = draft;
+    currentTranscriptRef.current = "";
+    isRecordingRef.current = true;
     recognitionRef.current.lang = browserLangMap[safeLocale];
     recognitionRef.current.start();
     setIsListening(true);
   }
 
   function stopListening() {
+    isRecordingRef.current = false;
     recognitionRef.current?.stop();
-    setIsListening(false);
+    // setIsListening(false) will be called via onend
   }
 
   function saveAndNext() {
     if (!currentQuestion || !draft.trim()) return;
+
+    // Stop any active recording before moving on
+    isRecordingRef.current = false;
+    recognitionRef.current?.stop();
 
     const nextAnswers = {
       ...answers,
@@ -311,14 +357,43 @@ export default function VoiceResumePage() {
 
     setAnswers(nextAnswers);
     setDraft("");
+    accumulatedTextRef.current = "";
+    currentTranscriptRef.current = "";
+    setIsListening(false);
 
     if (isLastQuestion) {
       sessionStorage.setItem("vericlause.voiceResumeAnswers", JSON.stringify(nextAnswers));
       sessionStorage.setItem("vericlause.resumeSource", "voice");
+      setFinished(true);
       return;
     }
 
     setCurrentIndex((prev) => prev + 1);
+  }
+
+  async function handleGenerate() {
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const res = await fetch("/api/resume/voice-build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(answers),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setGenerateError(json.detail ?? "Generation failed. Please try again.");
+        return;
+      }
+      const destination = json.resume_id
+        ? `/resume/review?resume_id=${json.resume_id}`
+        : "/resume/review";
+      router.push(destination);
+    } catch {
+      setGenerateError("Network error. Please check your connection and try again.");
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function goBack() {
@@ -336,6 +411,7 @@ export default function VoiceResumePage() {
 
   const compiledPreview = [
     answers.full_name ? `Name: ${answers.full_name}` : "",
+    answers.age ? `Age: ${answers.age}` : "",
     answers.job_title ? `Target Role: ${answers.job_title}` : "",
     answers.summary ? `Summary: ${answers.summary}` : "",
     answers.experience ? `Experience: ${answers.experience}` : "",
@@ -377,93 +453,137 @@ export default function VoiceResumePage() {
 
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  {t("voice_resume_step")} {currentIndex + 1} / {questions.length}
-                </p>
-                <h2 className="mt-1 text-2xl font-semibold text-navy-950">
-                  {currentQuestion.prompt[safeLocale]}
+            {finished ? (
+              <div className="flex flex-col items-center py-8 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-600">
+                  ✓
+                </div>
+                <h2 className="mt-5 text-2xl font-semibold text-navy-950">
+                  All answers recorded!
                 </h2>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
+                  Click below to generate your professionally formatted resume from your voice answers.
+                </p>
+
+                {generateError ? (
+                  <div className="mt-4 w-full rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {generateError}
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => void handleGenerate()}
+                  disabled={generating}
+                  className="mt-6 flex items-center gap-2 rounded-xl bg-navy-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {generating ? (
+                    <>
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Generating your resume…
+                    </>
+                  ) : "Generate My Resume"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setFinished(false); setCurrentIndex(questions.length - 1); }}
+                  className="mt-3 text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                >
+                  Go back and edit answers
+                </button>
               </div>
+            ) : (
+              <>
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">
+                      {t("voice_resume_step")} {currentIndex + 1} / {questions.length}
+                    </p>
+                    <h2 className="mt-1 text-2xl font-semibold text-navy-950">
+                      {currentQuestion.prompt[safeLocale]}
+                    </h2>
+                  </div>
 
-              <button
-                type="button"
-                onClick={() => speakPrompt(currentQuestion.prompt[safeLocale], safeLocale)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                {t("voice_resume_repeat")}
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => speakPrompt(currentQuestion.prompt[safeLocale], safeLocale)}
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    {t("voice_resume_repeat")}
+                  </button>
+                </div>
 
-            <div className="mb-5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-navy-950 transition-all"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+                <div className="mb-5 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-navy-950 transition-all"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
 
-            {!speechSupported && (
-              <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                {t("voice_resume_browser_warning")}
-              </div>
+                {!speechSupported && (
+                  <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    {t("voice_resume_browser_warning")}
+                  </div>
+                )}
+
+                {error && (
+                  <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <label className="mb-3 block text-sm font-medium text-slate-700">
+                    {t("voice_resume_your_answer")}
+                  </label>
+
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder={currentQuestion.placeholder[safeLocale]}
+                    className="min-h-[180px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
+                  />
+
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={isListening ? stopListening : startListening}
+                      disabled={!speechSupported}
+                      className="rounded-lg bg-navy-950 px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isListening ? t("voice_resume_stop_recording") : t("voice_resume_start_recording")}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={saveCurrentTextOnly}
+                      className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      {t("voice_resume_save_answer")}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={goBack}
+                      disabled={currentIndex === 0}
+                      className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {t("voice_resume_back")}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={saveAndNext}
+                      disabled={!draft.trim()}
+                      className="rounded-lg bg-[#b88a44] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isLastQuestion ? t("voice_resume_finish") : t("voice_resume_next")}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
-
-            {error && (
-              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <label className="mb-3 block text-sm font-medium text-slate-700">
-                {t("voice_resume_your_answer")}
-              </label>
-
-              <textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={currentQuestion.placeholder[safeLocale]}
-                className="min-h-[180px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
-              />
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={isListening ? stopListening : startListening}
-                  disabled={!speechSupported}
-                  className="rounded-lg bg-navy-950 px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isListening ? t("voice_resume_stop_recording") : t("voice_resume_start_recording")}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={saveCurrentTextOnly}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  {t("voice_resume_save_answer")}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={goBack}
-                  disabled={currentIndex === 0}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {t("voice_resume_back")}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={saveAndNext}
-                  disabled={!draft.trim()}
-                  className="rounded-lg bg-[#b88a44] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isLastQuestion ? t("voice_resume_finish") : t("voice_resume_next")}
-                </button>
-              </div>
-            </div>
           </div>
 
           <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
