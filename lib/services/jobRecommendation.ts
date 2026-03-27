@@ -249,11 +249,15 @@ export async function extractJobFromUrl(url: string): Promise<ScrapedJob> {
 
   // For MCF URLs, use the API directly instead of scraping
   if (source === "MyCareersFuture") {
-    const match = url.match(/JOB-[\w-]+/i);
-    if (match) {
-      const jobPostId = match[0];
+    const jobMatch = url.match(/JOB-[\w-]+/i);
+    const uuidMatch = url.match(/([a-f0-9]{32})(?:[^a-f0-9]|$)/i);
+    const jobPostId = jobMatch?.[0] ?? null;
+    const uuid = uuidMatch?.[1] ?? null;
+
+    if (jobPostId || uuid) {
+      const query = jobPostId ? `jobPostId=${jobPostId}` : `uuid=${uuid}`;
       const res = await fetch(
-        `${MCF_API_BASE}/jobs?jobPostId=${jobPostId}`,
+        `${MCF_API_BASE}/jobs?${query}`,
         {
           headers: {
             Accept: "application/json",
