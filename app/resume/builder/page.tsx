@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
-import { listResumes, getResumeById } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
 
 type ExperienceItem = {
   id: string;
@@ -93,102 +91,6 @@ export default function ResumeBuilderPage() {
       content: "Add certifications, awards, volunteer work, languages, or any other optional section here.",
     },
   ]);
-
-  const [prefillLoading, setPrefillLoading] = useState(true);
-
-  useEffect(() => {
-    async function prefillFromResume() {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email) setEmail(user.email);
-
-        console.log("[ResumeBuilder] Fetching resumes from GET /api/resumes …");
-        const { resumes } = await listResumes();
-        console.log("[ResumeBuilder] listResumes response:", resumes);
-
-        const analyzed = resumes.find((r) => r.parsed_profile);
-        if (!analyzed) {
-          console.log("[ResumeBuilder] No resume with parsed_profile found. Resumes returned:", resumes.length);
-          return;
-        }
-        console.log("[ResumeBuilder] Found analyzed resume:", analyzed.id, analyzed.file_name);
-
-        console.log(`[ResumeBuilder] Fetching resume detail from GET /api/resumes/${analyzed.id} …`);
-        const data = await getResumeById(analyzed.id);
-        console.log("[ResumeBuilder] getResumeById response:", data);
-
-        const profile = data?.resume?.parsed_profile;
-        if (!profile) {
-          console.log("[ResumeBuilder] parsed_profile is null on the fetched resume.");
-          return;
-        }
-        console.log("[ResumeBuilder] parsed_profile:", profile);
-
-        // full_name is not in the ResumeProfile schema — extract from the first
-        // non-empty line of raw_text, which is almost always the candidate's name.
-        const rawText = data?.resume?.raw_text ?? "";
-        const firstLine = rawText.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
-        const looksLikeName =
-          firstLine.length > 0 &&
-          firstLine.length < 60 &&
-          !/^\s*(email|phone|mobile|address|resume|curriculum|cv|summary|profile|objective)\b/i.test(firstLine) &&
-          !firstLine.includes("@") &&
-          !firstLine.includes("|");
-        console.log("[ResumeBuilder] Name candidate from raw_text first line:", JSON.stringify(firstLine), "→ using:", looksLikeName);
-        if (looksLikeName) setFullName(firstLine);
-
-        if (profile.summary) setSummary(profile.summary);
-
-        if (profile.experiences?.length) {
-          setExperiences(
-            profile.experiences.map((e) => ({
-              id: createId(),
-              jobTitle: e.title ?? "",
-              company: e.company ?? "",
-              location: "",
-              startDate: e.start_date ?? "",
-              endDate: e.end_date ?? "",
-              description: e.description ?? "",
-            })),
-          );
-        }
-
-        if (profile.education?.length) {
-          setEducations(
-            profile.education.map((ed) => ({
-              id: createId(),
-              school: ed.institution ?? "",
-              qualification: ed.qualification ?? "",
-              fieldOfStudy: ed.field_of_study ?? "",
-              startDate: "",
-              endDate: ed.graduation_year != null ? String(ed.graduation_year) : "",
-            })),
-          );
-        }
-
-        if (profile.skills?.length) {
-          setSkills(
-            profile.skills.slice(0, 12).map((name) => ({
-              id: createId(),
-              name,
-              level: 75,
-            })),
-          );
-        }
-
-        if (profile.headline) setTargetRole(profile.headline);
-
-        console.log("[ResumeBuilder] Pre-fill complete.");
-      } catch (err) {
-        console.error("[ResumeBuilder] prefillFromResume error:", err);
-      } finally {
-        setPrefillLoading(false);
-      }
-    }
-
-    void prefillFromResume();
-  }, []);
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -314,12 +216,6 @@ export default function ResumeBuilderPage() {
           <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
             {t("resume_builder_page_lead")}
           </p>
-          {prefillLoading ? (
-            <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-navy-950" />
-              Loading your resume data…
-            </p>
-          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-8">

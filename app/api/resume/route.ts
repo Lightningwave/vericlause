@@ -86,7 +86,6 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const file = formData.get("file");
-  const voiceText = (formData.get("voiceText") as string) || "";
 
   if (!file || !(file instanceof Blob)) {
     return NextResponse.json({ detail: "No file provided" }, { status: 400 });
@@ -118,15 +117,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "File produced no text" }, { status: 422 });
   }
 
-  const combinedInput = `RESUME DOCUMENT:
-${resumeText}
-
-ADDITIONAL CONTEXT FROM CANDIDATE:
-${voiceText || "None provided"}`;
-
   let raw: string;
   try {
-    raw = await callLlm(combinedInput);
+    raw = await callLlm(resumeText);
   } catch (e) {
     return NextResponse.json(
       { detail: `AI analysis failed: ${e instanceof Error ? e.message : e}` },
