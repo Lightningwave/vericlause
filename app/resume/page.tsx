@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+
+const ANALYSIS_STEPS = [
+  "Reading your resume…",
+  "Running ATS keyword scan…",
+  "Analysing career progression…",
+  "Generating salary benchmarks…",
+  "Finalising feedback…",
+] as const;
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { ResumeList } from "@/components/resume/ResumeList";
 import { useLanguage } from "@/components/providers/language-provider";
@@ -12,17 +20,17 @@ import { getProfileJob, listResumes, profileResume, uploadResume, type ResumeSum
 import type { ResumeProfile } from "@/lib/types";
 import type { ResumeFeedback } from "@/app/api/resume/route";
 
-export default function ResumeOnboardingPage() {
+function ResumeOnboardingContent() {
   const { t } = useLanguage();
   const { status: resumeStatus, refetch: refetchResumeStatus } = useResumeStatus();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [profiling, setProfiling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [lastResumeId, setLastResumeId] = useState<string | null>(null);
   const [userResumes, setUserResumes] = useState<ResumeSummary[]>([]);
 
@@ -31,20 +39,50 @@ export default function ResumeOnboardingPage() {
   const [voiceText, setVoiceText] = useState("");
   const recognizerRef = useRef<{ stop: () => void } | null>(null);
 
-  // AI feedback state
+  // Upload / analysis state
+  const [uploadComplete, setUploadComplete] = useState(false);
   const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
   const [analysing, setAnalysing] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState(0);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
+
+  // Stage 0 = no file, 1 = file selected, 2 = uploaded, 3 = analysed
+  const stage = !selectedFile ? 0 : !uploadComplete ? 1 : !analysisComplete ? 2 : 3;
+
+  useEffect(() => {
+    if (!analysing) {
+      setAnalysisStep(0);
+      return;
+    }
+    const timers = [
+      setTimeout(() => setAnalysisStep(1), 2000),
+      setTimeout(() => setAnalysisStep(2), 5000),
+      setTimeout(() => setAnalysisStep(3), 8000),
+      setTimeout(() => setAnalysisStep(4), 11000),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [analysing]);
 
   useEffect(() => {
     const supabase = createClient();
+    const paramResumeId = searchParams.get("resume_id");
     void supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
       void listResumes()
-        .then((r) => setUserResumes(r.resumes))
+        .then((r) => {
+          setUserResumes(r.resumes);
+          if (paramResumeId) {
+            setLastResumeId(paramResumeId);
+            const match = r.resumes.find((re) => re.id === paramResumeId);
+            if (match) {
+              // resume found from URL param — no banner needed, stage will reflect state
+            }
+          }
+        })
         .catch(() => setUserResumes([]));
     });
-  }, []);
+  }, [searchParams]);
 
   const handleResumeDeleted = useCallback(
     (resumeId: string) => {
@@ -58,9 +96,10 @@ export default function ResumeOnboardingPage() {
     setSelectedFile(file);
     setSelectedFileName(file?.name ?? "");
     setError(null);
-    setSuccessMessage(null);
     setFeedback(null);
     setAnalysisError(null);
+    setUploadComplete(false);
+    setAnalysisComplete(false);
   }, []);
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -75,7 +114,6 @@ export default function ResumeOnboardingPage() {
 
   const handleUpload = useCallback(async () => {
     setError(null);
-    setSuccessMessage(null);
 
     if (!selectedFile) {
       setError(t("resume_error_no_file"));
@@ -100,11 +138,8 @@ export default function ResumeOnboardingPage() {
     setUploading(true);
     try {
       const uploadResult = await uploadResume(selectedFile);
-      const { resume_id, raw_text_length } = uploadResult;
+      const { resume_id } = uploadResult;
       setLastResumeId(null);
-      setSuccessMessage(
-        t("resume_upload_progress").replace("{n}", raw_text_length.toLocaleString()),
-      );
       setProfiling(true);
 
       let started: {
@@ -135,7 +170,7 @@ export default function ResumeOnboardingPage() {
         } catch {
           /* ignore */
         }
-        setSuccessMessage(t("resume_success_profiled"));
+        setUploadComplete(true);
         setProfiling(false);
         return;
       }
@@ -150,7 +185,7 @@ export default function ResumeOnboardingPage() {
           } catch {
             /* ignore */
           }
-          setSuccessMessage(t("resume_success_profiled"));
+          setUploadComplete(true);
           setProfiling(false);
           return;
         }
@@ -165,7 +200,7 @@ export default function ResumeOnboardingPage() {
         /* ignore */
       }
       setLastResumeId(resume_id);
-      setSuccessMessage(t("resume_profiling_timeout"));
+      setUploadComplete(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("resume_error_upload_failed"));
     } finally {
@@ -198,6 +233,10 @@ export default function ResumeOnboardingPage() {
       }
 
       setFeedback(json.feedback as ResumeFeedback);
+      try {
+        sessionStorage.setItem("vericlause.resumeFeedback", JSON.stringify(json.feedback));
+      } catch { /* ignore */ }
+      setAnalysisComplete(true);
     } catch {
       setAnalysisError("Network error. Please check your connection and try again.");
     } finally {
@@ -338,19 +377,26 @@ export default function ResumeOnboardingPage() {
               {error ? (
                 <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
               ) : null}
-              {successMessage ? (
-                <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                  {successMessage}
-                </p>
-              ) : null}
 
+              {/* Upload button — active only at stage 1 */}
               <button
                 type="submit"
-                disabled={uploading || profiling || !selectedFile}
-                className="mt-4 w-full rounded-xl bg-navy-950 px-4 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={stage !== 1 || uploading || profiling}
+                className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none ${
+                  stage === 1 && !uploading && !profiling
+                    ? "bg-navy-950 hover:opacity-90"
+                    : "bg-slate-300"
+                }`}
               >
                 {uploading || profiling ? t("resume_processing") : t("resume_upload_button")}
               </button>
+
+              {/* Stage 2 banner — upload done, waiting for analysis */}
+              {stage === 2 ? (
+                <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  Resume uploaded successfully. Click <strong>Analyse My Resume</strong> to get your AI feedback.
+                </p>
+              ) : null}
             </form>
 
             <div className="mt-5">
@@ -366,18 +412,61 @@ export default function ResumeOnboardingPage() {
               />
             </div>
 
+            {/* Analyse button — active only at stage 2 */}
             <button
               type="button"
               onClick={() => void handleAnalyse()}
-              disabled={!selectedFile || analysing}
-              className="mt-4 w-full rounded-xl border border-[#b88a44] px-4 py-3 text-sm font-medium text-[#b88a44] transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={stage !== 2 || analysing}
+              className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none ${
+                stage === 2 && !analysing
+                  ? "border border-[#b88a44] text-[#b88a44] hover:bg-amber-50"
+                  : "border border-slate-200 text-slate-400 bg-white"
+              }`}
             >
-              {analysing ? "Analysing..." : "Analyse My Resume"}
+              {analysing ? "Analysing…" : "Analyse My Resume"}
             </button>
+
+            {analysing ? (
+              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                <div className="space-y-1.5">
+                  {ANALYSIS_STEPS.map((step, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-2.5 text-sm transition-opacity duration-500 ${
+                        i <= analysisStep ? "opacity-100" : "opacity-25"
+                      }`}
+                    >
+                      {i < analysisStep ? (
+                        <svg className="h-3.5 w-3.5 shrink-0 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      ) : i === analysisStep ? (
+                        <svg className="h-3.5 w-3.5 shrink-0 animate-spin text-[#b88a44]" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                      ) : (
+                        <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-slate-300" />
+                      )}
+                      <span className={i === analysisStep ? "font-medium text-[#b88a44]" : "text-slate-500"}>
+                        {step}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {analysisError ? (
               <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {analysisError}
+              </p>
+            ) : null}
+
+            {/* Stage 3 banner — analysis done */}
+            {stage === 3 && feedback ? (
+              <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                Analysis complete. Your resume scored <strong>{Math.min(100, Math.round((feedback.score / 10) * 100))}/100</strong>. Click <strong>Go to Resume Review</strong> to see your full feedback.
               </p>
             ) : null}
 
@@ -392,12 +481,19 @@ export default function ResumeOnboardingPage() {
               </button>
             </div>
 
-            <Link
-              href={reviewHref}
-              className="mt-4 flex w-full items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            {/* Go to Review button — active only at stage 3 */}
+            <button
+              type="button"
+              disabled={stage !== 3}
+              onClick={() => router.push(reviewHref)}
+              className={`mt-4 flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none ${
+                stage === 3
+                  ? "border border-navy-950 bg-navy-950 text-white hover:opacity-90"
+                  : "border border-slate-200 bg-white text-slate-400"
+              }`}
             >
               {t("resume_go_review")}
-            </Link>
+            </button>
           </section>
 
           <aside className="space-y-6">
@@ -414,12 +510,37 @@ export default function ResumeOnboardingPage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-navy-950">{t("resume_what_next_title")}</h2>
-              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <p>• {t("resume_what_next_1")}</p>
-                <p>• {t("resume_what_next_2")}</p>
-                <p>• {t("resume_what_next_3")}</p>
-              </div>
+              <h2 className="text-xl font-semibold text-navy-950">Your resume journey</h2>
+              <ol className="mt-4 space-y-3">
+                {[
+                  {
+                    label: "Analyse",
+                    desc: "Upload your resume and click Analyse My Resume to get instant AI feedback on strengths, gaps, and your ATS score.",
+                  },
+                  {
+                    label: "Review and Improve",
+                    desc: "See your score, apply AI suggestions, and edit your resume sections directly on the review page.",
+                  },
+                  {
+                    label: "Rebuild if Needed",
+                    desc: "Use the Resume Builder to restructure your resume from scratch or refine it section by section.",
+                  },
+                  {
+                    label: "Match and Apply",
+                    desc: "Head to Job Matching to compare your resume against live Singapore job listings and get a recommended fit score.",
+                  },
+                ].map((step, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-navy-950 text-[10px] font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-navy-950">{step.label}</p>
+                      <p className="mt-0.5 text-xs leading-5 text-slate-500">{step.desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
           </aside>
         </div>
@@ -576,5 +697,19 @@ export default function ResumeOnboardingPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function ResumeOnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#f8f8f6]">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-navy-950" />
+        </div>
+      }
+    >
+      <ResumeOnboardingContent />
+    </Suspense>
   );
 }

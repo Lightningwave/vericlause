@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(find /c/Users/zackx/vericlause -maxdepth 3 -type f \\\\\\(-name .cursor* -o -name *rules* \\\\\\))"
+    ]
+  }
+}
