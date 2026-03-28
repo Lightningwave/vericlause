@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
+import { createClient } from "@/lib/supabase/client";
+import { getResumeById, listResumes } from "@/lib/api";
 
 type ExperienceItem = {
   id: string;
@@ -44,6 +46,7 @@ export default function ResumeBuilderPage() {
   const { t } = useLanguage();
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [prefillLoading, setPrefillLoading] = useState(false);
 
   const [fullName, setFullName] = useState("Your Name");
   const [targetRole, setTargetRole] = useState("Operations Executive");
@@ -91,6 +94,104 @@ export default function ResumeBuilderPage() {
       content: "Add certifications, awards, volunteer work, languages, or any other optional section here.",
     },
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function prefillFromResume() {
+      setPrefillLoading(true);
+      try {
+        // Get email from Supabase auth
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!cancelled && user?.email) {
+          console.log("[ResumeBuilder] Got user email:", user.email);
+          setEmail(user.email);
+        }
+
+        // Get most recent analyzed resume
+        console.log("[ResumeBuilder] Fetching resumes...");
+        const listed = await listResumes();
+        console.log("[ResumeBuilder] Listed resumes:", listed.resumes?.length ?? 0);
+
+        if (!listed.resumes?.length || cancelled) return;
+
+        const withProfile = listed.resumes.find((r) => r.parsed_profile);
+        const target = withProfile ?? listed.resumes[0];
+        if (!target) return;
+
+        console.log("[ResumeBuilder] Loading resume:", target.id, target.file_name);
+        const data = await getResumeById(target.id);
+        if (cancelled || !data?.resume) return;
+
+        const resume = data.resume;
+        const profile = resume.parsed_profile;
+
+        console.log("[ResumeBuilder] Profile:", profile);
+
+        // Extract name from raw_text first meaningful line
+        if (resume.raw_text) {
+          const firstMeaningfulLine = resume.raw_text.split("\n").find((line) => {
+            const trimmed = line.trim();
+            return (
+              trimmed.length > 0 &&
+              trimmed.length < 60 &&
+              !/[@\d+()[\]]|Summary|Experience|Skills|Education|Name:|Target/i.test(trimmed)
+            );
+          });
+          if (firstMeaningfulLine && !cancelled) {
+            console.log("[ResumeBuilder] Extracted name:", firstMeaningfulLine.trim());
+            setFullName(firstMeaningfulLine.trim());
+          }
+        }
+
+        if (!profile || cancelled) return;
+
+        if (profile.headline) setTargetRole(profile.headline);
+        if (profile.summary) setSummary(profile.summary);
+
+        if (profile.skills?.length) {
+          setSkills(profile.skills.map((name) => ({ id: createId(), name, level: 80 })));
+        }
+
+        if (profile.experiences?.length) {
+          setExperiences(
+            profile.experiences.map((exp) => ({
+              id: createId(),
+              jobTitle: exp.title ?? "",
+              company: exp.company ?? "",
+              location: "",
+              startDate: exp.start_date ?? "",
+              endDate: exp.end_date ?? "",
+              description: exp.description ?? "",
+            })),
+          );
+        }
+
+        if (profile.education?.length) {
+          setEducations(
+            profile.education.map((edu) => ({
+              id: createId(),
+              school: edu.institution ?? "",
+              qualification: edu.qualification ?? "",
+              fieldOfStudy: edu.field_of_study ?? "",
+              startDate: "",
+              endDate: edu.graduation_year != null ? String(edu.graduation_year) : "",
+            })),
+          );
+        }
+      } catch (err) {
+        console.error("[ResumeBuilder] prefillFromResume error:", err);
+      } finally {
+        if (!cancelled) setPrefillLoading(false);
+      }
+    }
+
+    prefillFromResume();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

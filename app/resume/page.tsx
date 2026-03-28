@@ -10,6 +10,7 @@ import { useResumeStatus } from "@/components/providers/resume-status-provider";
 import { createClient } from "@/lib/supabase/client";
 import { getProfileJob, listResumes, profileResume, uploadResume, type ResumeSummary } from "@/lib/api";
 import type { ResumeProfile } from "@/lib/types";
+import type { ResumeFeedback } from "@/app/api/resume/route";
 
 export default function ResumeOnboardingPage() {
   const { t } = useLanguage();
@@ -24,11 +25,16 @@ export default function ResumeOnboardingPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [lastResumeId, setLastResumeId] = useState<string | null>(null);
   const [userResumes, setUserResumes] = useState<ResumeSummary[]>([]);
+
+  // Voice-to-text state
   const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
   const [voiceText, setVoiceText] = useState("");
-  const recognizerRef = useRef<{
-    stopContinuousRecognitionAsync: (cb?: () => void, err?: (e: string) => void) => void;
-  } | null>(null);
+  const recognizerRef = useRef<{ stop: () => void } | null>(null);
+
+  // AI feedback state
+  const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
+  const [analysing, setAnalysing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -53,6 +59,8 @@ export default function ResumeOnboardingPage() {
     setSelectedFileName(file?.name ?? "");
     setError(null);
     setSuccessMessage(null);
+    setFeedback(null);
+    setAnalysisError(null);
   }, []);
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -170,46 +178,63 @@ export default function ResumeOnboardingPage() {
     }
   }, [router, selectedFile, refetchResumeStatus, t]);
 
-  async function handleMicClick() {
+  async function handleAnalyse() {
+    if (!selectedFile) return;
+    setAnalysing(true);
+    setAnalysisError(null);
+    setFeedback(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("voiceText", voiceText);
+
+      const res = await fetch("/api/resume", { method: "POST", body: formData });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setAnalysisError(json.detail ?? "Something went wrong. Please try again.");
+        return;
+      }
+
+      setFeedback(json.feedback as ResumeFeedback);
+    } catch {
+      setAnalysisError("Network error. Please check your connection and try again.");
+    } finally {
+      setAnalysing(false);
+    }
+  }
+
+  function handleMicClick() {
     if (micState === "listening") {
-      recognizerRef.current?.stopContinuousRecognitionAsync(
-        () => setMicState("idle"),
-        () => setMicState("idle"),
-      );
+      recognizerRef.current?.stop();
       return;
     }
 
-    setMicState("processing");
-    try {
-      const res = await fetch("/api/speech");
-      if (!res.ok) throw new Error("Failed to get speech token");
-      const { token, region } = await res.json();
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-      const SpeechSDK = await import("microsoft-cognitiveservices-speech-sdk");
-      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
-      speechConfig.speechRecognitionLanguage = "en-SG";
-      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-      const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
-
-      recognizerRef.current = recognizer;
-
-      recognizer.recognized = (_: unknown, e: { result: { reason: number; text: string } }) => {
-        if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) {
-          setVoiceText((prev) => (prev ? prev + " " + e.result.text : e.result.text));
-        }
-      };
-
-      recognizer.startContinuousRecognitionAsync(
-        () => setMicState("listening"),
-        (err: string) => {
-          console.error("Speech recognition error:", err);
-          setMicState("idle");
-        },
-      );
-    } catch (err) {
-      console.error("Mic setup failed:", err);
-      setMicState("idle");
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported in this browser");
+      return;
     }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      setVoiceText((prev) => (prev ? prev + " " + transcript : transcript));
+    };
+
+    recognition.onerror = () => setMicState("idle");
+    recognition.onend = () => setMicState("idle");
+
+    recognition.start();
+    recognizerRef.current = recognition;
+    setMicState("listening");
   }
 
   const reviewHref =
@@ -280,7 +305,7 @@ export default function ResumeOnboardingPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => void handleMicClick()}
+                  onClick={handleMicClick}
                   title={micState === "listening" ? "Stop recording" : "Start voice input"}
                   className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition ${
                     micState === "listening"
@@ -341,6 +366,21 @@ export default function ResumeOnboardingPage() {
               />
             </div>
 
+            <button
+              type="button"
+              onClick={() => void handleAnalyse()}
+              disabled={!selectedFile || analysing}
+              className="mt-4 w-full rounded-xl border border-[#b88a44] px-4 py-3 text-sm font-medium text-[#b88a44] transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {analysing ? "Analysing..." : "Analyse My Resume"}
+            </button>
+
+            {analysisError ? (
+              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {analysisError}
+              </p>
+            ) : null}
+
             <div className="mt-3 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -383,6 +423,153 @@ export default function ResumeOnboardingPage() {
             </div>
           </aside>
         </div>
+
+        {/* AI Feedback section — only rendered when feedback data exists */}
+        {feedback ? (
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-navy-950">AI Feedback</h2>
+              <span className="text-sm font-semibold text-navy-950">
+                Score: <span className="text-2xl">{feedback.score}</span>
+                <span className="font-normal text-slate-400"> / 10</span>
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Overall Impression
+                </p>
+                <p className="text-sm leading-6 text-slate-700">{feedback.overallImpression}</p>
+              </div>
+
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-600">
+                  Key Strengths
+                </p>
+                <ul className="space-y-1.5">
+                  {feedback.keyStrengths.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-slate-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700">
+                        {i + 1}
+                      </span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-600">
+                  Areas to Improve
+                </p>
+                <ul className="space-y-1.5">
+                  {feedback.areasToImprove.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-slate-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-700">
+                        {i + 1}
+                      </span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Suggested Edits
+                </p>
+                <ul className="space-y-1.5">
+                  {feedback.suggestedEdits.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-slate-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-navy-100 text-[10px] font-bold text-navy-700">
+                        {i + 1}
+                      </span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {feedback.atsAnalysis ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 sm:col-span-2">
+                  <div className="mb-3 flex items-center gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      ATS Analysis
+                    </p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        feedback.atsAnalysis.atsFriendly
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {feedback.atsAnalysis.atsFriendly ? "ATS Friendly" : "Not ATS Friendly"}
+                    </span>
+                  </div>
+                  {feedback.atsAnalysis.atsNotes ? (
+                    <p className="mb-3 text-sm leading-6 text-slate-700">{feedback.atsAnalysis.atsNotes}</p>
+                  ) : null}
+                  {feedback.atsAnalysis.keywordsFound?.length ? (
+                    <div className="mb-2">
+                      <p className="mb-1.5 text-xs font-medium text-slate-500">Keywords Found</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {feedback.atsAnalysis.keywordsFound.map((kw) => (
+                          <span
+                            key={kw}
+                            className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800"
+                          >
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {feedback.atsAnalysis.keywordsMissing?.length ? (
+                    <div>
+                      <p className="mb-1.5 text-xs font-medium text-slate-500">Keywords Missing</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {feedback.atsAnalysis.keywordsMissing.map((kw) => (
+                          <span
+                            key={kw}
+                            className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800"
+                          >
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {feedback.careerProgression ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Career Progression
+                  </p>
+                  <p className="text-sm leading-6 text-slate-700">{feedback.careerProgression}</p>
+                </div>
+              ) : null}
+
+              {feedback.salaryBenchmark ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Salary Benchmark
+                  </p>
+                  <p className="text-lg font-semibold text-navy-950">
+                    {feedback.salaryBenchmark.estimatedRange}
+                  </p>
+                  {feedback.salaryBenchmark.rationale ? (
+                    <p className="mt-1.5 text-sm leading-6 text-slate-600">
+                      {feedback.salaryBenchmark.rationale}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-10 max-w-3xl">
           <ResumeList resumes={userResumes} onDeleted={handleResumeDeleted} className="mt-0" />

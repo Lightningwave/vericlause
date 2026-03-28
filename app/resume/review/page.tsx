@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -56,7 +57,6 @@ function splitSuggestions(suggestions: ResumeSuggestion[] | null | undefined): {
   positiveHints: ResumeSuggestion[];
 } {
   if (!suggestions?.length) return { toImprove: [], positiveHints: [] };
-  /** Layout/visual feedback from vision + text — must be included; was missing and never appeared in sidebar columns */
   const toImprove = suggestions.filter(
     (s) =>
       s.type === "critical_fix" ||
@@ -71,6 +71,52 @@ function splitSuggestions(suggestions: ResumeSuggestion[] | null | undefined): {
     toImprove: toImprove.length ? toImprove : suggestions.slice(0, Math.min(5, suggestions.length)),
     positiveHints: positiveHints.length ? positiveHints.slice(0, 5) : [],
   };
+}
+
+function parseImprovedResume(text: string): {
+  summary: string | null;
+  experience: string | null;
+  skills: string | null;
+  education: string | null;
+} {
+  // Strip **bold** markdown markers from AI output
+  const cleaned = text.replace(/\*\*/g, "");
+
+  function extractSection(label: string): string | null {
+    const regex = new RegExp(
+      `${label}[:\\s]*\\n([\\s\\S]*?)(?=\\n[A-Z][A-Za-z ]{2,}[:\\n]|$)`,
+      "i",
+    );
+    const match = cleaned.match(regex);
+    return match?.[1]?.trim() || null;
+  }
+
+  const summary = extractSection("Summary") || extractSection("Professional Summary");
+  const experience = extractSection("Experience") || extractSection("Work Experience");
+  const skills = extractSection("Skills") || extractSection("Key Skills");
+  const education = extractSection("Education");
+
+  // Fallback: if no sections parsed, put entire text into experience
+  if (!summary && !experience && !skills && !education) {
+    return { summary: null, experience: text.trim(), skills: null, education: null };
+  }
+
+  return { summary, experience, skills, education };
+}
+
+function extractCandidateName(rawText: string, fileName: string): string {
+  const firstMeaningfulLine = rawText.split("\n").find((line) => {
+    const trimmed = line.trim();
+    return (
+      trimmed.length > 0 &&
+      trimmed.length < 60 &&
+      !/[@\d+()[\]]|Summary|Experience|Skills|Education|Name:|Target/i.test(trimmed)
+    );
+  });
+  if (firstMeaningfulLine) return firstMeaningfulLine.trim();
+  // Fallback: "John Doe - Voice Resume" → "John Doe"
+  const fromFileName = fileName.split(" - ")[0].trim();
+  return fromFileName || "Resume";
 }
 
 const SUGGESTION_TYPE_LABEL: Record<ResumeSuggestion["type"], string> = {
@@ -92,15 +138,31 @@ function ResumeReviewContent() {
   const [error, setError] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [rawText, setRawText] = useState<string>("");
   const [profile, setProfile] = useState<ResumeProfile | null>(null);
   const [suggestions, setSuggestions] = useState<ResumeSuggestion[] | null>(null);
   const [resumeId, setResumeId] = useState<string | null>(null);
+
+  // Editable override states
+  const [summaryOverride, setSummaryOverride] = useState<string | null>(null);
+  const [experienceOverride, setExperienceOverride] = useState<string | null>(null);
+  const [skillsOverride, setSkillsOverride] = useState<string | null>(null);
+  const [educationOverride, setEducationOverride] = useState<string | null>(null);
+
+  // Improve / rescore states
+  const [improving, setImproving] = useState(false);
+  const [improvedText, setImprovedText] = useState<string | null>(null);
+  const [improveError, setImproveError] = useState<string | null>(null);
+  const [rescoring, setRescoring] = useState(false);
+  const [rescoreScore, setRescoreScore] = useState<number | null>(null);
+  const [rescoreError, setRescoreError] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const loadResume = useCallback(async (id: string) => {
     try {
       const data = await getResumeById(id);
       if (!data?.resume) {
-        setError("Resume not found or you don’t have access.");
+        setError("Resume not found or you don't have access.");
         setProfile(null);
         setSuggestions(null);
         setFileName(null);
@@ -109,11 +171,19 @@ function ResumeReviewContent() {
       }
       setResumeId(data.resume.id);
       setFileName(data.resume.file_name);
+      setRawText(data.resume.raw_text ?? "");
       setProfile(data.resume.parsed_profile);
       setSuggestions(data.resume.ai_suggestions);
+      // Reset overrides when loading a new resume
+      setSummaryOverride(null);
+      setExperienceOverride(null);
+      setSkillsOverride(null);
+      setEducationOverride(null);
+      setRescoreScore(null);
+      setImprovedText(null);
       if (!data.resume.parsed_profile) {
         setError(
-          "This resume has not been analyzed yet. Use “Run AI analysis” below, or upload again from the resume page.",
+          "This resume has not been analyzed yet. Use \"Run AI analysis\" below, or upload again from the resume page.",
         );
       } else {
         setError(null);
@@ -236,7 +306,156 @@ function ResumeReviewContent() {
     }
   }
 
-  const score = deriveIndicatorScore(suggestions);
+  async function handleGenerateImproved() {
+    setImproving(true);
+    setImproveError(null);
+    try {
+      const resumeText = [
+        summaryDisplay ? `Summary:\n${summaryDisplay}` : "",
+        experienceDisplay ? `Experience:\n${experienceDisplay}` : "",
+        skillsDisplay ? `Skills:\n${skillsDisplay}` : "",
+        educationDisplay ? `Education:\n${educationDisplay}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      const feedbackList = suggestions?.map((s) => s.suggestion) ?? [];
+
+      const res = await fetch("/api/resume/improve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText, feedback: feedbackList }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Improvement failed");
+      setImprovedText(data.improvedResume);
+    } catch (e) {
+      setImproveError(e instanceof Error ? e.message : "Improvement failed");
+    } finally {
+      setImproving(false);
+    }
+  }
+
+  function handleApplyImproved() {
+    if (!improvedText) return;
+    const parsed = parseImprovedResume(improvedText);
+    if (parsed.summary) setSummaryOverride(parsed.summary);
+    if (parsed.experience) setExperienceOverride(parsed.experience);
+    if (parsed.skills) setSkillsOverride(parsed.skills);
+    if (parsed.education) setEducationOverride(parsed.education);
+    setImprovedText(null);
+  }
+
+  async function handleRescore() {
+    setRescoring(true);
+    setRescoreError(null);
+    try {
+      const resumeText = [summaryDisplay, experienceDisplay, skillsDisplay, educationDisplay]
+        .filter(Boolean)
+        .join("\n\n");
+      const res = await fetch("/api/resume/rescore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: resumeText }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Rescore failed");
+      // score is 1–10, scale to 0–100 for display
+      setRescoreScore(Math.round(data.score * 10));
+    } catch (e) {
+      setRescoreError(e instanceof Error ? e.message : "Rescore failed");
+    } finally {
+      setRescoring(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    setDownloadingPdf(true);
+    try {
+      const { pdf, Document, Page, Text, View, StyleSheet } = await import("@react-pdf/renderer");
+
+      const styles = StyleSheet.create({
+        page: { padding: 56.7, fontFamily: "Helvetica" },
+        name: { fontSize: 18, marginBottom: 4 },
+        contact: { fontSize: 9, color: "#888888", marginBottom: 8 },
+        divider: { borderBottomWidth: 1, borderBottomColor: "#dddddd", borderBottomStyle: "solid", marginBottom: 12 },
+        sectionHeader: { fontSize: 11, fontWeight: "bold", marginBottom: 6, marginTop: 10 },
+        body: { fontSize: 10, lineHeight: 1.5, marginBottom: 4 },
+        bullet: { fontSize: 10, lineHeight: 1.5, marginBottom: 2 },
+      });
+
+      const candidateName = rawText
+        ? extractCandidateName(rawText, fileName ?? "")
+        : fileName?.split(" - ")[0] ?? "Resume";
+
+      const sections: React.ReactNode[] = [];
+
+      if (summaryDisplay) {
+        sections.push(
+          React.createElement(Text, { key: "summary-h", style: styles.sectionHeader }, "SUMMARY"),
+          React.createElement(Text, { key: "summary-b", style: styles.body }, summaryDisplay),
+        );
+      }
+
+      if (experienceDisplay) {
+        sections.push(
+          React.createElement(Text, { key: "exp-h", style: styles.sectionHeader }, "EXPERIENCE"),
+        );
+        experienceDisplay.split("\n").filter(Boolean).forEach((line, i) => {
+          sections.push(
+            React.createElement(Text, { key: `exp-${i}`, style: styles.bullet }, `• ${line}`),
+          );
+        });
+      }
+
+      if (skillsDisplay) {
+        sections.push(
+          React.createElement(Text, { key: "skills-h", style: styles.sectionHeader }, "SKILLS"),
+          React.createElement(Text, { key: "skills-b", style: styles.body }, skillsDisplay),
+        );
+      }
+
+      if (educationDisplay) {
+        sections.push(
+          React.createElement(Text, { key: "edu-h", style: styles.sectionHeader }, "EDUCATION"),
+          React.createElement(Text, { key: "edu-b", style: styles.body }, educationDisplay),
+        );
+      }
+
+      const doc = React.createElement(
+        Document,
+        null,
+        React.createElement(
+          Page,
+          { size: "A4", style: styles.page },
+          React.createElement(Text, { style: styles.name }, candidateName),
+          React.createElement(
+            Text,
+            { style: styles.contact },
+            [profile?.headline, "Singapore"].filter(Boolean).join(" • "),
+          ),
+          React.createElement(View, { style: styles.divider }),
+          ...sections,
+        ),
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const slug = candidateName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+      a.href = url;
+      a.download = `${slug}_vericlause_resume.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("PDF generation failed:", e);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
+  const baseScore = deriveIndicatorScore(suggestions);
+  const score = rescoreScore ?? baseScore;
   const { toImprove, positiveHints } = splitSuggestions(suggestions);
 
   const strengthsDisplay =
@@ -262,6 +481,11 @@ function ResumeReviewContent() {
   const experienceValue = profile ? formatExperiencesText(profile) : "";
   const skillsValue = profile?.skills?.length ? profile.skills.join(", ") : "";
   const educationValue = profile ? formatEducationText(profile) : "";
+
+  const summaryDisplay = summaryOverride !== null ? summaryOverride : summaryValue;
+  const experienceDisplay = experienceOverride !== null ? experienceOverride : experienceValue;
+  const skillsDisplay = skillsOverride !== null ? skillsOverride : skillsValue;
+  const educationDisplay = educationOverride !== null ? educationOverride : educationValue;
 
   return (
     <div className="min-h-screen bg-white">
@@ -359,6 +583,19 @@ function ResumeReviewContent() {
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
                 {t("resume_review_score_note")}
               </p>
+
+              {rescoreError && (
+                <p className="mt-2 text-xs text-red-600">{rescoreError}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={handleRescore}
+                disabled={rescoring}
+                className="mt-4 w-full rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-navy-200 hover:text-navy-950 disabled:opacity-50"
+              >
+                {rescoring ? "Rescoring…" : "Rescore Resume"}
+              </button>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -465,6 +702,47 @@ function ResumeReviewContent() {
                     </li>
                   ))}
                 </ul>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleGenerateImproved}
+                    disabled={improving}
+                    className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-navy-800 disabled:opacity-50"
+                  >
+                    {improving ? "Generating improved version…" : "Generate Improved Version"}
+                  </button>
+                  {improveError && (
+                    <p className="self-center text-xs text-red-600">{improveError}</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {improvedText ? (
+              <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+                  Improved Resume Preview
+                </p>
+                <pre className="mt-3 max-h-64 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                  {improvedText}
+                </pre>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleApplyImproved}
+                    className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                  >
+                    Update Resume with Improved Version
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImprovedText(null)}
+                    className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             ) : null}
 
@@ -475,10 +753,10 @@ function ResumeReviewContent() {
                 </label>
                 <textarea
                   rows={5}
-                  readOnly
-                  value={summaryValue}
+                  value={summaryDisplay}
+                  onChange={(e) => setSummaryOverride(e.target.value)}
                   placeholder="No summary extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
                 />
               </div>
 
@@ -488,10 +766,10 @@ function ResumeReviewContent() {
                 </label>
                 <textarea
                   rows={8}
-                  readOnly
-                  value={experienceValue}
+                  value={experienceDisplay}
+                  onChange={(e) => setExperienceOverride(e.target.value)}
                   placeholder="No experience extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
                 />
               </div>
 
@@ -501,10 +779,10 @@ function ResumeReviewContent() {
                 </label>
                 <textarea
                   rows={4}
-                  readOnly
-                  value={skillsValue}
+                  value={skillsDisplay}
+                  onChange={(e) => setSkillsOverride(e.target.value)}
                   placeholder="No skills extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
                 />
               </div>
 
@@ -514,10 +792,10 @@ function ResumeReviewContent() {
                 </label>
                 <textarea
                   rows={3}
-                  readOnly
-                  value={educationValue}
+                  value={educationDisplay}
+                  onChange={(e) => setEducationOverride(e.target.value)}
                   placeholder="No education extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
                 />
               </div>
             </div>
@@ -526,10 +804,11 @@ function ResumeReviewContent() {
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  disabled
-                  className="cursor-not-allowed rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400"
+                  onClick={handleDownloadPdf}
+                  disabled={downloadingPdf}
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-navy-200 hover:text-navy-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {t("resume_review_download_pdf")}
+                  {downloadingPdf ? "Generating PDF…" : t("resume_review_download_pdf")}
                 </button>
                 <button
                   type="button"

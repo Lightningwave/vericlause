@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
@@ -41,10 +42,6 @@ const browserLangMap: Record<SupportedLocale, string> = {
   ta: "ta-IN",
 };
 
-function ChevronDownFallback() {
-  return null;
-}
-
 function getBestVoice(locale: SupportedLocale) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
 
@@ -76,6 +73,7 @@ function getBestVoice(locale: SupportedLocale) {
 
 export default function VoiceResumePage() {
   const { t, locale } = useLanguage();
+  const router = useRouter();
   const safeLocale: SupportedLocale =
     locale === "en" || locale === "zh" || locale === "ms" || locale === "ta" ? locale : "en";
 
@@ -85,8 +83,14 @@ export default function VoiceResumePage() {
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [finished, setFinished] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionType | null>(null);
+  const isRecordingRef = useRef(false);
+  const accumulatedTextRef = useRef("");
+  const currentTranscriptRef = useRef("");
 
   const questions = useMemo<VoiceQuestion[]>(
     () => [
@@ -104,6 +108,22 @@ export default function VoiceResumePage() {
           zh: "请说出你的全名",
           ms: "Sebut nama penuh anda",
           ta: "உங்கள் முழுப் பெயரைச் சொல்லுங்கள்",
+        },
+      },
+      {
+        id: "age",
+        section: "basics",
+        prompt: {
+          en: "How old are you?",
+          zh: "你几岁了？",
+          ms: "Berapa umur anda?",
+          ta: "உங்கள் வயது என்ன?",
+        },
+        placeholder: {
+          en: "Say your age",
+          zh: "请说出你的年龄",
+          ms: "Sebut umur anda",
+          ta: "உங்கள் வயதைச் சொல்லுங்கள்",
         },
       },
       {
@@ -235,31 +255,68 @@ export default function VoiceResumePage() {
       return;
     }
 
+    // Stop any active recording when locale changes
+    isRecordingRef.current = false;
+    setIsListening(false);
+
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = browserLangMap[safeLocale];
 
     recognition.onresult = (event) => {
-      let transcript = "";
+      let finalText = "";
+      let interimText = "";
 
-      for (let i = 0; i < event.results.length; i += 1) {
-        transcript += event.results[i][0].transcript;
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        if (event.results[i].isFinal) {
+          finalText += event.results[i][0].transcript;
+        } else {
+          interimText += event.results[i][0].transcript;
+        }
       }
 
-      setDraft(transcript.trim());
+      if (finalText) {
+        accumulatedTextRef.current = (accumulatedTextRef.current + " " + finalText).trim();
+      }
+      currentTranscriptRef.current = interimText;
+
+      const combined = [accumulatedTextRef.current, currentTranscriptRef.current]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      setDraft(combined);
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      if (isRecordingRef.current) {
+        try {
+          recognition.start();
+        } catch {
+          // recognition may already be starting; ignore
+        }
+      } else {
+        setIsListening(false);
+      }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      isRecordingRef.current = false;
       setIsListening(false);
       setError(t("voice_input_error"));
     };
 
     recognitionRef.current = recognition;
+
+    return () => {
+      isRecordingRef.current = false;
+      try {
+        recognition.stop();
+      } catch {
+        // ignore
+      }
+    };
   }, [safeLocale, t]);
 
   useEffect(() => {
@@ -290,19 +347,25 @@ export default function VoiceResumePage() {
   function startListening() {
     if (!recognitionRef.current) return;
     setError(null);
-    setDraft("");
+    // Preserve any existing manually typed text
+    accumulatedTextRef.current = draft;
+    currentTranscriptRef.current = "";
     recognitionRef.current.lang = browserLangMap[safeLocale];
+    isRecordingRef.current = true;
     recognitionRef.current.start();
     setIsListening(true);
   }
 
   function stopListening() {
+    isRecordingRef.current = false;
     recognitionRef.current?.stop();
-    setIsListening(false);
+    // isListening set to false via onend → setIsListening(false)
   }
 
   function saveAndNext() {
     if (!currentQuestion || !draft.trim()) return;
+
+    if (isListening) stopListening();
 
     const nextAnswers = {
       ...answers,
@@ -311,10 +374,13 @@ export default function VoiceResumePage() {
 
     setAnswers(nextAnswers);
     setDraft("");
+    accumulatedTextRef.current = "";
+    currentTranscriptRef.current = "";
 
     if (isLastQuestion) {
       sessionStorage.setItem("vericlause.voiceResumeAnswers", JSON.stringify(nextAnswers));
       sessionStorage.setItem("vericlause.resumeSource", "voice");
+      setFinished(true);
       return;
     }
 
@@ -323,6 +389,10 @@ export default function VoiceResumePage() {
 
   function goBack() {
     if (currentIndex === 0) return;
+    if (isListening) stopListening();
+    accumulatedTextRef.current = "";
+    currentTranscriptRef.current = "";
+    setDraft("");
     setCurrentIndex((prev) => prev - 1);
   }
 
@@ -334,8 +404,36 @@ export default function VoiceResumePage() {
     }));
   }
 
+  async function handleGenerate() {
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const storedAnswers = JSON.parse(
+        sessionStorage.getItem("vericlause.voiceResumeAnswers") || "{}",
+      );
+      const res = await fetch("/api/resume/voice-build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(storedAnswers),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Generation failed");
+      if (data.resume_id) {
+        sessionStorage.setItem("vericlause.lastResumeId", data.resume_id);
+        router.push(`/resume/review?resume_id=${data.resume_id}`);
+      } else {
+        sessionStorage.setItem("vericlause.voiceResumeResult", JSON.stringify(data));
+        router.push("/resume/review");
+      }
+    } catch (e) {
+      setGenerateError(e instanceof Error ? e.message : "Generation failed");
+      setGenerating(false);
+    }
+  }
+
   const compiledPreview = [
     answers.full_name ? `Name: ${answers.full_name}` : "",
+    answers.age ? `Age: ${answers.age}` : "",
     answers.job_title ? `Target Role: ${answers.job_title}` : "",
     answers.summary ? `Summary: ${answers.summary}` : "",
     answers.experience ? `Experience: ${answers.experience}` : "",
@@ -348,6 +446,65 @@ export default function VoiceResumePage() {
 
   const completedCount = Math.min(Object.keys(answers).length + (draft.trim() ? 1 : 0), questions.length);
   const progressPercent = Math.round((completedCount / questions.length) * 100);
+
+  if (finished) {
+    return (
+      <main className="min-h-screen bg-[#f8f8f6]">
+        <SiteNavbar
+          rightSlot={
+            <Link
+              href="/resume"
+              className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            >
+              {t("nav_dashboard")}
+            </Link>
+          }
+        />
+
+        <section className="mx-auto max-w-2xl px-4 py-20 text-center sm:px-6">
+          <div className="mb-8">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-700">
+              ✓
+            </div>
+            <h1 className="font-serif text-3xl font-semibold text-navy-950">
+              All answers recorded!
+            </h1>
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              Click below to generate your professional resume with AI.
+            </p>
+          </div>
+
+          {generateError && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {generateError}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={generating}
+            className="rounded-xl bg-navy-950 px-8 py-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {generating ? "Generating your resume…" : "Generate My Resume"}
+          </button>
+
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => {
+                setFinished(false);
+                setCurrentIndex(questions.length - 1);
+              }}
+              className="text-sm font-medium text-slate-600 underline"
+            >
+              Go back and review answers
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f8f8f6]">
@@ -422,7 +579,10 @@ export default function VoiceResumePage() {
 
               <textarea
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  accumulatedTextRef.current = e.target.value;
+                }}
                 placeholder={currentQuestion.placeholder[safeLocale]}
                 className="min-h-[180px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
               />
