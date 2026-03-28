@@ -187,6 +187,7 @@ export default function ResumeOnboardingPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
+      formData.append("voiceText", voiceText);
 
       const res = await fetch("/api/resume", { method: "POST", body: formData });
       const json = await res.json();
