@@ -54,7 +54,6 @@ export interface ScrapedJob {
 const MCF_API_BASE = "https://api.mycareersfuture.gov.sg/v2";
 
 function buildMCFSearchQuery(profile: ResumeProfile): string {
-  // Use target roles first, fall back to most recent job title
   if (profile.target_roles?.length) {
     return profile.target_roles[0];
   }
@@ -74,13 +73,12 @@ export async function fetchMCFJobs(profile: ResumeProfile, limit = 10): Promise<
     page: "0",
   });
 
-  // Add salary filter if we can estimate from profile
   const res = await fetch(`${MCF_API_BASE}/jobs?${params.toString()}`, {
     headers: {
       Accept: "application/json",
       "User-Agent": "VeriClause/1.0",
     },
-    next: { revalidate: 300 }, // cache 5 mins
+    next: { revalidate: 300 },
   });
 
   if (!res.ok) {
@@ -104,10 +102,10 @@ function getOpenAIClient(): OpenAI {
 const MATCH_SYSTEM_PROMPT = `You are an expert Singapore career advisor. Given a candidate's resume profile and a list of job postings, score and rank each job by fit.
 
 For each job return:
-- matchScore: 0–100 integer
-- strengths: 2–3 bullet points on why the candidate is a good fit
-- improvements: 2–3 bullet points on gaps to address
-- reasoning: 1–2 sentence overall reasoning
+- matchScore: 0-100 integer
+- strengths: 2-3 bullet points on why the candidate is a good fit
+- improvements: 2-3 bullet points on gaps to address
+- reasoning: 1-2 sentence overall reasoning
 
 Return ONLY a JSON object in this exact shape, no extra text:
 {
@@ -215,7 +213,6 @@ export async function getJobRecommendations(
     };
   });
 
-  // Sort by matchScore descending
   return recommendations.sort((a, b) => b.matchScore - a.matchScore);
 }
 
@@ -250,31 +247,34 @@ export async function extractJobFromUrl(url: string): Promise<ScrapedJob> {
   // For MCF URLs, use the API directly instead of scraping
   if (source === "MyCareersFuture") {
     const jobMatch = url.match(/JOB-[\w-]+/i);
-    const uuidMatch = url.match(/([a-f0-9]{32})(?:[^a-f0-9]|$)/i);
+    const uuidMatch = url.match(/([a-f0-9]{32})$/i);
     const jobPostId = jobMatch?.[0] ?? null;
     const uuid = uuidMatch?.[1] ?? null;
 
     if (jobPostId || uuid) {
-      const query = jobPostId ? `jobPostId=${jobPostId}` : `uuid=${uuid}`;
-      const res = await fetch(
-        `${MCF_API_BASE}/jobs?${query}`,
-        {
-          headers: {
-            Accept: "application/json",
-            "User-Agent": "VeriClause/1.0",
-          },
+      // Use direct job endpoint for UUID, query param for jobPostId
+      const endpoint = jobPostId
+        ? `${MCF_API_BASE}/jobs?jobPostId=${jobPostId}`
+        : `${MCF_API_BASE}/jobs/${uuid}`;
+
+      const res = await fetch(endpoint, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "VeriClause/1.0",
         },
-      );
+      });
+
       if (res.ok) {
         const data = await res.json();
-        const job: MCFJob = data.results?.[0];
-        if (job) {
+        // jobPostId returns results array, UUID returns direct object
+        const job: MCFJob = jobPostId ? data.results?.[0] : data;
+        if (job && job.title) {
           return {
             title: job.title ?? null,
             company: job.postedCompany?.name ?? job.company?.name ?? null,
             description: job.description ?? null,
             salary: job.salary?.minimum
-              ? `$${job.salary.minimum.toLocaleString()} – $${job.salary.maximum?.toLocaleString() ?? "?"} / month`
+              ? `$${job.salary.minimum.toLocaleString()} - $${job.salary.maximum?.toLocaleString() ?? "?"} / month`
               : null,
             location: "Singapore",
             employmentType: job.employmentTypes?.[0]?.employmentType ?? null,
@@ -302,7 +302,6 @@ export async function extractJobFromUrl(url: string): Promise<ScrapedJob> {
 
   const html = await res.text();
 
-  // Strip HTML tags to get readable text (keep it under token limit)
   const text = html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")

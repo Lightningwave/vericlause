@@ -30,7 +30,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Only http/https URLs are supported" }, { status: 400 });
     }
 
-    const job = await extractJobFromUrl(url);
+    console.log("Scraping URL:", url);
+const job = await extractJobFromUrl(url);
+console.log("Job result:", job.title, job.company);
 
     return NextResponse.json({ job });
   } catch (err) {
