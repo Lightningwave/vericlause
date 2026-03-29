@@ -9,7 +9,7 @@ import { getAuthenticatedUser } from "@/lib/services/db";
 const OPENAI_MODEL = "gpt-4o-mini";
 const GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant";
 
-const SYSTEM_PROMPT = `You are an elite Singapore resume advisor: language coach, ATS specialist, Singapore market expert (MOM standards, local hiring norms), and career progression analyst. Be specific — always reference actual resume content, never generic advice. Salary benchmarks must be SGD Singapore market rates.
+const BASE_SYSTEM_PROMPT = `You are an elite Singapore resume advisor: language coach, ATS specialist, Singapore market expert (MOM standards, local hiring norms), and career progression analyst. Be specific — always reference actual resume content, never generic advice. Salary benchmarks must be SGD Singapore market rates.
 
 Return ONLY valid JSON with exactly these fields:
 
@@ -18,6 +18,22 @@ Return ONLY valid JSON with exactly these fields:
 Score rubric (1–10): 2pts quantified achievements with numbers; 2pts Singapore market/MOM alignment; 2pts structure/ATS compatibility; 2pts action verb quality; 2pts completeness (contact, history, education, skills).
 
 No text outside the JSON.`;
+
+function getLanguageName(code: string): string {
+  const names: Record<string, string> = {
+    zh: "Simplified Chinese (简体中文)",
+    ms: "Bahasa Melayu",
+    ta: "Tamil (தமிழ்)",
+  };
+  return names[code] || "English";
+}
+
+function buildSystemPrompt(language?: string): string {
+  if (!language || language === "en") return BASE_SYSTEM_PROMPT;
+  const langName = getLanguageName(language);
+  const instruction = `IMPORTANT: You must respond entirely in ${langName}. All feedback, suggestions, and analysis must be written in ${langName}. Do not use English anywhere in your response.\n\n`;
+  return instruction + BASE_SYSTEM_PROMPT;
+}
 
 export interface ResumeFeedback {
   overallImpression: string;
@@ -51,7 +67,8 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-async function callLlm(resumeText: string): Promise<string> {
+async function callLlm(resumeText: string, language?: string): Promise<string> {
+  const systemPrompt = buildSystemPrompt(language);
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
@@ -59,7 +76,7 @@ async function callLlm(resumeText: string): Promise<string> {
       const response = await client.chat.completions.create({
         model: OPENAI_MODEL,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: resumeText.slice(0, 120_000) },
         ],
         temperature: 0,
@@ -77,7 +94,7 @@ async function callLlm(resumeText: string): Promise<string> {
   const response = await client.chat.completions.create({
     model: GROQ_FALLBACK_MODEL,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemPrompt },
       { role: "user", content: resumeText.slice(0, 120_000) },
     ],
     temperature: 0,
@@ -93,6 +110,8 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const file = formData.get("file");
+  const language = (formData.get("language") as string | null) ?? "en";
+  const translatedText = (formData.get("translatedText") as string | null) ?? null;
 
   if (!file || !(file instanceof Blob)) {
     return NextResponse.json({ detail: "No file provided" }, { status: 400 });
@@ -108,25 +127,29 @@ export async function POST(req: NextRequest) {
   }
 
   let resumeText: string;
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const { text } = await extractText(uint8Array, { mergePages: true });
-    resumeText = text;
-  } catch (e) {
-    return NextResponse.json(
-      { detail: `File could not be read: ${e instanceof Error ? e.message : e}` },
-      { status: 422 },
-    );
-  }
+  if (translatedText && translatedText.trim()) {
+    resumeText = translatedText;
+  } else {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const { text } = await extractText(uint8Array, { mergePages: true });
+      resumeText = text;
+    } catch (e) {
+      return NextResponse.json(
+        { detail: `File could not be read: ${e instanceof Error ? e.message : e}` },
+        { status: 422 },
+      );
+    }
 
-  if (!resumeText.trim()) {
-    return NextResponse.json({ detail: "File produced no text" }, { status: 422 });
+    if (!resumeText.trim()) {
+      return NextResponse.json({ detail: "File produced no text" }, { status: 422 });
+    }
   }
 
   let raw: string;
   try {
-    raw = await callLlm(resumeText);
+    raw = await callLlm(resumeText, language);
   } catch (e) {
     return NextResponse.json(
       { detail: `AI analysis failed: ${e instanceof Error ? e.message : e}` },

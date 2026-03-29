@@ -51,7 +51,7 @@ export async function downloadResume(
     }
 
     const React = await import("react");
-    const blob = await pdf(React.createElement(Component, { data })).toBlob();
+    const blob = await pdf(React.createElement(Component, { data }) as any).toBlob();
     triggerDownload(blob, filename);
     return;
   }

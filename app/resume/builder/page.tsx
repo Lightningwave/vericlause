@@ -182,11 +182,11 @@ export default function ResumeBuilderPage() {
     { id: createId(), name: "Documentation", level: 90 },
   ]);
 
-  const [extraSections, setExtraSections] = useState<ExtraSection[]>([
+  const [extraSections, setExtraSections] = useState<ExtraSection[]>(() => [
     {
       id: createId(),
       title: "Certifications",
-      content: "Add certifications, awards, volunteer work, languages, or any other optional section here.",
+      content: t("builder_optional_placeholder"),
     },
   ]);
 
@@ -576,7 +576,7 @@ export default function ResumeBuilderPage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">Location</label>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">{t("resume_builder_label_location")}</label>
                     <input
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
@@ -634,7 +634,7 @@ export default function ResumeBuilderPage() {
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <input
-                        placeholder="Company"
+                        placeholder={t("resume_builder_ph_company")}
                         value={item.company}
                         onChange={(e) => updateExperience(item.id, "company", e.target.value)}
                         onBlur={(e) => void handleCompanyBlur(item.id, e.target.value)}
@@ -647,7 +647,7 @@ export default function ResumeBuilderPage() {
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-slate-500">Start date</p>
+                        <p className="text-xs font-medium text-slate-500">{t("builder_start_date")}</p>
                         <MonthYearPicker
                           month={item.startMonth}
                           year={item.startYear}
@@ -656,7 +656,7 @@ export default function ResumeBuilderPage() {
                             updateExperience(item.id, "startYear", y);
                           }}
                         />
-                        <p className="pt-1 text-xs font-medium text-slate-500">End date</p>
+                        <p className="pt-1 text-xs font-medium text-slate-500">{t("builder_end_date")}</p>
                         {!item.endIsPresent && (
                           <MonthYearPicker
                             month={item.endMonth}
@@ -674,7 +674,7 @@ export default function ResumeBuilderPage() {
                             onChange={(e) => updateExperience(item.id, "endIsPresent", e.target.checked)}
                             className="accent-navy-950"
                           />
-                          Present
+                          {t("builder_present_only")}
                         </label>
                         {(() => {
                           const dur = calcDuration(item.startMonth, item.startYear, item.endMonth, item.endYear, item.endIsPresent);
@@ -751,13 +751,13 @@ export default function ResumeBuilderPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-xl font-semibold text-navy-950">Education</h2>
+                <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_education_title")}</h2>
                 <button
                   type="button"
                   onClick={addEducation}
                   className="rounded-lg bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
                 >
-                  Add Education
+                  {t("resume_builder_add_education")}
                 </button>
               </div>
 
@@ -781,7 +781,7 @@ export default function ResumeBuilderPage() {
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <input
-                        placeholder="School"
+                        placeholder={t("resume_builder_ph_school")}
                         value={item.school}
                         onChange={(e) => updateEducation(item.id, "school", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -799,7 +799,7 @@ export default function ResumeBuilderPage() {
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-slate-500">Start date</p>
+                        <p className="text-xs font-medium text-slate-500">{t("builder_start_date")}</p>
                         <MonthYearPicker
                           month={item.startMonth}
                           year={item.startYear}
@@ -808,7 +808,7 @@ export default function ResumeBuilderPage() {
                             updateEducation(item.id, "startYear", y);
                           }}
                         />
-                        <p className="pt-1 text-xs font-medium text-slate-500">End / Graduation date</p>
+                        <p className="pt-1 text-xs font-medium text-slate-500">{t("builder_end_date")}</p>
                         {!item.endIsPresent && (
                           <MonthYearPicker
                             month={item.endMonth}
@@ -826,7 +826,7 @@ export default function ResumeBuilderPage() {
                             onChange={(e) => updateEducation(item.id, "endIsPresent", e.target.checked)}
                             className="accent-navy-950"
                           />
-                          Present / Ongoing
+                          {t("builder_present")}
                         </label>
                         {(() => {
                           const dur = calcDuration(item.startMonth, item.startYear, item.endMonth, item.endYear, item.endIsPresent);
@@ -855,13 +855,15 @@ export default function ResumeBuilderPage() {
                 {extraSections.map((section, index) => (
                   <div key={section.id} className="rounded-2xl border border-slate-200 bg-white p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">Optional Section {index + 1}</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {t("builder_optional_section").replace("{n}", String(index + 1))}
+                      </p>
                       <button
                         type="button"
                         onClick={() => removeExtraSection(section.id)}
                         className="text-sm font-medium text-red-600"
                       >
-                        Remove
+                        {t("resume_builder_remove")}
                       </button>
                     </div>
 
@@ -873,7 +875,7 @@ export default function ResumeBuilderPage() {
                     />
 
                     <textarea
-                      placeholder="Add section content"
+                      placeholder={t("resume_builder_ph_section_content")}
                       value={section.content}
                       onChange={(e) => updateExtraSection(section.id, "content", e.target.value)}
                       className="mt-4 min-h-[120px] w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -883,13 +885,19 @@ export default function ResumeBuilderPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              <Link
+                href="/resume/review"
+                className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                {t("builder_back_to_review")}
+              </Link>
               <button
                 type="button"
                 onClick={() => setShowTemplatePicker(true)}
                 className="rounded-xl bg-navy-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-navy-800"
               >
-                Download Resume
+                {t("builder_download")}
               </button>
             </div>
           </section>
@@ -946,7 +954,7 @@ export default function ResumeBuilderPage() {
                               {[
                                 item.location,
                                 item.startYear ? formatDate(item.startMonth, item.startYear) : null,
-                                item.endIsPresent ? "Present" : item.endYear ? formatDate(item.endMonth, item.endYear) : null,
+                                item.endIsPresent ? t("builder_present_only") : item.endYear ? formatDate(item.endMonth, item.endYear) : null,
                               ].filter(Boolean).join(" • ")}
                             </p>
                             <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
@@ -998,7 +1006,7 @@ export default function ResumeBuilderPage() {
                             <p className="text-xs text-slate-500">
                               {[
                                 item.startYear ? formatDate(item.startMonth, item.startYear) : null,
-                                item.endIsPresent ? "Present" : item.endYear ? formatDate(item.endMonth, item.endYear) : null,
+                                item.endIsPresent ? t("builder_present_only") : item.endYear ? formatDate(item.endMonth, item.endYear) : null,
                               ].filter(Boolean).join(" – ")}
                             </p>
                           </div>

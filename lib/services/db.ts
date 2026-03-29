@@ -315,6 +315,7 @@ export async function insertResume(
   profile: ResumeProfile | null,
   filePath?: string,
   imageUrls?: string[],
+  aiSuggestions?: ResumeSuggestion[] | null,
 ): Promise<ResumeRow> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -326,6 +327,7 @@ export async function insertResume(
       raw_text: rawText,
       parsed_profile: profile,
       image_urls: imageUrls?.length ? imageUrls : null,
+      ai_suggestions: aiSuggestions?.length ? aiSuggestions : null,
     })
     .select()
     .single();

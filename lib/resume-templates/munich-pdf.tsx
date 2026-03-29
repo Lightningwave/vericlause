@@ -1,11 +1,13 @@
 import React from "react";
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet, Font } from "@react-pdf/renderer";
 import type { ResumeTemplateData } from "./types";
 
+Font.register({ family: "NotoSansSC", src: "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2" });
+
 const styles = StyleSheet.create({
-  page: { padding: 44, fontFamily: "Helvetica", backgroundColor: "#ffffff", fontSize: 9 },
+  page: { padding: 44, fontFamily: "NotoSansSC", backgroundColor: "#ffffff", fontSize: 9 },
   tagline: { fontSize: 7.5, letterSpacing: 2, color: "#777777", marginBottom: 5, textTransform: "uppercase" },
-  name: { fontSize: 26, fontFamily: "Times-Roman", color: "#111111", marginBottom: 10 },
+  name: { fontSize: 26, fontFamily: "NotoSansSC", color: "#111111", marginBottom: 10 },
   divider: { borderBottomWidth: 0.75, borderBottomColor: "#cccccc", marginBottom: 14 },
   row: { flexDirection: "row" },
   leftCol: { width: "30%", paddingRight: 14 },
@@ -23,7 +25,7 @@ const styles = StyleSheet.create({
   },
   body: { fontSize: 9, lineHeight: 1.55, color: "#333333", marginBottom: 4 },
   contactLine: { fontSize: 8.5, color: "#444444", marginBottom: 3 },
-  expHeader: { fontSize: 9, fontFamily: "Helvetica-Bold", color: "#111111", marginBottom: 2 },
+  expHeader: { fontSize: 9, fontFamily: "NotoSansSC", color: "#111111", marginBottom: 2 },
   expMeta: { fontSize: 8, color: "#777777", marginBottom: 4 },
   skillRow: { flexDirection: "row", marginBottom: 5, alignItems: "center" },
   skillName: { fontSize: 8.5, color: "#333333", flex: 1 },
@@ -78,7 +80,7 @@ export function MunichPdf({ data }: { data: ResumeTemplateData }) {
                 <Text style={styles.sectionLabel}>Education</Text>
                 {data.educations.map((edu, i) => (
                   <View key={i} style={{ marginBottom: 8 }}>
-                    <Text style={[styles.body, { fontFamily: "Helvetica-Bold" }]}>
+                    <Text style={[styles.body, { fontFamily: "NotoSansSC" }]}>
                       {edu.qualification}
                     </Text>
                     {edu.fieldOfStudy ? (

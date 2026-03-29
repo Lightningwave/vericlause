@@ -3,25 +3,17 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-
-const ANALYSIS_STEPS = [
-  "Reading your resume…",
-  "Running ATS keyword scan…",
-  "Analysing career progression…",
-  "Generating salary benchmarks…",
-  "Finalising feedback…",
-] as const;
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { ResumeList } from "@/components/resume/ResumeList";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
 import { createClient } from "@/lib/supabase/client";
-import { getProfileJob, listResumes, profileResume, uploadResume, type ResumeSummary } from "@/lib/api";
+import { getProfileJob, getResumeById, listResumes, profileResume, uploadResume, type ResumeSummary } from "@/lib/api";
 import type { ResumeProfile } from "@/lib/types";
 import type { ResumeFeedback } from "@/app/api/resume/route";
 
 function ResumeOnboardingContent() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { status: resumeStatus, refetch: refetchResumeStatus } = useResumeStatus();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,9 +35,18 @@ function ResumeOnboardingContent() {
   const [uploadComplete, setUploadComplete] = useState(false);
   const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
   const [analysing, setAnalysing] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisComplete, setAnalysisComplete] = useState(false);
+
+  const analysisSteps = [
+    t("upload_step_reading"),
+    t("upload_step_ats"),
+    t("upload_step_career"),
+    t("upload_step_salary"),
+    t("upload_step_finalising"),
+  ];
 
   // Stage 0 = no file, 1 = file selected, 2 = uploaded, 3 = analysed
   const stage = !selectedFile ? 0 : !uploadComplete ? 1 : !analysisComplete ? 2 : 3;
@@ -219,10 +220,35 @@ function ResumeOnboardingContent() {
     setAnalysisError(null);
     setFeedback(null);
 
+    // FIX 2: translate resume text if non-English locale
+    let translatedText: string | null = null;
+    if (locale !== "en" && lastResumeId) {
+      setTranslating(true);
+      try {
+        const resumeData = await getResumeById(lastResumeId);
+        const rawText = resumeData?.resume?.raw_text;
+        if (rawText) {
+          const res = await fetch("/api/resume/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: rawText, targetLanguage: locale }),
+          });
+          const data = await res.json();
+          translatedText = (data.translatedText as string) || null;
+        }
+      } catch {
+        // ignore — proceed without translation
+      } finally {
+        setTranslating(false);
+      }
+    }
+
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("voiceText", voiceText);
+      formData.append("language", locale);
+      if (translatedText) formData.append("translatedText", translatedText);
 
       const res = await fetch("/api/resume", { method: "POST", body: formData });
       const json = await res.json();
@@ -261,7 +287,10 @@ function ResumeOnboardingContent() {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = false;
-    recognition.lang = "en-US";
+    const micLangMap: Record<string, string> = {
+      en: "en-SG", zh: "zh-CN", ms: "ms-MY", ta: "ta-IN",
+    };
+    recognition.lang = micLangMap[locale] ?? "en-SG";
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[event.results.length - 1][0].transcript;
@@ -394,19 +423,19 @@ function ResumeOnboardingContent() {
               {/* Stage 2 banner — upload done, waiting for analysis */}
               {stage === 2 ? (
                 <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                  Resume uploaded successfully. Click <strong>Analyse My Resume</strong> to get your AI feedback.
+                  {t("upload_success_banner")}
                 </p>
               ) : null}
             </form>
 
             <div className="mt-5">
               <label className="mb-2 block text-sm font-medium text-slate-700">
-                Or describe your experience verbally
+                {t("voice_describe_label")}
               </label>
               <textarea
                 value={voiceText}
                 onChange={(e) => setVoiceText(e.target.value)}
-                placeholder="Your spoken input will appear here..."
+                placeholder={t("voice_textarea_placeholder")}
                 rows={4}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
               />
@@ -416,20 +445,26 @@ function ResumeOnboardingContent() {
             <button
               type="button"
               onClick={() => void handleAnalyse()}
-              disabled={stage !== 2 || analysing}
+              disabled={stage !== 2 || analysing || translating}
               className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none ${
-                stage === 2 && !analysing
+                stage === 2 && !analysing && !translating
                   ? "border border-[#b88a44] text-[#b88a44] hover:bg-amber-50"
                   : "border border-slate-200 text-slate-400 bg-white"
               }`}
             >
-              {analysing ? "Analysing…" : "Analyse My Resume"}
+              {analysing ? t("resume_analysing_label") : t("resume_analyse_button")}
             </button>
+
+            {translating ? (
+              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                {t("upload_step_translating")}
+              </div>
+            ) : null}
 
             {analysing ? (
               <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
                 <div className="space-y-1.5">
-                  {ANALYSIS_STEPS.map((step, i) => (
+                  {analysisSteps.map((step, i) => (
                     <div
                       key={i}
                       className={`flex items-center gap-2.5 text-sm transition-opacity duration-500 ${
@@ -466,7 +501,7 @@ function ResumeOnboardingContent() {
             {/* Stage 3 banner — analysis done */}
             {stage === 3 && feedback ? (
               <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                Analysis complete. Your resume scored <strong>{Math.min(100, Math.round((feedback.score / 10) * 100))}/100</strong>. Click <strong>Go to Resume Review</strong> to see your full feedback.
+                {t("upload_complete_banner").replace("{score}", String(Math.min(100, Math.round((feedback.score / 10) * 100))))}
               </p>
             ) : null}
 
@@ -510,33 +545,21 @@ function ResumeOnboardingContent() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-navy-950">Your resume journey</h2>
+              <h2 className="text-xl font-semibold text-navy-950">{t("resume_journey_title")}</h2>
               <ol className="mt-4 space-y-3">
-                {[
-                  {
-                    label: "Analyse",
-                    desc: "Upload your resume and click Analyse My Resume to get instant AI feedback on strengths, gaps, and your ATS score.",
-                  },
-                  {
-                    label: "Review and Improve",
-                    desc: "See your score, apply AI suggestions, and edit your resume sections directly on the review page.",
-                  },
-                  {
-                    label: "Rebuild if Needed",
-                    desc: "Use the Resume Builder to restructure your resume from scratch or refine it section by section.",
-                  },
-                  {
-                    label: "Match and Apply",
-                    desc: "Head to Job Matching to compare your resume against live Singapore job listings and get a recommended fit score.",
-                  },
-                ].map((step, i) => (
+                {([
+                  { labelKey: "resume_journey_step1_label", descKey: "resume_journey_step1_desc" },
+                  { labelKey: "resume_journey_step2_label", descKey: "resume_journey_step2_desc" },
+                  { labelKey: "resume_journey_step3_label", descKey: "resume_journey_step3_desc" },
+                  { labelKey: "resume_journey_step4_label", descKey: "resume_journey_step4_desc" },
+                ] as const).map((step, i) => (
                   <li key={i} className="flex gap-3">
                     <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-navy-950 text-[10px] font-bold text-white">
                       {i + 1}
                     </span>
                     <div>
-                      <p className="text-sm font-semibold text-navy-950">{step.label}</p>
-                      <p className="mt-0.5 text-xs leading-5 text-slate-500">{step.desc}</p>
+                      <p className="text-sm font-semibold text-navy-950">{t(step.labelKey)}</p>
+                      <p className="mt-0.5 text-xs leading-5 text-slate-500">{t(step.descKey)}</p>
                     </div>
                   </li>
                 ))}
@@ -549,9 +572,9 @@ function ResumeOnboardingContent() {
         {feedback ? (
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-navy-950">AI Feedback</h2>
+              <h2 className="text-xl font-semibold text-navy-950">{t("ai_feedback_title")}</h2>
               <span className="text-sm font-semibold text-navy-950">
-                Score: <span className="text-2xl">{feedback.score}</span>
+                {t("ai_score_label")} <span className="text-2xl">{feedback.score}</span>
                 <span className="font-normal text-slate-400"> / 10</span>
               </span>
             </div>
@@ -559,14 +582,14 @@ function ResumeOnboardingContent() {
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Overall Impression
+                  {t("ai_overall_impression")}
                 </p>
                 <p className="text-sm leading-6 text-slate-700">{feedback.overallImpression}</p>
               </div>
 
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-600">
-                  Key Strengths
+                  {t("ai_key_strengths")}
                 </p>
                 <ul className="space-y-1.5">
                   {feedback.keyStrengths.map((s, i) => (
@@ -582,7 +605,7 @@ function ResumeOnboardingContent() {
 
               <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-600">
-                  Areas to Improve
+                  {t("ai_areas_to_improve")}
                 </p>
                 <ul className="space-y-1.5">
                   {feedback.areasToImprove.map((s, i) => (
@@ -598,7 +621,7 @@ function ResumeOnboardingContent() {
 
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Suggested Edits
+                  {t("ai_suggested_edits")}
                 </p>
                 <ul className="space-y-1.5">
                   {feedback.suggestedEdits.map((s, i) => (
@@ -616,7 +639,7 @@ function ResumeOnboardingContent() {
                 <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 sm:col-span-2">
                   <div className="mb-3 flex items-center gap-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                      ATS Analysis
+                      {t("ai_ats_analysis")}
                     </p>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -625,7 +648,7 @@ function ResumeOnboardingContent() {
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {feedback.atsAnalysis.atsFriendly ? "ATS Friendly" : "Not ATS Friendly"}
+                      {feedback.atsAnalysis.atsFriendly ? t("ai_ats_friendly") : t("ai_ats_not_friendly")}
                     </span>
                   </div>
                   {feedback.atsAnalysis.atsNotes ? (
@@ -633,7 +656,7 @@ function ResumeOnboardingContent() {
                   ) : null}
                   {feedback.atsAnalysis.keywordsFound?.length ? (
                     <div className="mb-2">
-                      <p className="mb-1.5 text-xs font-medium text-slate-500">Keywords Found</p>
+                      <p className="mb-1.5 text-xs font-medium text-slate-500">{t("ai_keywords_found")}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {feedback.atsAnalysis.keywordsFound.map((kw) => (
                           <span
@@ -648,7 +671,7 @@ function ResumeOnboardingContent() {
                   ) : null}
                   {feedback.atsAnalysis.keywordsMissing?.length ? (
                     <div>
-                      <p className="mb-1.5 text-xs font-medium text-slate-500">Keywords Missing</p>
+                      <p className="mb-1.5 text-xs font-medium text-slate-500">{t("ai_keywords_missing")}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {feedback.atsAnalysis.keywordsMissing.map((kw) => (
                           <span
@@ -667,7 +690,7 @@ function ResumeOnboardingContent() {
               {feedback.careerProgression ? (
                 <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Career Progression
+                    {t("ai_career_progression")}
                   </p>
                   <p className="text-sm leading-6 text-slate-700">{feedback.careerProgression}</p>
                 </div>
@@ -676,7 +699,7 @@ function ResumeOnboardingContent() {
               {feedback.salaryBenchmark ? (
                 <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Salary Benchmark
+                    {t("ai_salary_benchmark")}
                   </p>
                   <p className="text-lg font-semibold text-navy-950">
                     {feedback.salaryBenchmark.estimatedRange}

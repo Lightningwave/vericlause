@@ -1,11 +1,13 @@
 import React from "react";
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet, Font } from "@react-pdf/renderer";
 import type { ResumeTemplateData } from "./types";
 
+Font.register({ family: "NotoSansSC", src: "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2" });
+
 const styles = StyleSheet.create({
-  page: { padding: 40, fontFamily: "Helvetica", backgroundColor: "#ffffff", fontSize: 9.5 },
+  page: { padding: 40, fontFamily: "NotoSansSC", backgroundColor: "#ffffff", fontSize: 9.5 },
   nameRow: { flexDirection: "row", justifyContent: "center", marginBottom: 4 },
-  nameText: { fontSize: 18, fontFamily: "Times-Roman", color: "#111111" },
+  nameText: { fontSize: 18, fontFamily: "NotoSansSC", color: "#111111" },
   contactBar: {
     flexDirection: "row",
     justifyContent: "center",
@@ -18,7 +20,7 @@ const styles = StyleSheet.create({
   jobTitle: {
     textAlign: "center",
     fontSize: 11,
-    fontFamily: "Helvetica-Bold",
+    fontFamily: "NotoSansSC",
     color: "#222222",
     marginBottom: 14,
     letterSpacing: 1,
@@ -45,7 +47,7 @@ const styles = StyleSheet.create({
   expRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
   companyText: { fontSize: 9, color: "#333333" },
   dateText: { fontSize: 8.5, color: "#777777" },
-  expTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", color: "#111111", marginBottom: 4 },
+  expTitle: { fontSize: 10, fontFamily: "NotoSansSC", color: "#111111", marginBottom: 4 },
   expDesc: { fontSize: 9, lineHeight: 1.55, color: "#333333", marginBottom: 6 },
   bulletRow: { flexDirection: "row", marginBottom: 3 },
   bulletDot: { fontSize: 9, color: "#333333", marginRight: 4 },
@@ -142,7 +144,7 @@ export function ExecutivePdf({ data }: { data: ResumeTemplateData }) {
             <View style={styles.sectionDivBottom} />
             {data.educations.map((edu, i) => (
               <View key={i} style={styles.expRow}>
-                <Text style={[styles.companyText, { fontFamily: "Helvetica-Bold" }]}>
+                <Text style={[styles.companyText, { fontFamily: "NotoSansSC" }]}>
                   {[edu.qualification, edu.fieldOfStudy].filter(Boolean).join(", ")} — {edu.institution}
                 </Text>
                 {edu.graduationYear ? (

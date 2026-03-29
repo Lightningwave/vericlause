@@ -128,25 +128,25 @@ function countKeywordsFound(resumeText: string, keywords: string[]): number {
   return keywords.filter((kw) => lower.includes(kw.toLowerCase())).length;
 }
 
-function SuggestionBox({ items, hidden }: { items: ResumeSuggestion[]; hidden?: boolean }) {
+function SuggestionBox({ items, hidden, t }: { items: ResumeSuggestion[]; hidden?: boolean; t: (key: string) => string }) {
   if (!items.length || hidden) return null;
   return (
     <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
       <div className="mb-3 flex items-center gap-1.5">
         <span className="h-2 w-2 rounded-full bg-green-500" />
-        <span className="text-xs font-medium text-green-700">AI suggested improvement</span>
+        <span className="text-xs font-medium text-green-700">{t("ai_suggestion_badge")}</span>
       </div>
       <div className="space-y-0">
         {items.map((s, i) => (
           <div key={i} className={i > 0 ? "mt-3 border-t border-green-200 pt-3" : ""}>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-green-700">
-              What to improve
+              {t("what_to_improve")}
             </p>
             <p className="text-sm leading-relaxed text-gray-800">{s.suggestion}</p>
             {s.suggested_rewrite ? (
               <>
                 <p className="mb-1 mt-2 text-xs font-semibold uppercase tracking-wide text-green-700">
-                  Suggested replacement
+                  {t("suggested_replacement")}
                 </p>
                 <p className="text-sm leading-relaxed text-gray-700 italic">{s.suggested_rewrite}</p>
               </>
@@ -159,7 +159,7 @@ function SuggestionBox({ items, hidden }: { items: ResumeSuggestion[]; hidden?: 
 }
 
 function ResumeReviewContent() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { refetch: refetchResumeStatus } = useResumeStatus();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -570,7 +570,7 @@ function ResumeReviewContent() {
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Resume Score
+                    {t("resume_review_score_label")}
                   </p>
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${scoreLabelClass}`}>
                     {scoreLabel}
@@ -587,14 +587,14 @@ function ResumeReviewContent() {
                   />
                 </div>
                 <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
-                  Indicative score from AI suggestion count/priority — not a hiring decision.
+                  {t("score_disclaimer")}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-slate-600">{scoreCommentary}</p>
               </div>
 
               {/* Block 2 — Strengths */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-3 text-sm font-semibold text-navy-950">Strengths</p>
+                <p className="mb-3 text-sm font-semibold text-navy-950">{t("resume_review_strengths_title")}</p>
                 {strengthsList.length ? (
                   <ul className="space-y-2">
                     {strengthsList.map((s, i) => (
@@ -615,7 +615,7 @@ function ResumeReviewContent() {
 
               {/* Block 3 — Suggested Improvements */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-3 text-sm font-semibold text-navy-950">Suggested improvements</p>
+                <p className="mb-3 text-sm font-semibold text-navy-950">{t("resume_review_improvements_title")}</p>
                 {improvementsList.length ? (
                   <ul className="space-y-2">
                     {improvementsList.map((s, i) => (
@@ -634,9 +634,9 @@ function ResumeReviewContent() {
 
               {/* Block 4 — Missing or Weak Keywords */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-1 text-sm font-semibold text-navy-950">Missing or weak keywords</p>
+                <p className="mb-1 text-sm font-semibold text-navy-950">{t("resume_review_keywords_title")}</p>
                 <p className="mb-3 text-xs leading-relaxed text-slate-500">
-                  These keywords may help improve your resume&apos;s match with job listings.
+                  {t("resume_review_keywords_description")}
                 </p>
                 {keywordsMissing.length ? (
                   <div className="flex flex-wrap gap-1.5">
@@ -668,7 +668,7 @@ function ResumeReviewContent() {
                 {profile.headline ?? t("resume_review_title")}
               </h1>
               <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                Review your resume below. AI-suggested improvements appear in green under each section.
+                {t("resume_review_subtitle")}
               </p>
             </section>
 
@@ -678,25 +678,25 @@ function ResumeReviewContent() {
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                   {candidateName ? (
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Full Name</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_full_name")}</p>
                       <p className="mt-1 text-sm font-medium text-navy-950">{candidateName}</p>
                     </div>
                   ) : null}
                   {extractedEmail ? (
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Email</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_email")}</p>
                       <p className="mt-1 text-sm font-medium text-navy-950">{extractedEmail}</p>
                     </div>
                   ) : null}
                   {extractedPhone ? (
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Phone</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_phone")}</p>
                       <p className="mt-1 text-sm font-medium text-navy-950">{extractedPhone}</p>
                     </div>
                   ) : null}
                   {extractedAddress ? (
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Address</p>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_address")}</p>
                       <p className="mt-1 text-sm font-medium text-navy-950">{extractedAddress}</p>
                     </div>
                   ) : null}
@@ -711,7 +711,7 @@ function ResumeReviewContent() {
               {/* Professional Summary */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  Professional Summary
+                  {t("resume_review_summary")}
                 </label>
                 <textarea
                   rows={5}
@@ -720,13 +720,13 @@ function ResumeReviewContent() {
                   placeholder="No summary extracted yet."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
                 />
-                <SuggestionBox items={summarySuggestions} hidden={suggestionsApplied} />
+                <SuggestionBox items={summarySuggestions} hidden={suggestionsApplied} t={t} />
               </div>
 
               {/* Work Experience */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  Work Experience
+                  {t("resume_review_experience")}
                 </label>
                 <textarea
                   rows={8}
@@ -735,13 +735,13 @@ function ResumeReviewContent() {
                   placeholder="No experience extracted yet."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
                 />
-                <SuggestionBox items={experienceSuggestions} hidden={suggestionsApplied} />
+                <SuggestionBox items={experienceSuggestions} hidden={suggestionsApplied} t={t} />
               </div>
 
               {/* Skills */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  Skills
+                  {t("resume_review_skills")}
                 </label>
                 <textarea
                   rows={4}
@@ -750,13 +750,13 @@ function ResumeReviewContent() {
                   placeholder="No skills extracted yet."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
                 />
-                <SuggestionBox items={skillsSuggestions} hidden={suggestionsApplied} />
+                <SuggestionBox items={skillsSuggestions} hidden={suggestionsApplied} t={t} />
               </div>
 
               {/* Education */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  Education
+                  {t("resume_review_education")}
                 </label>
                 <textarea
                   rows={3}
@@ -765,7 +765,7 @@ function ResumeReviewContent() {
                   placeholder="No education extracted yet."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
                 />
-                <SuggestionBox items={educationSuggestions} hidden={suggestionsApplied} />
+                <SuggestionBox items={educationSuggestions} hidden={suggestionsApplied} t={t} />
               </div>
 
             </section>
@@ -783,7 +783,7 @@ function ResumeReviewContent() {
                 disabled={improving}
                 className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {improving ? "Applying…" : "Apply AI Suggestions"}
+                {improving ? "Applying…" : t("resume_review_apply_ai")}
               </button>
 
               <div className="flex flex-wrap gap-3">
@@ -792,7 +792,7 @@ function ResumeReviewContent() {
                   onClick={() => setShowTemplatePicker(true)}
                   className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-navy-200 hover:text-navy-950"
                 >
-                  Download Resume
+                  {t("resume_review_download")}
                 </button>
                 <Link
                   href={`/resume${resumeId ? `?resume_id=${encodeURIComponent(resumeId)}` : ""}`}
@@ -817,6 +817,7 @@ function ResumeReviewContent() {
           <TemplatePickerModal
             data={buildTemplateData()}
             onClose={() => setShowTemplatePicker(false)}
+            language={locale}
           />
         ) : null}
 

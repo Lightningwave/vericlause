@@ -381,9 +381,10 @@ function TemplateCard({ id, isSelected, isRecommended, onClick }: {
 interface TemplatePickerModalProps {
   data: ResumeTemplateData;
   onClose: () => void;
+  language?: string;
 }
 
-export function TemplatePickerModal({ data, onClose }: TemplatePickerModalProps) {
+export function TemplatePickerModal({ data, onClose, language }: TemplatePickerModalProps) {
   const recommended = recommendTemplate(data);
 
   const [selected, setSelected] = useState<TemplateId>(() => {
@@ -396,6 +397,7 @@ export function TemplatePickerModal({ data, onClose }: TemplatePickerModalProps)
 
   const [format, setFormat] = useState<"pdf" | "docx">("pdf");
   const [loading, setLoading] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -409,7 +411,26 @@ export function TemplatePickerModal({ data, onClose }: TemplatePickerModalProps)
     setLoading(true);
     try {
       localStorage.setItem(STORAGE_KEY, selected);
-      await downloadResume(data, selected, format);
+
+      let resumeData = data;
+      if (language && language !== "en") {
+        setTranslating(true);
+        try {
+          const res = await fetch("/api/resume/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ resumeData: data, targetLanguage: language }),
+          });
+          if (res.ok) {
+            const json = await res.json();
+            resumeData = json.translatedData ?? data;
+          }
+        } finally {
+          setTranslating(false);
+        }
+      }
+
+      await downloadResume(resumeData, selected, format);
     } finally {
       setLoading(false);
       onClose();
@@ -500,7 +521,7 @@ export function TemplatePickerModal({ data, onClose }: TemplatePickerModalProps)
             disabled={loading}
             className="flex-1 rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
           >
-            {loading ? "Generating…" : `Download ${format.toUpperCase()}`}
+            {translating ? "Translating resume…" : loading ? "Generating…" : `Download ${format.toUpperCase()}`}
           </button>
         </div>
       </div>

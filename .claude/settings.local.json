@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(find /c/Users/zackx/vericlause -maxdepth 3 -type f \\\\\\(-name .cursor* -o -name *rules* \\\\\\))"
+      "Bash(find /c/Users/zackx/vericlause -maxdepth 3 -type f \\\\\\(-name .cursor* -o -name *rules* \\\\\\))",
+      "Bash(npx next:*)",
+      "Bash(node -e \"require\\(''fs''\\).readFileSync\\(''app/api/resume/voice-build/route.ts'',''utf8''\\)\")",
+      "Bash(npx tsx:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

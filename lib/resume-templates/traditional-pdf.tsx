@@ -1,12 +1,14 @@
 import React from "react";
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet, Font } from "@react-pdf/renderer";
 import type { ResumeTemplateData } from "./types";
 
+Font.register({ family: "NotoSansSC", src: "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2" });
+
 const styles = StyleSheet.create({
-  page: { padding: 44, fontFamily: "Helvetica", backgroundColor: "#ffffff", fontSize: 9 },
+  page: { padding: 44, fontFamily: "NotoSansSC", backgroundColor: "#ffffff", fontSize: 9 },
   headerRow: { flexDirection: "row", marginBottom: 12 },
   headerLeft: { flex: 1 },
-  name: { fontSize: 22, fontFamily: "Helvetica-Bold", color: "#111111", marginBottom: 4 },
+  name: { fontSize: 22, fontFamily: "NotoSansSC", color: "#111111", marginBottom: 4 },
   headerContact: { fontSize: 9, color: "#555555", marginBottom: 2 },
   photoBox: {
     width: 72,
@@ -58,7 +60,7 @@ export function TraditionalPdf({ data }: { data: ResumeTemplateData }) {
           <View style={styles.headerLeft}>
             <Text style={styles.name}>{sanitiseName(data.name)}</Text>
             {data.jobTitle ? (
-              <Text style={[styles.headerContact, { fontFamily: "Helvetica-Bold" }]}>
+              <Text style={[styles.headerContact, { fontFamily: "NotoSansSC" }]}>
                 {data.jobTitle}
               </Text>
             ) : null}
@@ -134,7 +136,7 @@ export function TraditionalPdf({ data }: { data: ResumeTemplateData }) {
                   {i === 0 ? "TERTIARY" : "SECONDARY"}
                 </Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.body, { fontFamily: "Helvetica-Bold" }]}>
+                  <Text style={[styles.body, { fontFamily: "NotoSansSC" }]}>
                     {[edu.qualification, edu.fieldOfStudy].filter(Boolean).join(", ")}
                   </Text>
                   <Text style={styles.body}>{edu.institution}</Text>
@@ -161,7 +163,7 @@ export function TraditionalPdf({ data }: { data: ResumeTemplateData }) {
                     : exp.startDate || exp.endDate || ""}
                 </Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.body, { fontFamily: "Helvetica-Bold" }]}>
+                  <Text style={[styles.body, { fontFamily: "NotoSansSC" }]}>
                     {exp.title}
                     {exp.company ? `, ${exp.company}` : ""}
                   </Text>
