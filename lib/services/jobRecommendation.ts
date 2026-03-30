@@ -106,6 +106,10 @@ For each job return:
 - strengths: 2-3 bullet points on why the candidate is a good fit
 - improvements: 2-3 bullet points on gaps to address
 - reasoning: 1-2 sentence overall reasoning
+- matchScore: 0–100 integer
+- strengths: 2–3 bullet points on why the candidate is a good fit
+- improvements: 2–3 bullet points on gaps to address
+- reasoning: 1–2 sentence overall reasoning
 
 Return ONLY a JSON object in this exact shape, no extra text:
 {
@@ -248,6 +252,7 @@ export async function extractJobFromUrl(url: string): Promise<ScrapedJob> {
   if (source === "MyCareersFuture") {
     const jobMatch = url.match(/JOB-[\w-]+/i);
     const uuidMatch = url.match(/([a-f0-9]{32})$/i);
+    const uuidMatch = url.match(/([a-f0-9]{32})(?:[^a-f0-9]|$)/i);
     const jobPostId = jobMatch?.[0] ?? null;
     const uuid = uuidMatch?.[1] ?? null;
 
@@ -261,6 +266,14 @@ export async function extractJobFromUrl(url: string): Promise<ScrapedJob> {
         headers: {
           Accept: "application/json",
           "User-Agent": "VeriClause/1.0",
+      const query = jobPostId ? `jobPostId=${jobPostId}` : `uuid=${uuid}`;
+      const res = await fetch(
+        `${MCF_API_BASE}/jobs?${query}`,
+        {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "VeriClause/1.0",
+          },
         },
       });
 
