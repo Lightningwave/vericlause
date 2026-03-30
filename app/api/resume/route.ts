@@ -9,6 +9,31 @@ import { getAuthenticatedUser } from "@/lib/services/db";
 const OPENAI_MODEL = "gpt-4o-mini";
 const GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant";
 
+const BASE_SYSTEM_PROMPT = `You are an elite Singapore resume advisor: language coach, ATS specialist, Singapore market expert (MOM standards, local hiring norms), and career progression analyst. Be specific — always reference actual resume content, never generic advice. Salary benchmarks must be SGD Singapore market rates.
+
+Return ONLY valid JSON with exactly these fields:
+
+{"overallImpression":"3–4 sentences: profile strength, Singapore market positioning, target role fit","keyStrengths":["specific strength referencing actual resume content","strength 2","strength 3"],"areasToImprove":["specific gap explaining why it weakens the resume in Singapore's market","gap 2","gap 3"],"suggestedEdits":["exact rewrite (not advice) e.g. change 'Managed social media' to 'Grew combined social following 40% to 120k'","edit 2","edit 3"],"atsAnalysis":{"keywordsFound":["kw1","kw2"],"keywordsMissing":["missing1","missing2"],"atsFriendly":true,"atsNotes":"One sentence on ATS suitability"},"careerProgression":"2 sentences on trajectory logic and competitiveness for the candidate's level in Singapore","salaryBenchmark":{"estimatedRange":"SGD X,000–Y,000/month","rationale":"One sentence based on role, sector, and years of experience"},"score":5}
+
+Score rubric (1–10): 2pts quantified achievements with numbers; 2pts Singapore market/MOM alignment; 2pts structure/ATS compatibility; 2pts action verb quality; 2pts completeness (contact, history, education, skills).
+
+No text outside the JSON.`;
+
+function getLanguageName(code: string): string {
+  const names: Record<string, string> = {
+    zh: "Simplified Chinese (简体中文)",
+    ms: "Bahasa Melayu",
+    ta: "Tamil (தமிழ்)",
+  };
+  return names[code] || "English";
+}
+
+function buildSystemPrompt(language?: string): string {
+  if (!language || language === "en") return BASE_SYSTEM_PROMPT;
+  const langName = getLanguageName(language);
+  const instruction = `IMPORTANT: You must respond entirely in ${langName}. All feedback, suggestions, and analysis must be written in ${langName}. Do not use English anywhere in your response.\n\n`;
+  return instruction + BASE_SYSTEM_PROMPT;
+}
 const SYSTEM_PROMPT = `You are a professional resume coach specialising in Singapore's white-collar job market.
 
 Analyse the resume below and return ONLY a valid JSON object with exactly these fields:
@@ -28,6 +53,17 @@ export interface ResumeFeedback {
   keyStrengths: string[];
   areasToImprove: string[];
   suggestedEdits: string[];
+  atsAnalysis: {
+    keywordsFound: string[];
+    keywordsMissing: string[];
+    atsFriendly: boolean;
+    atsNotes: string;
+  };
+  careerProgression: string;
+  salaryBenchmark: {
+    estimatedRange: string;
+    rationale: string;
+  };
   score: number;
 }
 
@@ -44,6 +80,8 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
+async function callLlm(resumeText: string, language?: string): Promise<string> {
+  const systemPrompt = buildSystemPrompt(language);
 async function callLlm(resumeText: string): Promise<string> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
@@ -52,6 +90,7 @@ async function callLlm(resumeText: string): Promise<string> {
       const response = await client.chat.completions.create({
         model: OPENAI_MODEL,
         messages: [
+          { role: "system", content: systemPrompt },
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: resumeText.slice(0, 120_000) },
         ],
@@ -70,6 +109,7 @@ async function callLlm(resumeText: string): Promise<string> {
   const response = await client.chat.completions.create({
     model: GROQ_FALLBACK_MODEL,
     messages: [
+      { role: "system", content: systemPrompt },
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: resumeText.slice(0, 120_000) },
     ],
@@ -86,6 +126,8 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const file = formData.get("file");
+  const language = (formData.get("language") as string | null) ?? "en";
+  const translatedText = (formData.get("translatedText") as string | null) ?? null;
 
   if (!file || !(file instanceof Blob)) {
     return NextResponse.json({ detail: "No file provided" }, { status: 400 });
@@ -101,6 +143,24 @@ export async function POST(req: NextRequest) {
   }
 
   let resumeText: string;
+  if (translatedText && translatedText.trim()) {
+    resumeText = translatedText;
+  } else {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const { text } = await extractText(uint8Array, { mergePages: true });
+      resumeText = text;
+    } catch (e) {
+      return NextResponse.json(
+        { detail: `File could not be read: ${e instanceof Error ? e.message : e}` },
+        { status: 422 },
+      );
+    }
+
+    if (!resumeText.trim()) {
+      return NextResponse.json({ detail: "File produced no text" }, { status: 422 });
+    }
   try {
     const arrayBuffer = await file.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
@@ -119,6 +179,7 @@ export async function POST(req: NextRequest) {
 
   let raw: string;
   try {
+    raw = await callLlm(resumeText, language);
     raw = await callLlm(resumeText);
   } catch (e) {
     return NextResponse.json(
