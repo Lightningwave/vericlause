@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { ResumeList } from "@/components/resume/ResumeList";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
@@ -313,20 +314,7 @@ function ResumeOnboardingContent() {
   return (
     <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
-        rightSlot={
-          <button
-            type="button"
-            onClick={async () => {
-              const supabase = createClient();
-              await supabase.auth.signOut();
-              router.push("/");
-              router.refresh();
-            }}
-            className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
-          >
-            {t("dash_sign_out")}
-          </button>
-        }
+        rightSlot={<UserMenu />}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">

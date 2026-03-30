@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { DisclaimerModal, useDisclaimerAccepted } from "@/components/contract/DisclaimerModal";
 import { OnboardingForm, type OnboardingData } from "@/components/contract/OnboardingForm";
 import { VerdictBadge } from "@/components/contract/VerdictBadge";
@@ -497,22 +498,15 @@ export default function ContractPage() {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <SiteNavbar
         rightSlot={
-          <button
-            onClick={async () => {
+          <UserMenu
+            onSignOut={() => {
               try {
                 sessionStorage.removeItem("vericlause.contractFlowStep");
               } catch {
                 /* ignore */
               }
-              const supabase = createClient();
-              await supabase.auth.signOut();
-              router.push("/");
-              router.refresh();
             }}
-            className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
-          >
-            {t("dash_sign_out")}
-          </button>
+          />
         }
       />
 
@@ -545,16 +539,6 @@ export default function ContractPage() {
                 }}
               />
             </div>
-
-            <p className="mt-6 text-center">
-              <button
-                type="button"
-                onClick={() => setFlowStep("upload")}
-                className="text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-navy-950"
-              >
-                {t("dash_step1_skip")}
-              </button>
-            </p>
           </div>
         ) : null}
 
