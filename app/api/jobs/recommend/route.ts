@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getResume, listResumes } from "@/lib/services/db";
 import { getJobRecommendations } from "@/lib/services/jobRecommendation";
 
+/** Uses Supabase auth (cookies); avoid static analysis during `next build`. */
+export const dynamic = "force-dynamic";
+
 export const maxDuration = 60;
 
 export async function GET(req: Request) {

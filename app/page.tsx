@@ -4,56 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
-import { createClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
   const { t } = useLanguage();
   const router = useRouter();
-  /** `null` = still checking session */
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      setSignedIn(!!user);
-    });
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSignedIn(!!session?.user);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
 
   return (
     <main className="min-h-screen bg-white">
       <SiteNavbar
-        rightSlot={
-          signedIn === null ? (
-            <span className="inline-block h-9 w-[5.5rem] rounded-md bg-slate-100" aria-hidden />
-          ) : signedIn ? (
-            <button
-              type="button"
-              onClick={async () => {
-                const supabase = createClient();
-                await supabase.auth.signOut();
-                router.push("/");
-                router.refresh();
-              }}
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
-            >
-              {t("dash_sign_out")}
-            </button>
-          ) : (
-            <Link
-              href="/auth/sign-in"
-              className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              {t("sign_in")}
-            </Link>
-          )
-        }
+        rightSlot={<UserMenu />}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">

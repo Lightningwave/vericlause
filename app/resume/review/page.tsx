@@ -1,9 +1,11 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -15,6 +17,9 @@ import {
   profileResume,
 } from "@/lib/api";
 import type { ResumeProfile, ResumeSuggestion } from "@/lib/types";
+import type { ResumeFeedback } from "@/app/api/resume/route";
+import type { ResumeTemplateData } from "@/lib/resume-templates/types";
+import { TemplatePickerModal } from "@/components/resume/TemplatePickerModal";
 
 function formatExperiencesText(profile: ResumeProfile): string {
   if (!profile.experiences?.length) return "";
@@ -39,92 +44,123 @@ function formatEducationText(profile: ResumeProfile): string {
     .join("\n");
 }
 
-function deriveIndicatorScore(suggestions: ResumeSuggestion[] | null | undefined): number {
-  if (!suggestions?.length) return 78;
-  let penalty = 0;
-  for (const s of suggestions) {
-    if (s.type === "critical_fix") penalty += 14;
-    else if (s.priority === "high") penalty += 10;
-    else if (s.priority === "medium") penalty += 5;
-    else penalty += 2;
-  }
-  return Math.max(42, Math.min(96, Math.round(96 - penalty)));
-}
-
-function splitSuggestions(suggestions: ResumeSuggestion[] | null | undefined): {
-  toImprove: ResumeSuggestion[];
-  positiveHints: ResumeSuggestion[];
-} {
-  if (!suggestions?.length) return { toImprove: [], positiveHints: [] };
-  /** Layout/visual feedback from vision + text — must be included; was missing and never appeared in sidebar columns */
-  const toImprove = suggestions.filter(
-    (s) =>
-      s.type === "critical_fix" ||
-      s.priority === "high" ||
-      s.type === "content_gap" ||
-      s.type === "design_feedback",
-  );
-  const positiveHints = suggestions.filter(
-    (s) => s.type === "enhancement" || s.type === "impact_opportunity" || s.type === "ats_optimization",
-  );
-  return {
-    toImprove: toImprove.length ? toImprove : suggestions.slice(0, Math.min(5, suggestions.length)),
-    positiveHints: positiveHints.length ? positiveHints.slice(0, 5) : [],
-  };
-}
-
-const SUGGESTION_TYPE_LABEL: Record<ResumeSuggestion["type"], string> = {
-  critical_fix: "Critical",
-  enhancement: "Enhancement",
-  design_feedback: "Design",
-  content_gap: "Content gap",
-  impact_opportunity: "Impact",
-  ats_optimization: "ATS",
-};
-
 function parseImprovedResume(text: string): {
-  summary: string;
-  experience: string;
-  skills: string;
-  education: string;
+  summary: string | null;
+  experience: string | null;
+  skills: string | null;
+  education: string | null;
 } {
-  const lines = text.split("\n");
-  const sections: Record<string, string[]> = { summary: [], experience: [], skills: [], education: [] };
-  let current = "summary";
+  const cleaned = text.replace(/\*\*/g, "");
 
-  for (const line of lines) {
-    // Strip markdown bold markers for header detection: **Work Experience** → work experience
-    const stripped = line.replace(/\*\*/g, "").trim();
-
-    if (/^(summary|professional summary|profile|about me|objective)\s*:?\s*$/i.test(stripped)) {
-      current = "summary"; continue;
-    }
-    if (/^(experience|work experience|employment|career|professional experience)\s*:?\s*$/i.test(stripped)) {
-      current = "experience"; continue;
-    }
-    if (/^(skills|technical skills|core competencies|key competencies|competencies|areas of expertise)\s*:?\s*$/i.test(stripped)) {
-      current = "skills"; continue;
-    }
-    if (/^(education|academic|qualifications|certifications?)\s*:?\s*$/i.test(stripped)) {
-      current = "education"; continue;
-    }
-
-    // Also skip lines that are only decorators like "---" or "==="
-    if (/^[-=]{3,}$/.test(stripped)) continue;
-
-    sections[current].push(line);
+  function extractSection(label: string): string | null {
+    const regex = new RegExp(
+      `${label}[:\\s]*\\n([\\s\\S]*?)(?=\\n[A-Z][A-Za-z ]{2,}[:\\n]|$)`,
+      "i",
+    );
+    const match = cleaned.match(regex);
+    return match?.[1]?.trim() || null;
   }
 
-  return {
-    summary: sections.summary.join("\n").trim(),
-    experience: sections.experience.join("\n").trim(),
-    skills: sections.skills.join("\n").trim(),
-    education: sections.education.join("\n").trim(),
-  };
+  const summary = extractSection("Summary") || extractSection("Professional Summary");
+  const experience = extractSection("Experience") || extractSection("Work Experience");
+  const skills = extractSection("Skills") || extractSection("Key Skills");
+  const education = extractSection("Education");
+
+  if (!summary && !experience && !skills && !education) {
+    return { summary: null, experience: text.trim(), skills: null, education: null };
+  }
+
+  return { summary, experience, skills, education };
+}
+
+function sanitiseName(raw: string): string {
+  return raw.replace(/^[#\s]+|[#\s]+$/g, "").trim();
+}
+
+function extractCandidateName(rawText: string, fileName: string): string {
+  const firstMeaningfulLine = rawText.split("\n").find((line) => {
+    const trimmed = line.trim();
+    return (
+      trimmed.length > 0 &&
+      trimmed.length < 60 &&
+      !/[@\d+()[\]]|Summary|Experience|Skills|Education|Name:|Target/i.test(trimmed)
+    );
+  });
+  if (firstMeaningfulLine) return sanitiseName(firstMeaningfulLine);
+  const fromFileName = fileName.split(" - ")[0].trim();
+  return sanitiseName(fromFileName) || "";
+}
+
+function extractEmail(text: string): string | null {
+  return text.match(/[\w.+-]+@[\w-]+\.[\w.]+/)?.[0] ?? null;
+}
+
+function extractPhone(text: string): string | null {
+  return text.match(/(?:\+65[\s-]?)?[689]\d{3}[\s-]?\d{4}/)?.[0] ?? null;
+}
+
+/** Assign each ResumeSuggestion to its most relevant section by keyword matching. */
+function assignSuggestionSection(s: ResumeSuggestion): "summary" | "experience" | "skills" | "education" {
+  const lower = (s.suggestion + " " + (s.suggested_rewrite ?? "")).toLowerCase();
+  if (/\bsummary\b|professional profile|opening statement|career objective|introduction/.test(lower))
+    return "summary";
+  if (/\bexperience\b|work history|work experience|\brole\b|\bjob\b|position|company|achievement|bullet|quantif|action verb|responsibilit|managed|coordinated|implemented/.test(lower))
+    return "experience";
+  if (/\beducation\b|degree|qualification|school|university|institution|academic|gpa/.test(lower))
+    return "education";
+  return "skills";
+}
+
+/** C1: count lines in experience text that contain a number + metric indicator */
+function countQuantifiedAchievements(text: string): number {
+  if (!text.trim()) return 0;
+  const lines = text.split(/[\n.•]+/).map((l) => l.trim()).filter(Boolean);
+  return lines.filter(
+    (line) =>
+      /\d/.test(line) &&
+      /[%$]|\bSGD\b|\d+[kKmMbB]\b|\bmillion\b|\bbillion\b|\bthousand\b|\bfold\b|\bx\b/i.test(line),
+  ).length;
+}
+
+/** C2: count how many keywords from the list appear in the resume text */
+function countKeywordsFound(resumeText: string, keywords: string[]): number {
+  if (!keywords.length) return 0;
+  const lower = resumeText.toLowerCase();
+  return keywords.filter((kw) => lower.includes(kw.toLowerCase())).length;
+}
+
+function SuggestionBox({ items, hidden, t }: { items: ResumeSuggestion[]; hidden?: boolean; t: (key: string) => string }) {
+  if (!items.length || hidden) return null;
+  return (
+    <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
+      <div className="mb-3 flex items-center gap-1.5">
+        <span className="h-2 w-2 rounded-full bg-green-500" />
+        <span className="text-xs font-medium text-green-700">{t("ai_suggestion_badge")}</span>
+      </div>
+      <div className="space-y-0">
+        {items.map((s, i) => (
+          <div key={i} className={i > 0 ? "mt-3 border-t border-green-200 pt-3" : ""}>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-green-700">
+              {t("what_to_improve")}
+            </p>
+            <p className="text-sm leading-relaxed text-gray-800">{s.suggestion}</p>
+            {s.suggested_rewrite ? (
+              <>
+                <p className="mb-1 mt-2 text-xs font-semibold uppercase tracking-wide text-green-700">
+                  {t("suggested_replacement")}
+                </p>
+                <p className="text-sm leading-relaxed text-gray-700 italic">{s.suggested_rewrite}</p>
+              </>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function ResumeReviewContent() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { refetch: refetchResumeStatus } = useResumeStatus();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -133,26 +169,29 @@ function ResumeReviewContent() {
   const [error, setError] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [rawText, setRawText] = useState<string>("");
   const [profile, setProfile] = useState<ResumeProfile | null>(null);
   const [suggestions, setSuggestions] = useState<ResumeSuggestion[] | null>(null);
   const [resumeId, setResumeId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
+
+  // Editable override states
+  const [summaryOverride, setSummaryOverride] = useState<string | null>(null);
+  const [experienceOverride, setExperienceOverride] = useState<string | null>(null);
+  const [skillsOverride, setSkillsOverride] = useState<string | null>(null);
+  const [educationOverride, setEducationOverride] = useState<string | null>(null);
+
+  // Improve / download states
   const [improving, setImproving] = useState(false);
-  const [improvedResume, setImprovedResume] = useState<string | null>(null);
   const [improveError, setImproveError] = useState<string | null>(null);
-  const [rescoring, setRescoring] = useState(false);
-  const [rescoreScore, setRescoreScore] = useState<number | null>(null);
-  const [overrideSummary, setOverrideSummary] = useState<string | null>(null);
-  const [overrideExperience, setOverrideExperience] = useState<string | null>(null);
-  const [overrideSkills, setOverrideSkills] = useState<string | null>(null);
-  const [overrideEducation, setOverrideEducation] = useState<string | null>(null);
-  const [updateSuccess, setUpdateSuccess] = useState(false);
-  const sectionRef = useRef<HTMLDivElement>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [suggestionsApplied, setSuggestionsApplied] = useState(false);
 
   const loadResume = useCallback(async (id: string) => {
     try {
       const data = await getResumeById(id);
       if (!data?.resume) {
-        setError("Resume not found or you don’t have access.");
+        setError("Resume not found or you don't have access.");
         setProfile(null);
         setSuggestions(null);
         setFileName(null);
@@ -161,11 +200,17 @@ function ResumeReviewContent() {
       }
       setResumeId(data.resume.id);
       setFileName(data.resume.file_name);
+      setRawText(data.resume.raw_text ?? "");
       setProfile(data.resume.parsed_profile);
       setSuggestions(data.resume.ai_suggestions);
+      setSummaryOverride(null);
+      setExperienceOverride(null);
+      setSkillsOverride(null);
+      setEducationOverride(null);
+      setSuggestionsApplied(false);
       if (!data.resume.parsed_profile) {
         setError(
-          "This resume has not been analyzed yet. Use “Run AI analysis” below, or upload again from the resume page.",
+          "This resume has not been analyzed yet. Use \"Run AI analysis\" below, or upload again from the resume page.",
         );
       } else {
         setError(null);
@@ -201,47 +246,14 @@ function ResumeReviewContent() {
         return;
       }
 
-      // Check for a voice-generated resume first
       try {
-        const voiceRaw = sessionStorage.getItem("vericlause.voiceBuilderResult");
-        if (voiceRaw) {
-          sessionStorage.removeItem("vericlause.voiceBuilderResult");
-          const v = JSON.parse(voiceRaw);
-          const syntheticProfile = {
-            headline: v.targetRole ?? null,
-            summary: v.summary ?? null,
-            skills: v.skills
-              ? v.skills.split(/,|\n/).map((s: string) => s.trim()).filter(Boolean)
-              : [],
-            years_experience: null,
-            experiences: v.experience
-              ? [{ title: null, company: null, start_date: null, end_date: null, description: v.experience }]
-              : [],
-            education: v.education
-              ? [{ institution: null, qualification: v.education, field_of_study: null, graduation_year: null }]
-              : [],
-            target_roles: v.targetRole ? [v.targetRole] : [],
-            target_industries: [],
-            location_preference: null,
-            seniority_level: null,
-          };
-          if (!cancelled) {
-            setFileName("Voice Resume");
-            setProfile(syntheticProfile as any);
-            setOverrideSummary(v.summary ?? null);
-            setOverrideExperience(
-              [v.experience, v.achievement ? `Achievement: ${v.achievement}` : ""].filter(Boolean).join("\n\n") || null,
-            );
-            setOverrideSkills(v.skills ?? null);
-            setOverrideEducation(
-              [v.education, v.certifications].filter(Boolean).join("\n") || null,
-            );
-            setLoading(false);
-          }
-          return;
+        const raw = sessionStorage.getItem("vericlause.resumeFeedback");
+        if (raw) {
+          const parsed = JSON.parse(raw) as ResumeFeedback;
+          if (!cancelled) setFeedback(parsed);
         }
-      } catch {
-        // sessionStorage unavailable or parse error — fall through to normal load
+      } catch (e) {
+        console.warn("Could not restore resume feedback from sessionStorage:", e);
       }
 
       const fromQuery = searchParams.get("resume_id");
@@ -331,362 +343,187 @@ function ResumeReviewContent() {
     }
   }
 
-  async function handleGenerateImproved() {
-    if (!profile) return;
+  /** One-shot: generate improved version and immediately apply it to the editable fields. */
+  async function handleApplyAiSuggestions() {
     setImproving(true);
     setImproveError(null);
-    setImprovedResume(null);
-
-    const resumeText = [
-      profile.summary,
-      formatExperiencesText(profile),
-      profile.skills?.length ? `Skills: ${profile.skills.join(", ")}` : "",
-      formatEducationText(profile),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    const feedback = suggestions?.map((s) =>
-      s.suggested_rewrite ? `${s.suggestion} → ${s.suggested_rewrite}` : s.suggestion,
-    ) ?? [];
-
     try {
+      const resumeText = [
+        summaryDisplay ? `Summary:\n${summaryDisplay}` : "",
+        experienceDisplay ? `Experience:\n${experienceDisplay}` : "",
+        skillsDisplay ? `Skills:\n${skillsDisplay}` : "",
+        educationDisplay ? `Education:\n${educationDisplay}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      const feedbackList = suggestions?.map((s) => s.suggestion) ?? [];
+
       const res = await fetch("/api/resume/improve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText, feedback }),
+        body: JSON.stringify({ resumeText, feedback: feedbackList }),
       });
-      const json = await res.json();
-      if (!res.ok) {
-        setImproveError(json.detail ?? "Something went wrong. Please try again.");
-        return;
-      }
-      setImprovedResume(json.improvedResume);
-    } catch {
-      setImproveError("Network error. Please check your connection and try again.");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Improvement failed");
+
+      const parsed = parseImprovedResume(data.improvedResume);
+      if (parsed.summary) setSummaryOverride(parsed.summary);
+      if (parsed.experience) setExperienceOverride(parsed.experience);
+      if (parsed.skills) setSkillsOverride(parsed.skills);
+      if (parsed.education) setEducationOverride(parsed.education);
+      setSuggestionsApplied(true);
+    } catch (e) {
+      setImproveError(e instanceof Error ? e.message : "Improvement failed");
     } finally {
       setImproving(false);
     }
   }
 
-  function getDownloadContent() {
-    if (improvedResume) return improvedResume;
-    return [
-      profile?.summary ?? "",
-      profile ? formatExperiencesText(profile) : "",
-      profile?.skills?.length ? `Skills: ${profile.skills.join(", ")}` : "",
-      profile ? formatEducationText(profile) : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+  function buildTemplateData(): ResumeTemplateData {
+    const name = rawText
+      ? extractCandidateName(rawText, fileName ?? "")
+      : fileName?.split(" - ")[0] ?? "Resume";
+
+    const experiences = (profile?.experiences ?? []).map((e) => ({
+      title: e.title ?? "",
+      company: e.company ?? "",
+      location: undefined,
+      startDate: e.start_date ?? "",
+      endDate: e.end_date ?? "",
+      description: experienceOverride !== null ? "" : (e.description ?? ""),
+    }));
+
+    // If the user edited experience text, put it as a single entry
+    const finalExperiences =
+      experienceOverride !== null
+        ? [{ title: "", company: "", startDate: "", endDate: "", description: experienceDisplay }]
+        : experiences;
+
+    const educations = (profile?.education ?? []).map((ed) => ({
+      institution: ed.institution ?? "",
+      qualification: ed.qualification ?? "",
+      fieldOfStudy: ed.field_of_study ?? undefined,
+      graduationYear: ed.graduation_year != null ? String(ed.graduation_year) : undefined,
+    }));
+
+    const skills = (profile?.skills ?? []).map((s) => ({ name: s, level: 50 }));
+
+    return {
+      name,
+      jobTitle: profile?.headline ?? undefined,
+      email: extractedEmail ?? undefined,
+      phone: extractedPhone ?? undefined,
+      location: extractedAddress ?? undefined,
+      summary: summaryDisplay || undefined,
+      experiences: finalExperiences,
+      educations,
+      skills,
+    };
   }
 
-  async function handleDownloadPdf() {
-    const { pdf, Document, Page, Text, View, StyleSheet } = await import("@react-pdf/renderer");
+  // ── Derived values ──────────────────────────────────────────────────────────
 
-    // 2 cm margins (1 pt ≈ 0.0353 cm → 2 cm ≈ 56.7 pt)
-    const MARGIN = 56.7;
+  const summaryValue = profile?.summary ?? "";
+  const experienceValue = profile ? formatExperiencesText(profile) : "";
+  const skillsValue = profile?.skills?.length ? profile.skills.join(", ") : "";
+  const educationValue = profile ? formatEducationText(profile) : "";
 
-    const styles = StyleSheet.create({
-      page: {
-        paddingHorizontal: MARGIN,
-        paddingVertical: MARGIN,
-        fontFamily: "Helvetica",
-        backgroundColor: "#ffffff",
-      },
-      name: {
-        fontSize: 18,
-        fontFamily: "Helvetica-Bold",
-        color: "#0f172a",
-        marginBottom: 4,
-      },
-      contact: {
-        fontSize: 9,
-        color: "#6b7280",
-        marginBottom: 10,
-      },
-      divider: {
-        borderBottomWidth: 1,
-        borderBottomColor: "#d1d5db",
-        marginBottom: 14,
-      },
-      sectionHeader: {
-        fontSize: 11,
-        fontFamily: "Helvetica-Bold",
-        color: "#0f172a",
-        textTransform: "uppercase" as const,
-        marginTop: 16,
-        marginBottom: 6,
-        paddingBottom: 2,
-        borderBottomWidth: 0.5,
-        borderBottomColor: "#e5e7eb",
-      },
-      bodyText: {
-        fontSize: 10,
-        color: "#374151",
-        lineHeight: 1.55,
-        marginBottom: 3,
-      },
-      expBlock: { marginBottom: 8 },
-      expTitle: {
-        fontSize: 10,
-        fontFamily: "Helvetica-Bold",
-        color: "#0f172a",
-        marginBottom: 1,
-      },
-      expDates: {
-        fontSize: 9,
-        color: "#6b7280",
-        marginBottom: 3,
-      },
-      bulletRow: {
-        flexDirection: "row" as const,
-        marginBottom: 2,
-        paddingLeft: 8,
-      },
-      bulletDot: { width: 10, fontSize: 10, color: "#374151" },
-      bulletText: { flex: 1, fontSize: 10, color: "#374151", lineHeight: 1.55 },
-    });
+  const summaryDisplay = summaryOverride !== null ? summaryOverride : summaryValue;
+  const experienceDisplay = experienceOverride !== null ? experienceOverride : experienceValue;
+  const skillsDisplay = skillsOverride !== null ? skillsOverride : skillsValue;
+  const educationDisplay = educationOverride !== null ? educationOverride : educationValue;
 
-    const candidateName = (profile as any)?.full_name || profile?.headline || "Resume";
-    const safeFileName =
-      candidateName.replace(/[^a-zA-Z0-9\s]/g, "").trim().replace(/\s+/g, "_") ||
-      "resume";
-    const fileName = `${safeFileName}_vericlause_resume.pdf`;
+  // Profile block contact fields extracted from raw text
+  const candidateName = rawText
+    ? extractCandidateName(rawText, fileName ?? "")
+    : fileName?.split(" - ")[0] ?? "";
+  const extractedEmail = rawText ? extractEmail(rawText) : null;
+  const extractedPhone = rawText ? extractPhone(rawText) : null;
+  const extractedAddress = profile?.location_preference ?? null;
 
-    const contactParts = [
-      (profile as any)?.email,
-      (profile as any)?.phone,
-      (profile as any)?.location,
-    ].filter(Boolean);
-    const contactLine = contactParts.join("  |  ");
+  // ── Left panel score (5-criterion rubric, /100, live) ───────────────────────
 
-    // Parse experience text into structured blocks separated by blank lines.
-    // Within each block: first line = role/company header, second line = dates if it
-    // contains a year or "present", remaining lines = bullet points.
-    function buildExperienceNodes() {
-      if (!experienceValue) return [];
-      const datePattern = /\d{4}|present|current/i;
-      return experienceValue
-        .split(/\n{2,}/)
-        .map((block) => block.trim())
-        .filter(Boolean)
-        .map((block, bi) => {
-          const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
-          const [headerLine, ...rest] = lines;
-          let datesLine = "";
-          let bulletLines = rest;
-          if (rest.length > 0 && datePattern.test(rest[0])) {
-            datesLine = rest[0];
-            bulletLines = rest.slice(1);
-          }
-          const cleanText = (s: string) => s.replace(/\*\*/g, "").replace(/^[-•*]\s*/, "");
-          return React.createElement(
-            View,
-            { key: bi, style: styles.expBlock },
-            React.createElement(Text, { style: styles.expTitle }, cleanText(headerLine)),
-            datesLine
-              ? React.createElement(Text, { style: styles.expDates }, cleanText(datesLine))
-              : null,
-            ...bulletLines.map((line, li) =>
-              React.createElement(
-                View,
-                { key: li, style: styles.bulletRow },
-                React.createElement(Text, { style: styles.bulletDot }, "•"),
-                React.createElement(Text, { style: styles.bulletText }, cleanText(line)),
-              ),
-            ),
-          );
-        });
-    }
+  // C1: Impact & metrics — 4 pts per quantified achievement in experience, cap 20
+  const c1Impact = Math.min(20, countQuantifiedAchievements(experienceDisplay) * 4);
 
-    const strip = (s: string) => s.replace(/\*\*/g, "");
+  // C2: ATS keyword coverage — 2 pts per keyword from feedback found in resume, cap 20
+  const atsKwFound: string[] = Array.isArray(feedback?.atsAnalysis?.keywordsFound)
+    ? feedback!.atsAnalysis.keywordsFound
+    : [];
+  if (feedback && !Array.isArray(feedback?.atsAnalysis?.keywordsFound)) {
+    console.warn("[ResumeReview] feedback.atsAnalysis.keywordsFound missing/unexpected", feedback?.atsAnalysis);
+  }
+  const allResumeText = [summaryDisplay, experienceDisplay, skillsDisplay, educationDisplay].join(" ");
+  const c2Ats = Math.min(20, countKeywordsFound(allResumeText, atsKwFound) * 2);
 
-    const doc = React.createElement(
-      Document,
-      null,
-      React.createElement(
-        Page,
-        { size: "A4", style: styles.page },
-        React.createElement(
-          View,
-          null,
-          // ── Header ──────────────────────────────────────────
-          React.createElement(Text, { style: styles.name }, candidateName),
-          contactLine
-            ? React.createElement(Text, { style: styles.contact }, contactLine)
-            : null,
-          React.createElement(View, { style: styles.divider }),
+  // C3: Completeness — 5 pts per non-empty section, cap 20
+  const c3Complete =
+    [summaryDisplay, experienceDisplay, skillsDisplay, educationDisplay]
+      .filter((t) => t.trim().length > 0).length * 5;
 
-          // ── Summary ─────────────────────────────────────────
-          summaryValue
-            ? React.createElement(
-                View,
-                null,
-                React.createElement(Text, { style: styles.sectionHeader }, "Summary"),
-                React.createElement(Text, { style: styles.bodyText }, strip(summaryValue)),
-              )
-            : null,
+  // C4: Improvements resolved — 0 before Apply, 20 after
+  const c4Resolved = suggestionsApplied ? 20 : 0;
 
-          // ── Experience ──────────────────────────────────────
-          experienceValue
-            ? React.createElement(
-                View,
-                null,
-                React.createElement(Text, { style: styles.sectionHeader }, "Experience"),
-                ...buildExperienceNodes(),
-              )
-            : null,
+  // C5: Language & structure — AI score /10 → /20
+  const aiRawScore = typeof feedback?.score === "number" ? feedback.score : null;
+  if (feedback && typeof feedback?.score !== "number") {
+    console.warn("[ResumeReview] feedback.score missing or not a number", feedback?.score);
+  }
+  const c5Language = aiRawScore !== null ? Math.min(20, Math.round(aiRawScore * 2)) : 0;
 
-          // ── Skills ──────────────────────────────────────────
-          skillsValue
-            ? React.createElement(
-                View,
-                null,
-                React.createElement(Text, { style: styles.sectionHeader }, "Skills"),
-                React.createElement(Text, { style: styles.bodyText }, strip(skillsValue)),
-              )
-            : null,
+  const score = Math.round(c1Impact + c2Ats + c3Complete + c4Resolved + c5Language);
 
-          // ── Education ───────────────────────────────────────
-          educationValue
-            ? React.createElement(
-                View,
-                null,
-                React.createElement(Text, { style: styles.sectionHeader }, "Education"),
-                React.createElement(Text, { style: styles.bodyText }, strip(educationValue)),
-              )
-            : null,
-        ),
-      ),
-    );
+  const scoreLabel =
+    score >= 80 ? "Strong"
+    : score >= 60 ? "Needs improvement"
+    : "Weak";
+  const scoreLabelClass =
+    score >= 80 ? "bg-emerald-100 text-emerald-700"
+    : score >= 60 ? "bg-amber-100 text-amber-700"
+    : "bg-red-100 text-red-700";
+  const scoreBarClass =
+    score >= 80 ? "bg-emerald-500"
+    : score >= 60 ? "bg-amber-500"
+    : "bg-red-500";
+  const scoreCommentary =
+    score >= 80
+      ? "Your resume is well-structured and competitive for the Singapore market. Minor refinements can push it further."
+      : score >= 60
+      ? "There are actionable improvements that could meaningfully boost your chances. Review the suggestions below."
+      : "Several high-priority gaps were identified. Addressing them will significantly strengthen your application.";
 
-    const blob = await pdf(doc).toBlob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
+  // Left panel lists — wired directly to AI feedback fields
+  const strengthsList: string[] = Array.isArray(feedback?.keyStrengths) ? feedback!.keyStrengths : [];
+  if (feedback && !Array.isArray(feedback?.keyStrengths)) {
+    console.warn("[ResumeReview] feedback.keyStrengths missing/unexpected", feedback?.keyStrengths);
+  }
+  const improvementsList: string[] = Array.isArray(feedback?.areasToImprove) ? feedback!.areasToImprove : [];
+  if (feedback && !Array.isArray(feedback?.areasToImprove)) {
+    console.warn("[ResumeReview] feedback.areasToImprove missing/unexpected", feedback?.areasToImprove);
+  }
+  const keywordsMissing: string[] = Array.isArray(feedback?.atsAnalysis?.keywordsMissing)
+    ? feedback!.atsAnalysis.keywordsMissing
+    : [];
+  if (feedback && !Array.isArray(feedback?.atsAnalysis?.keywordsMissing)) {
+    console.warn("[ResumeReview] feedback.atsAnalysis.keywordsMissing missing/unexpected", feedback?.atsAnalysis);
   }
 
-  async function handleDownloadDocx() {
-    const content = getDownloadContent();
-    const { Document, Packer, Paragraph, TextRun } = await import("docx");
-    const children = content.split("\n").map(
-      (line) => new Paragraph({ children: [new TextRun(line)] }),
-    );
-    const doc = new Document({ sections: [{ properties: {}, children }] });
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "resume_improved.docx";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  // Per-section inline suggestions (keyword-matched from Supabase ai_suggestions)
+  const summarySuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "summary");
+  const experienceSuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "experience");
+  const skillsSuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "skills");
+  const educationSuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "education");
 
-  function handleApplyImproved() {
-    if (!improvedResume) return;
-    const parsed = parseImprovedResume(improvedResume);
-
-    // If section parsing found nothing useful, fall back to putting
-    // the entire improved text into the experience field as a single block.
-    const hasAnySections = parsed.summary || parsed.experience || parsed.skills || parsed.education;
-
-    if (hasAnySections) {
-      if (parsed.summary) setOverrideSummary(parsed.summary);
-      if (parsed.experience) setOverrideExperience(parsed.experience);
-      if (parsed.skills) setOverrideSkills(parsed.skills);
-      if (parsed.education) setOverrideEducation(parsed.education);
-    } else {
-      setOverrideExperience(improvedResume);
-    }
-
-    setUpdateSuccess(true);
-    setTimeout(() => setUpdateSuccess(false), 3000);
-    sectionRef.current?.scrollIntoView({ behavior: "smooth" });
-  }
-
-  async function handleRescore() {
-    const text = getDownloadContent();
-    if (!text.trim()) return;
-    setRescoring(true);
-    try {
-      const res = await fetch("/api/resume/rescore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const json = await res.json();
-      if (res.ok && typeof json.score === "number") {
-        setRescoreScore(json.score * 10);
-      }
-    } catch {
-      // silently keep current score
-    } finally {
-      setRescoring(false);
-    }
-  }
-
-  const score = rescoreScore ?? deriveIndicatorScore(suggestions);
-  const { toImprove, positiveHints } = splitSuggestions(suggestions);
-
-  const strengthsDisplay =
-    positiveHints.length > 0
-      ? positiveHints.map((s) => s.suggestion)
-      : profile?.skills?.length
-        ? profile.skills.slice(0, 6)
-        : [t("resume_review_strength_1"), t("resume_review_strength_2"), t("resume_review_strength_3")];
-
-  const improvementsDisplay =
-    toImprove.length > 0
-      ? toImprove.map((s) => s.suggestion)
-      : suggestions?.length
-        ? suggestions.slice(0, 5).map((s) => s.suggestion)
-        : [t("resume_review_improvement_1"), t("resume_review_improvement_2"), t("resume_review_improvement_3")];
-
-  const keywordChips = [
-    ...(profile?.skills ?? []),
-    ...(profile?.target_roles ?? []).slice(0, 4),
-  ].slice(0, 12);
-
-  const summaryValue = overrideSummary ?? profile?.summary ?? "";
-  const experienceValue = overrideExperience ?? (profile ? formatExperiencesText(profile) : "");
-  const skillsValue = overrideSkills ?? (profile?.skills?.length ? profile.skills.join(", ") : "");
-  const educationValue = overrideEducation ?? (profile ? formatEducationText(profile) : "");
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-white">
       <SiteNavbar
-        rightSlot={
-          <Link
-            href="/auth/sign-in"
-            className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-          >
-            {t("sign_in")}
-          </Link>
-        }
+        rightSlot={<UserMenu />}
       />
 
-      <main className="mx-auto max-w-7xl px-6 py-14 md:py-18">
-        <section className="mb-10">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gold-600">
-            {t("resume_review_badge")}
-          </p>
-          <h1 className="font-serif text-4xl font-bold text-navy-950 md:text-5xl">
-            {t("resume_review_title")}
-          </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-relaxed text-slate-600">
-            {t("resume_review_description")}
-          </p>
-          {fileName ? (
-            <p className="mt-3 text-sm text-slate-500">
-              File: <span className="font-medium text-slate-700">{fileName}</span>
-            </p>
-          ) : null}
-        </section>
-
+      <main className="mx-auto max-w-7xl px-6 py-14">
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-navy-950" />
@@ -718,280 +555,241 @@ function ResumeReviewContent() {
         ) : null}
 
         {!loading && profile ? (
-        <section
-          id="review"
-          className="grid gap-8 lg:grid-cols-[380px_minmax(0,1fr)]"
-        >
-          <aside className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
+          <div className="flex items-start gap-6">
+
+            {/* LEFT PANEL */}
+            <aside className="w-1/3 shrink-0 space-y-4">
+
+              {/* Block 1 — Resume Score */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     {t("resume_review_score_label")}
                   </p>
-                  <h2 className="mt-2 font-serif text-4xl font-bold text-navy-950">
-                    {score}
-                    <span className="ml-1 text-xl text-slate-400">/100</span>
-                  </h2>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                    {t("resume_review_score_status")}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleRescore()}
-                    disabled={rescoring || !profile}
-                    className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {rescoring ? (
-                      <>
-                        <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                        </svg>
-                        Rescoring…
-                      </>
-                    ) : "Rescore Resume"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-gold-500"
-                  style={{ width: `${score}%` }}
-                />
-              </div>
-
-              <p className="mt-4 text-xs leading-relaxed text-slate-500">
-                Indicative score from AI suggestion count/priority — not a hiring decision.
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                {t("resume_review_score_note")}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-serif text-xl font-bold text-navy-950">
-                {t("resume_review_strengths_title")}
-              </h3>
-              <ul className="mt-4 space-y-3">
-                {strengthsDisplay.map((item, index) => (
-                  <li key={index} className="flex items-start gap-3 text-sm text-slate-700">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                      ✓
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-serif text-xl font-bold text-navy-950">
-                {t("resume_review_improvements_title")}
-              </h3>
-              <ul className="mt-4 space-y-3">
-                {improvementsDisplay.map((item, index) => (
-                  <li key={index} className="flex items-start gap-3 text-sm text-slate-700">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
-                      !
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-              <h3 className="font-serif text-xl font-bold text-navy-950">
-                {t("resume_review_keywords_title")}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                {t("resume_review_keywords_description")}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(keywordChips.length ? keywordChips : ["—"]).map((keyword) => (
-                  <span
-                    key={keyword}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700"
-                  >
-                    {keyword}
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${scoreLabelClass}`}>
+                    {scoreLabel}
                   </span>
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="flex flex-col gap-4 border-b border-slate-100 pb-6 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-gold-600">
-                  {t("resume_review_editor_badge")}
+                </div>
+                <div className="mt-2 flex items-end gap-1">
+                  <span className="text-5xl font-bold text-navy-950">{score}</span>
+                  <span className="mb-1 text-xl font-medium text-slate-400">/100</span>
+                </div>
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-2 rounded-full transition-all ${scoreBarClass}`}
+                    style={{ width: `${score}%` }}
+                  />
+                </div>
+                <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+                  {t("score_disclaimer")}
                 </p>
-                <h2 className="mt-2 font-serif text-2xl font-bold text-navy-950">
-                  {profile.headline ?? t("resume_review_editor_title")}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
-                  {t("resume_review_editor_description")}
-                </p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">{scoreCommentary}</p>
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  disabled={profiling || !resumeId}
-                  onClick={handleRunAnalysis}
-                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950 disabled:opacity-50"
-                >
-                  {profiling ? "Re-analyzing…" : t("resume_review_apply_ai")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleGenerateImproved()}
-                  disabled={improving || !profile}
-                  className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {improving ? "Generating…" : t("resume_review_generate_new")}
-                </button>
+              {/* Block 2 — Strengths */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="mb-3 text-sm font-semibold text-navy-950">{t("resume_review_strengths_title")}</p>
+                {strengthsList.length ? (
+                  <ul className="space-y-2">
+                    {strengthsList.map((s, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-slate-700">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                          <svg className="h-3 w-3 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-400">No strengths identified yet.</p>
+                )}
               </div>
-            </div>
 
-            {suggestions && suggestions.length > 0 ? (
-              <div className="mt-6 rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Detailed AI suggestions
+              {/* Block 3 — Suggested Improvements */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="mb-3 text-sm font-semibold text-navy-950">{t("resume_review_improvements_title")}</p>
+                {improvementsList.length ? (
+                  <ul className="space-y-2">
+                    {improvementsList.map((s, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-slate-700">
+                        <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-400">No improvements flagged.</p>
+                )}
+              </div>
+
+              {/* Block 4 — Missing or Weak Keywords */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="mb-1 text-sm font-semibold text-navy-950">{t("resume_review_keywords_title")}</p>
+                <p className="mb-3 text-xs leading-relaxed text-slate-500">
+                  {t("resume_review_keywords_description")}
                 </p>
-                <ul className="mt-3 space-y-3">
-                  {suggestions.map((s, i) => (
-                    <li key={i} className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                      <span className="font-medium text-navy-950">
-                        [{SUGGESTION_TYPE_LABEL[s.type] ?? s.type}] {s.priority}
+                {keywordsMissing.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {keywordsMissing.map((kw, i) => (
+                      <span
+                        key={i}
+                        className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-700"
+                      >
+                        {kw}
                       </span>
-                      : {s.suggestion}
-                      {s.suggested_rewrite ? (
-                        <p className="mt-2 text-xs text-slate-600">
-                          <span className="font-semibold">Suggestion:</span> {s.suggested_rewrite}
-                        </p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">No keyword gaps identified yet.</p>
+                )}
               </div>
+
+            </aside>
+
+            {/* RIGHT PANEL */}
+            <div className="w-2/3 space-y-8">
+
+            {/* SECTION 1 — PAGE HEADER */}
+            <section>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gold-600">
+                {t("resume_review_badge")}
+              </p>
+              <h1 className="font-serif text-4xl font-bold text-navy-950 md:text-5xl">
+                {profile.headline ?? t("resume_review_title")}
+              </h1>
+              <p className="mt-3 text-sm leading-relaxed text-slate-500">
+                {t("resume_review_subtitle")}
+              </p>
+            </section>
+
+            {/* SECTION 2 — PROFILE BLOCK */}
+            {(candidateName || extractedEmail || extractedPhone || extractedAddress) ? (
+              <section>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                  {candidateName ? (
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_full_name")}</p>
+                      <p className="mt-1 text-sm font-medium text-navy-950">{candidateName}</p>
+                    </div>
+                  ) : null}
+                  {extractedEmail ? (
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_email")}</p>
+                      <p className="mt-1 text-sm font-medium text-navy-950">{extractedEmail}</p>
+                    </div>
+                  ) : null}
+                  {extractedPhone ? (
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_phone")}</p>
+                      <p className="mt-1 text-sm font-medium text-navy-950">{extractedPhone}</p>
+                    </div>
+                  ) : null}
+                  {extractedAddress ? (
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_address")}</p>
+                      <p className="mt-1 text-sm font-medium text-navy-950">{extractedAddress}</p>
+                    </div>
+                  ) : null}
+                </div>
+                <hr className="mt-6 border-slate-200" />
+              </section>
             ) : null}
 
-            <div ref={sectionRef} className="mt-8 space-y-6">
+            {/* SECTION 3 — RESUME SECTIONS WITH INLINE AI SUGGESTIONS */}
+            <section className="space-y-8">
+
+              {/* Professional Summary */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
                   {t("resume_review_summary")}
                 </label>
                 <textarea
                   rows={5}
-                  value={summaryValue}
-                  onChange={(e) => setOverrideSummary(e.target.value)}
+                  value={summaryDisplay}
+                  onChange={(e) => setSummaryOverride(e.target.value)}
                   placeholder="No summary extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none focus:border-navy-300 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
                 />
+                <SuggestionBox items={summarySuggestions} hidden={suggestionsApplied} t={t} />
               </div>
 
+              {/* Work Experience */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
                   {t("resume_review_experience")}
                 </label>
                 <textarea
                   rows={8}
-                  value={experienceValue}
-                  onChange={(e) => setOverrideExperience(e.target.value)}
+                  value={experienceDisplay}
+                  onChange={(e) => setExperienceOverride(e.target.value)}
                   placeholder="No experience extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap focus:border-navy-300 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
                 />
+                <SuggestionBox items={experienceSuggestions} hidden={suggestionsApplied} t={t} />
               </div>
 
+              {/* Skills */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
                   {t("resume_review_skills")}
                 </label>
                 <textarea
                   rows={4}
-                  value={skillsValue}
-                  onChange={(e) => setOverrideSkills(e.target.value)}
+                  value={skillsDisplay}
+                  onChange={(e) => setSkillsOverride(e.target.value)}
                   placeholder="No skills extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none focus:border-navy-300 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
                 />
+                <SuggestionBox items={skillsSuggestions} hidden={suggestionsApplied} t={t} />
               </div>
 
+              {/* Education */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-navy-950">
                   {t("resume_review_education")}
                 </label>
                 <textarea
                   rows={3}
-                  value={educationValue}
-                  onChange={(e) => setOverrideEducation(e.target.value)}
+                  value={educationDisplay}
+                  onChange={(e) => setEducationOverride(e.target.value)}
                   placeholder="No education extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap focus:border-navy-300 focus:bg-white"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
                 />
+                <SuggestionBox items={educationSuggestions} hidden={suggestionsApplied} t={t} />
               </div>
-            </div>
 
+            </section>
+
+            {/* Improve error */}
             {improveError ? (
-              <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {improveError}
-              </div>
+              <p className="text-xs text-red-600">{improveError}</p>
             ) : null}
 
-            {improvedResume ? (
-              <div className="mt-6">
-                <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  Improved Resume
-                </label>
-                <textarea
-                  rows={20}
-                  readOnly
-                  value={improvedResume}
-                  className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-slate-700 outline-none whitespace-pre-wrap"
-                />
-                <div className="mt-2 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleApplyImproved}
-                    className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                  >
-                    Update Resume with Improved Version
-                  </button>
-                  {updateSuccess ? (
-                    <span className="text-sm font-medium text-emerald-600">
-                      Resume updated — review and adjust the fields as needed
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
+            {/* SECTION 4 — BOTTOM ACTION BAR */}
+            <div className="flex items-center justify-between border-t border-slate-100 pt-6">
+              <button
+                type="button"
+                onClick={() => void handleApplyAiSuggestions()}
+                disabled={improving}
+                className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {improving ? "Applying…" : t("resume_review_apply_ai")}
+              </button>
 
-            <div className="mt-8 flex flex-col gap-3 border-t border-slate-100 pt-6 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  disabled={!profile}
-                  onClick={handleDownloadPdf}
-                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => setShowTemplatePicker(true)}
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-navy-200 hover:text-navy-950"
                 >
-                  {t("resume_review_download_pdf")}
+                  {t("resume_review_download")}
                 </button>
-                <button
-                  type="button"
-                  disabled={!profile}
-                  onClick={() => void handleDownloadDocx()}
-                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {t("resume_review_download_docx")}
-                </button>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
                 <Link
-                  href="/resume"
+                  href={`/resume${resumeId ? `?resume_id=${encodeURIComponent(resumeId)}` : ""}`}
                   className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
                 >
                   {t("resume_review_back")}
@@ -1004,8 +802,17 @@ function ResumeReviewContent() {
                 </Link>
               </div>
             </div>
-          </section>
-        </section>
+
+            </div>
+          </div>
+        ) : null}
+
+        {showTemplatePicker ? (
+          <TemplatePickerModal
+            data={buildTemplateData()}
+            onClose={() => setShowTemplatePicker(false)}
+            language={locale}
+          />
         ) : null}
 
         {!loading && !profile && !error ? (

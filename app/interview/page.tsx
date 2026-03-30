@@ -1,508 +1,466 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
-import { useLanguage } from "@/components/providers/language-provider";
-import { createClient } from "@/lib/supabase/client";
-import AzureAvatarStage from "@/components/interview/AzureAvatarStage";
+import { UserMenu } from "@/components/layout/UserMenu";
+import { useConversation } from "@11labs/react";
 
-type InterviewRole =
-  | "general"
-  | "operations_executive"
-  | "project_coordinator"
-  | "software_engineer";
+/** Fixed bar heights for speaking indicator (avoid Math.random on each render). */
+const SPEAKING_BAR_HEIGHTS_PX = [12, 20, 14, 18, 16];
 
-type InterviewType = "hr" | "behavioral" | "technical";
-type Difficulty = "easy" | "medium" | "hard";
+const INTERVIEWERS = [
+    {
+        id: "alex",
+        name: "Alex",
+        role: "Hiring Manager",
+        description: "Direct, practical, and focuses on your technical expertise.",
+        avatar: "https://i.ibb.co/bRRtgr0x/alex.jpg",
+        color: "bg-blue-500"
+    },
+    {
+        id: "sophia",
+        name: "Sophia",
+        role: "Senior Executive Recruiter",
+        description:
+            "Warm and strategic — she explores leadership, collaboration, and motivation with behavioural questions tailored to your profile.",
+        avatar: "https://i.ibb.co/zH2WSZSj/sarah.jpg",
+        color: "bg-gold-500"
+    }
+];
 
-type AgentState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
+function InterviewContent() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const resumeId = searchParams.get("resume_id");
 
-type ConversationMessage = {
-  id: string;
-  speaker: "agent" | "user" | "system";
-  text: string;
-  timestamp: string;
-};
+    const [selectedInterviewer, setSelectedInterviewer] = useState<typeof INTERVIEWERS[0] | null>(null);
+    const [isInterviewing, setIsInterviewing] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(120);
+    const [lastError, setLastError] = useState<string | null>(null);
+    const [isIntermediate, setIsIntermediate] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [transcript, setTranscript] = useState<{ id: string; role: "user" | "agent"; text: string }[]>([]);
+    const transcriptLineIdRef = useRef(0);
+    const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
-function formatTime(date = new Date()) {
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+    const conversation = useConversation({
+        onConnect: () => {
+            transcriptLineIdRef.current = 0;
+            setTranscript([]);
+            setIsInterviewing(true);
+            setLoading(false);
+            setLastError(null);
+            setIsIntermediate(false);
+        },
+        onDisconnect: () => {
+            setIsInterviewing(false);
+            setTimeLeft(120);
+            setLoading(false);
+            setIsIntermediate(false);
+        },
+        onError: (err: any) => {
+            setLastError(err.message || String(err));
+            setIsIntermediate(false);
+            setIsInterviewing(false);
+            setLoading(false);
+        },
+        onMessage: ({ role, message }) => {
+            const id = `t-${++transcriptLineIdRef.current}`;
+            setTranscript((prev) => [...prev, { id, role, text: message }]);
+        },
+    });
 
-function getOpeningLine(locale: string, role: InterviewRole, interviewType: InterviewType) {
-  const roleLabel =
-    role === "operations_executive"
-      ? "Operations Executive"
-      : role === "project_coordinator"
-      ? "Project Coordinator"
-      : role === "software_engineer"
-      ? "Software Engineer"
-      : "your target role";
+    useEffect(() => {
+        transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [transcript]);
 
-  if (locale === "zh") {
-    return `你好，我会担任你的 AI 面试官。我们将开始一场 ${roleLabel} 的${
-      interviewType === "technical" ? "技术" : interviewType === "behavioral" ? "行为" : "人事"
-    }面试练习。请先简单介绍自己。`;
-  }
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (isInterviewing && timeLeft > 0) {
+            timer = setInterval(() => {
+                setTimeLeft((prev) => {
+                    if (prev <= 1) {
+                        conversation.endSession();
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [isInterviewing, timeLeft, conversation]);
 
-  if (locale === "ms") {
-    return `Hai, saya akan menjadi penemuduga AI anda. Kita akan mulakan sesi latihan temu duga ${
-      interviewType === "technical" ? "teknikal" : interviewType === "behavioral" ? "tingkah laku" : "HR"
-    } untuk jawatan ${roleLabel}. Sila mulakan dengan memperkenalkan diri anda.`;
-  }
+    const startInterview = async () => {
+        if (!selectedInterviewer || loading || isInterviewing || isIntermediate) return;
+        setLoading(true);
+        setLastError(null);
+        try {
+            const url = new URL("/api/interviews/session", window.location.origin);
+            if (resumeId) url.searchParams.set("resume_id", resumeId);
+            url.searchParams.set("interviewer", selectedInterviewer.id);
 
-  if (locale === "ta") {
-    return `வணக்கம், நான் உங்கள் AI நேர்காணல் முகவராக இருப்பேன். ${roleLabel} பதவிக்கான ${
-      interviewType === "technical" ? "தொழில்நுட்ப" : interviewType === "behavioral" ? "நடத்தை சார்ந்த" : "மனிதவள"
-    } நேர்காணல் பயிற்சியை தொடங்கலாம். முதலில் உங்களை அறிமுகப்படுத்துங்கள்.`;
-  }
+            const res = await fetch(url.toString());
+            const data = await res.json();
 
-  return `Hi, I’ll be your AI interviewer. We’re starting a ${interviewType} interview practice session for a ${roleLabel} role. Please begin by introducing yourself.`;
-}
+            if (!res.ok) throw new Error(data.detail || "Failed to fetch session config");
 
-function buildMockCoaching(locale: string, messages: ConversationMessage[]) {
-  const userTurns = messages.filter((m) => m.speaker === "user");
-  const totalLength = userTurns.map((m) => m.text).join(" ").length;
-  const score = userTurns.length === 0 ? 0 : Math.max(58, Math.min(91, 58 + Math.floor(totalLength / 20)));
+            setTimeLeft(120);
+            setIsIntermediate(true);
 
-  if (locale === "zh") {
-    return {
-      score,
-      strengths:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["回答更加完整", "表达更清晰", "结构逐渐改善"]
-          : ["愿意作答", "基础表达清楚"],
-      improvements:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["加入量化成果", "强化岗位相关性", "结尾更有说服力"]
-          : ["加入真实例子", "说明行动与结果", "补充更多细节"],
+            await conversation.startSession({
+                agentId: data.agent_id,
+                connectionType: "websocket",
+                overrides: {
+                    agent: {
+                        prompt: {
+                            prompt: data.dynamic_instructions
+                        },
+                        firstMessage: data.first_message
+                    },
+                    tts: {
+                        ...(data.use_voice_override ? { voiceId: data.voice_id } : {})
+                    }
+                }
+            });
+        } catch (e: any) {
+            console.error("Failed to start ElevenLabs session:", e);
+            // Check if it's a voice ID error
+            const errorMsg = e.message || String(e);
+            setLastError(errorMsg);
+            setIsIntermediate(false);
+            setLoading(false);
+        }
     };
-  }
 
-  if (locale === "ms") {
-    return {
-      score,
-      strengths:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["Jawapan semakin lengkap", "Penyampaian lebih jelas", "Struktur semakin baik"]
-          : ["Sedia menjawab", "Asas jawapan boleh difahami"],
-      improvements:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["Tambah hasil yang boleh diukur", "Kaitkan lebih rapat dengan jawatan", "Penutup boleh lebih kuat"]
-          : ["Tambah contoh sebenar", "Terangkan tindakan dan hasil", "Tambah lebih banyak perincian"],
+    const stopInterview = async () => {
+        await conversation.endSession();
+        setIsInterviewing(false);
+        setTimeLeft(120);
+        setSelectedInterviewer(null);
+        transcriptLineIdRef.current = 0;
+        setTranscript([]);
     };
-  }
 
-  if (locale === "ta") {
-    return {
-      score,
-      strengths:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["பதில்கள் மேலும் முழுமையாக உள்ளன", "விளக்கம் தெளிவாக உள்ளது", "அமைப்பு மேம்படுகிறது"]
-          : ["பதிலளிக்கும் முனைப்பு உள்ளது", "அடிப்படை கருத்து புரிகிறது"],
-      improvements:
-        userTurns.length === 0
-          ? []
-          : totalLength > 180
-          ? ["அளவிடக்கூடிய முடிவுகளைச் சேர்க்கவும்", "பதவியுடன் தொடர்பை வலுப்படுத்தவும்", "முடிவை வலுப்படுத்தவும்"]
-          : ["உண்மையான உதாரணத்தைச் சேர்க்கவும்", "நடவடிக்கை மற்றும் முடிவை விளக்கவும்", "மேலும் விவரம் சேர்க்கவும்"],
+    const toggleMute = () => {
+        // The SDK doesn't have a direct mute method in this version, but we can simulate UI state
+        // or actually stop the mic if we had access to the stream. 
+        // For now, let's just toggle the UI state.
+        setIsMuted(!isMuted);
     };
-  }
 
-  return {
-    score,
-    strengths:
-      userTurns.length === 0
-        ? []
-        : totalLength > 180
-        ? ["Answers are becoming more complete", "Communication is clearer", "Structure is improving"]
-        : ["Willing to engage", "Basic ideas are understandable"],
-    improvements:
-      userTurns.length === 0
-        ? []
-        : totalLength > 180
-        ? ["Add measurable outcomes", "Tie answers closer to the role", "End more strongly"]
-        : ["Use a real example", "Explain actions and results", "Add more detail"],
-  };
+    if (!selectedInterviewer && !isInterviewing) {
+        return (
+            <div className="min-h-screen bg-[#f8f8f6] font-sans text-slate-900">
+                <SiteNavbar
+                    rightSlot={<UserMenu />}
+                />
+                <main className="mx-auto max-w-5xl px-6 py-14 sm:px-8 lg:py-20">
+                    <header className="mb-12 max-w-2xl">
+                        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b88a44]">
+                            Interview practice
+                        </p>
+                        <h1 className="font-serif text-4xl font-bold tracking-tight text-navy-950 sm:text-5xl">
+                            Choose your interviewer
+                        </h1>
+                        <p className="mt-4 text-lg leading-relaxed text-slate-600">
+                            Pick a style that matches how you want to rehearse. Each host uses a different focus and question style — both use your resume for context.
+                        </p>
+                    </header>
+
+                    <div className="grid gap-6 md:grid-cols-2 md:gap-8">
+                        {INTERVIEWERS.map((person) => (
+                            <button
+                                key={person.id}
+                                type="button"
+                                onClick={() => setSelectedInterviewer(person)}
+                                className="group relative rounded-2xl border border-slate-200 bg-white p-8 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-navy-950 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950"
+                            >
+                                <div className="mb-6 flex items-start gap-5">
+                                    <div
+                                        className={`h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-2xl ${person.color} p-0.5 shadow-md ring-1 ring-black/5 transition group-hover:scale-[1.03]`}
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element -- external ibb.co avatars */}
+                                        <img
+                                            src={person.avatar}
+                                            alt=""
+                                            className="h-full w-full rounded-[0.875rem] object-cover"
+                                        />
+                                    </div>
+                                    <div className="min-w-0 pt-1">
+                                        <h2 className="font-serif text-2xl font-bold text-navy-950">{person.name}</h2>
+                                        <p className="mt-0.5 text-sm font-medium text-[#b88a44]">{person.role}</p>
+                                    </div>
+                                </div>
+                                <p className="mb-6 text-sm leading-relaxed text-slate-600">{person.description}</p>
+                                <span className="inline-flex items-center gap-2 text-sm font-semibold text-navy-950 transition group-hover:gap-3">
+                                    Practice with {person.name}
+                                    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0" stroke="currentColor" strokeWidth="2" aria-hidden>
+                                        <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex min-h-screen flex-col overflow-hidden bg-[#141618] font-sans text-white">
+            <header className="z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#141618]/90 px-4 py-3 backdrop-blur-md sm:px-6">
+                <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-none">
+                    {!isInterviewing && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSelectedInterviewer(null);
+                                setLastError(null);
+                            }}
+                            className="shrink-0 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10"
+                        >
+                            ← Change host
+                        </button>
+                    )}
+                    <div className="flex min-w-0 items-center gap-2">
+                        <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${isInterviewing ? "animate-pulse bg-red-500" : "bg-white/30"}`}
+                            aria-hidden
+                        />
+                        <span className="truncate text-xs font-semibold uppercase tracking-wider text-white/55">
+                            {isInterviewing ? "Live session" : "Ready to join"}
+                        </span>
+                    </div>
+                </div>
+                {isInterviewing && (
+                    <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 font-mono text-xs font-bold text-white/90 tabular-nums">
+                        {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}
+                    </div>
+                )}
+                <span className="hidden text-[10px] font-bold uppercase tracking-[0.2em] text-white/35 sm:block">
+                    VeriClause
+                </span>
+            </header>
+
+            <main className="relative flex flex-1 items-center justify-center p-4 lg:p-10">
+                <div
+                    className="pointer-events-none absolute inset-0 opacity-[0.04]"
+                    style={{
+                        backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
+                        backgroundSize: "36px 36px",
+                    }}
+                    aria-hidden
+                />
+
+                <div className="grid h-full max-h-[min(720px,85vh)] w-full max-w-6xl grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 md:items-stretch">
+                    {/* Interviewer Feed */}
+                    <div
+                        className={`relative overflow-hidden rounded-3xl border-2 bg-[#1e2124] shadow-2xl transition-all duration-500 ${
+                            conversation.isSpeaking ? "scale-[1.01] border-[#b88a44]/90 shadow-[#b88a44]/10" : "border-white/[0.08]"
+                        }`}
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/25 to-transparent" />
+                        <div className="relative flex h-full min-h-[320px] w-full flex-col items-center justify-center p-8 sm:p-10">
+                            <div className="relative">
+                                <div
+                                    className={`absolute -inset-5 rounded-full bg-[#b88a44]/15 blur-2xl transition-opacity duration-300 ${
+                                        conversation.isSpeaking ? "opacity-100" : "opacity-0"
+                                    }`}
+                                />
+                                <div
+                                    className={`relative h-44 w-44 overflow-hidden rounded-3xl border-[3px] border-white/10 shadow-xl sm:h-48 sm:w-48 ${
+                                        conversation.isSpeaking ? "ring-2 ring-[#b88a44]/40" : ""
+                                    }`}
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={selectedInterviewer?.avatar}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                    />
+                                </div>
+                            </div>
+                            <div className="mt-7 text-center">
+                                <h2 className="font-serif text-2xl font-bold tracking-tight">{selectedInterviewer?.name}</h2>
+                                <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/45">
+                                    {selectedInterviewer?.role}
+                                </p>
+                            </div>
+                            {conversation.isSpeaking && (
+                                <div className="mt-8 flex h-8 items-end justify-center gap-1">
+                                    {SPEAKING_BAR_HEIGHTS_PX.map((h, i) => (
+                                        <div
+                                            key={i}
+                                            className="w-1 animate-pulse rounded-full bg-[#b88a44]"
+                                            style={{
+                                                height: `${h}px`,
+                                                animationDelay: `${i * 90}ms`,
+                                                animationDuration: "0.6s",
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="absolute bottom-4 left-4 rounded-xl border border-white/10 bg-black/45 px-3 py-1.5 text-[11px] font-semibold backdrop-blur-md sm:bottom-6 sm:left-6">
+                            Host — {selectedInterviewer?.name}
+                        </div>
+                    </div>
+
+                    {/* User Feed */}
+                    <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#1e2124] shadow-2xl">
+                        <div className="flex h-full min-h-[320px] w-full flex-col items-center justify-center p-8 sm:p-10">
+                            <div className="flex h-36 w-36 items-center justify-center rounded-full border-[3px] border-white/10 bg-navy-950 font-serif text-4xl font-bold text-white shadow-inner sm:h-40 sm:w-40 sm:text-5xl">
+                                You
+                            </div>
+                            <div className="mt-7 text-center">
+                                <h2 className="text-xl font-bold tracking-tight">You</h2>
+                                <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/40">
+                                    Private practice — not recorded
+                                </p>
+                            </div>
+
+                            {!isInterviewing && !isIntermediate && !loading && (
+                                <button
+                                    type="button"
+                                    onClick={() => void startInterview()}
+                                    className="mt-8 rounded-xl bg-[#b88a44] px-8 py-3.5 text-sm font-bold text-navy-950 shadow-lg shadow-[#b88a44]/20 transition hover:bg-[#a67a39] active:scale-[0.98]"
+                                >
+                                    Start conversation
+                                </button>
+                            )}
+
+                            {(loading || isIntermediate) && !isInterviewing && (
+                                <div className="mt-8 flex flex-col items-center gap-3">
+                                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/15 border-t-[#b88a44]" />
+                                    <span className="text-center text-xs text-white/50">Connecting…</span>
+                                </div>
+                            )}
+
+                            {lastError ? (
+                                <div className="mt-6 max-w-sm rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-center text-xs leading-relaxed text-red-300">
+                                    {lastError}
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-xl border border-white/10 bg-black/45 px-3 py-1.5 text-[11px] font-semibold backdrop-blur-md sm:bottom-6 sm:left-6">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                            Your mic
+                        </div>
+                    </div>
+
+                    {/* Live transcript — populated from ElevenLabs onMessage (browser only, not saved). */}
+                    <section
+                        aria-label="Conversation transcript"
+                        className="flex max-h-[220px] min-h-[140px] flex-col rounded-2xl border border-white/[0.08] bg-[#16191c] md:col-span-2"
+                    >
+                        <div className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-4 py-2.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
+                                Transcript
+                            </span>
+                            <span className="text-[10px] text-white/35">
+                                {transcript.length === 0 ? "Lines appear as you and the host speak" : `${transcript.length} line${transcript.length === 1 ? "" : "s"}`}
+                            </span>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                            {transcript.length === 0 ? (
+                                <p className="text-center text-xs leading-relaxed text-white/35">
+                                    No messages yet. Start the conversation to see what you and {selectedInterviewer?.name} say.
+                                </p>
+                            ) : (
+                                <ul className="space-y-3 text-left">
+                                    {transcript.map((line) => (
+                                        <li key={line.id} className="text-sm leading-relaxed">
+                                            <span
+                                                className={
+                                                    line.role === "user"
+                                                        ? "font-semibold text-emerald-400/95"
+                                                        : "font-semibold text-[#d4b87c]"
+                                                }
+                                            >
+                                                {line.role === "user" ? "You" : selectedInterviewer?.name ?? "Host"}
+                                                <span className="mx-2 font-normal text-white/25" aria-hidden>
+                                                    ·
+                                                </span>
+                                            </span>
+                                            <span className="text-white/85">{line.text}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            <div ref={transcriptEndRef} aria-hidden />
+                        </div>
+                    </section>
+                </div>
+            </main>
+
+            <footer className="relative z-10 border-t border-white/5 bg-[#1a1d20] px-4 py-5 sm:px-8">
+                <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={toggleMute}
+                            title={isMuted ? "Unmute (display only)" : "Mute (display only)"}
+                            className={`flex h-12 w-12 items-center justify-center rounded-xl border transition-all sm:h-14 sm:w-14 ${
+                                isMuted
+                                    ? "border-red-500/40 bg-red-500/20 text-red-400"
+                                    : "border-white/10 bg-white/5 text-white/80 hover:bg-white/10"
+                            }`}
+                        >
+                            {isMuted ? (
+                                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM1 1l22 22M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-1.12 3.82M12 19v4M8 23h8" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            ) : (
+                                <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            )}
+                        </button>
+                        <span className="hidden text-xs text-white/35 sm:inline">Mic status is visual only in this build</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                        {isInterviewing && timeLeft < 30 && (
+                            <button
+                                type="button"
+                                onClick={() => router.push("/")}
+                                className="h-12 rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white/90 transition hover:bg-white/10 sm:h-14 sm:px-6"
+                            >
+                                Wrap up
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => void stopInterview()}
+                            className="h-12 rounded-xl bg-red-600 px-6 text-sm font-bold text-white shadow-lg shadow-red-900/30 transition hover:bg-red-500 sm:h-14 sm:px-8"
+                        >
+                            End session
+                        </button>
+                    </div>
+
+                    <p className="w-full text-center text-[10px] text-white/30 sm:w-auto sm:text-left">
+                        2-minute practice timer · Allow microphone when prompted
+                    </p>
+                </div>
+            </footer>
+        </div>
+    );
 }
 
 export default function InterviewPage() {
-  const router = useRouter();
-  const { t, locale } = useLanguage();
-  const safeLocale =
-    locale === "en" || locale === "zh" || locale === "ms" || locale === "ta"
-      ? locale
-      : "en";
-
-  const [role, setRole] = useState<InterviewRole>("general");
-  const [interviewType, setInterviewType] = useState<InterviewType>("hr");
-  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
-  const [agentState, setAgentState] = useState<AgentState>("idle");
-  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
-  const [textInput, setTextInput] = useState("");
-  const [sessionStarted, setSessionStarted] = useState(false);
-
-  const coaching = useMemo(
-    () => buildMockCoaching(safeLocale, conversation),
-    [safeLocale, conversation]
-  );
-
-  const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
-  const recognizerRef = useRef<{ stop: () => void } | null>(null);
-
-  function handleMicClick() {
-    if (micState === "listening") {
-      recognizerRef.current?.stop();
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert("Speech recognition not supported in this browser");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
-      setTextInput((prev) => (prev ? prev + " " + transcript : transcript));
-    };
-
-    recognition.onerror = () => setMicState("idle");
-    recognition.onend = () => setMicState("idle");
-
-    recognition.start();
-    recognizerRef.current = recognition;
-    setMicState("listening");
-  }
-
-  function startSession() {
-    setSessionStarted(true);
-    setConversation([
-      {
-        id: crypto.randomUUID(),
-        speaker: "system",
-        text: "Interview session started.",
-        timestamp: formatTime(),
-      },
-      {
-        id: crypto.randomUUID(),
-        speaker: "agent",
-        text: getOpeningLine(safeLocale, role, interviewType),
-        timestamp: formatTime(),
-      },
-    ]);
-  }
-
-  function endSession() {
-    setSessionStarted(false);
-    setConversation((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        speaker: "system",
-        text: "Interview session ended.",
-        timestamp: formatTime(),
-      },
-    ]);
-  }
-
-  function sendTextReply() {
-    if (!textInput.trim()) return;
-
-    const userMessage: ConversationMessage = {
-      id: crypto.randomUUID(),
-      speaker: "user",
-      text: textInput.trim(),
-      timestamp: formatTime(),
-    };
-
-    setConversation((prev) => [...prev, userMessage]);
-    setTextInput("");
-  }
-
-  return (
-    <main className="min-h-screen bg-[#f8f8f6]">
-      <SiteNavbar
-        rightSlot={
-          <button
-            type="button"
-            onClick={async () => {
-              const supabase = createClient();
-              await supabase.auth.signOut();
-              router.push("/");
-              router.refresh();
-            }}
-            className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
-          >
-            {t("dash_sign_out")}
-          </button>
-        }
-      />
-
-      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">
-        <div className="mb-8">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#b88a44]">
-            {t("nav_interview")}
-          </p>
-          <h1 className="font-serif text-4xl font-semibold tracking-tight text-navy-950 sm:text-5xl">
-            AI Interview Agent
-          </h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">
-            Practice with a live Azure avatar interviewer while keeping setup, transcript, and coaching on one page.
-          </p>
-        </div>
-
-        <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1.4fr)_240px]">
-          <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-navy-950">Session Setup</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Configure the mock interview before starting.
-            </p>
-
-            <div className="mt-5 space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Target Role</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as InterviewRole)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
-                >
-                  <option value="general">General</option>
-                  <option value="operations_executive">Operations Executive</option>
-                  <option value="project_coordinator">Project Coordinator</option>
-                  <option value="software_engineer">Software Engineer</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Interview Type</label>
-                <select
-                  value={interviewType}
-                  onChange={(e) => setInterviewType(e.target.value as InterviewType)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
-                >
-                  <option value="hr">HR</option>
-                  <option value="behavioral">Behavioral</option>
-                  <option value="technical">Technical</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Difficulty</label>
-                <select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
-                >
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </select>
-              </div>
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-navy-950" />
             </div>
-
-            <div className="mt-6 space-y-3">
-              <button
-                type="button"
-                onClick={startSession}
-                className="w-full rounded-xl bg-navy-950 px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
-              >
-                {sessionStarted ? "Restart Session" : "Start Session"}
-              </button>
-
-              <button
-                type="button"
-                onClick={endSession}
-                disabled={!sessionStarted}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                End Session
-              </button>
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Integration Status
-              </p>
-              <div className="mt-3 space-y-2 text-sm text-slate-700">
-                <div className="flex items-center justify-between">
-                  <span>Avatar engine</span>
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
-                    Connected
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Agent state</span>
-                  <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
-                    {agentState}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <section className="flex min-h-[860px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-6 py-4">
-              <h2 className="text-xl font-semibold text-navy-950">AI Interview Stage</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Live Azure avatar on top, transcript and reply area below.
-              </p>
-            </div>
-
-            <div className="grid flex-1 lg:grid-rows-[460px_minmax(0,1fr)_140px]">
-              <div className="border-b border-slate-200 bg-slate-50 p-6">
-                <AzureAvatarStage
-                  locale={safeLocale}
-                  onAgentStateChange={(state) => setAgentState(state)}
-                />
-              </div>
-
-              <div className="overflow-y-auto bg-white px-6 py-6">
-                {!sessionStarted && (
-                  <div className="flex h-full min-h-[220px] items-center justify-center text-center">
-                    <div>
-                      <div className="mx-auto w-fit rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        Waiting to start
-                      </div>
-                      <h3 className="mt-5 font-serif text-2xl font-semibold text-navy-950">
-                        Conversation transcript will appear here
-                      </h3>
-                      <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
-                        Start the session to let the AI interviewer greet the user and begin the conversation.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {conversation.length > 0 && (
-                  <div className="space-y-4">
-                    {conversation.map((message) => (
-                      <div key={message.id}>
-                        {message.speaker === "system" ? (
-                          <div className="text-center text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
-                            {message.text}
-                          </div>
-                        ) : (
-                          <div
-                            className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
-                              message.speaker === "agent"
-                                ? "bg-slate-50 text-slate-800"
-                                : "ml-auto bg-navy-950 text-white"
-                            }`}
-                          >
-                            <div className="mb-1 flex items-center justify-between gap-4 text-[11px] uppercase tracking-[0.12em] opacity-70">
-                              <span>{message.speaker === "agent" ? "AI Interviewer" : "User"}</span>
-                              <span>{message.timestamp}</span>
-                            </div>
-                            <p className="text-sm leading-6">{message.text}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-slate-200 bg-slate-50 p-4">
-                <div className="flex gap-3">
-                  <textarea
-                    value={textInput}
-                    onChange={(e) => setTextInput(e.target.value)}
-                    placeholder="Type the user's reply here, or let your teammate connect live microphone input later..."
-                    disabled={!sessionStarted}
-                    className="min-h-[92px] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950 disabled:bg-slate-100"
-                  />
-                  <div className="flex w-32 flex-col gap-3">
-                    <button
-                      type="button"
-                      onClick={sendTextReply}
-                      disabled={!sessionStarted || !textInput.trim()}
-                      className="rounded-xl bg-[#b88a44] px-4 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Send
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleMicClick()}
-                      disabled={!sessionStarted || micState === "processing"}
-                      className={`rounded-xl border px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                        micState === "listening"
-                          ? "border-red-300 bg-red-50 text-red-600"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
-                      {micState === "listening"
-                        ? "Listening..."
-                        : micState === "processing"
-                        ? "Processing..."
-                        : "Mic"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-navy-950">Coaching Panel</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Live coaching stays visible while the avatar interviews the user.
-            </p>
-
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Session Score
-              </p>
-              <p className="mt-2 text-3xl font-semibold text-navy-950">
-                {coaching.score > 0 ? `${coaching.score}/100` : "—"}
-              </p>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                Strengths
-              </p>
-              <div className="mt-3 space-y-2 text-sm leading-6 text-emerald-900">
-                {coaching.strengths.length > 0 ? (
-                  coaching.strengths.map((item) => <p key={item}>• {item}</p>)
-                ) : (
-                  <p>Live strengths will appear as the user answers.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
-                Improvement Areas
-              </p>
-              <div className="mt-3 space-y-2 text-sm leading-6 text-amber-900">
-                {coaching.improvements.length > 0 ? (
-                  coaching.improvements.map((item) => <p key={item}>• {item}</p>)
-                ) : (
-                  <p>Coaching suggestions will appear during the interview.</p>
-                )}
-              </div>
-            </div>
-          </aside>
-        </div>
-      </section>
-    </main>
-  );
+        }>
+            <InterviewContent />
+        </Suspense>
+    );
 }

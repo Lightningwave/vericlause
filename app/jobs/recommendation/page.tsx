@@ -257,17 +257,20 @@ function ScrapeTab() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleExtract() {
-    if (!url.trim()) return;
-    setLoading(true);
-    setError(null);
-    setJob(null);
+  if (!url.trim()) return;
+  setLoading(true);
+  setError(null);
+  setJob(null);
 
-    try {
-      const res = await fetch("/api/jobs/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
+  console.log("Sending POST to /api/jobs/scrape with URL:", url.trim());
+
+  try {
+    const res = await fetch("/api/jobs/scrape", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: url.trim() }),
+    });
+    console.log("Response status:", res.status, res.url);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to extract job");
       setJob(data.job);
@@ -289,13 +292,14 @@ function ScrapeTab() {
 
         <div className="mt-5 flex gap-3">
           <input
-            type="url"
+            type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://www.linkedin.com/jobs/view/..."
             className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-navy-950 focus:ring-2 focus:ring-navy-950/10"
           />
           <button
+          type="button"
             onClick={handleExtract}
             disabled={loading || !url.trim()}
             className="rounded-xl bg-navy-950 px-5 py-3 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
