@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { useMemo, useRef, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -129,41 +128,6 @@ export default function InterviewPage() {
       console.error("Mic setup failed:", err);
       setMicState("idle");
     }
-  }
-
-  const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
-  const recognizerRef = useRef<{ stop: () => void } | null>(null);
-
-  function handleMicClick() {
-    if (micState === "listening") {
-      recognizerRef.current?.stop();
-      return;
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert("Speech recognition not supported in this browser");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
-      setTextInput((prev) => (prev ? prev + " " + transcript : transcript));
-    };
-
-    recognition.onerror = () => setMicState("idle");
-    recognition.onend = () => setMicState("idle");
-
-    recognition.start();
-    recognizerRef.current = recognition;
-    setMicState("listening");
   }
 
   function startSession() {

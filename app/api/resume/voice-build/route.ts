@@ -6,7 +6,6 @@ import Groq from "groq-sdk";
 import { getAuthenticatedUser, insertResume } from "@/lib/services/db";
 import type { ResumeProfile, ResumeSuggestion } from "@/lib/types";
 import type { ResumeFeedback } from "@/app/api/resume/route";
-import type { ResumeProfile } from "@/lib/types";
 
 const OPENAI_MODEL = "gpt-4o-mini";
 const GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant";
@@ -99,10 +98,6 @@ Auto-correct the language, fix grammar, and compile the answers into a clean, pr
 
 If the candidate's name appears to contain individual letters separated by spaces (e.g. J A Y S O N), reconstruct it as a single proper name. Strip any leading or trailing hash symbols or special characters from the name before saving.
 
-const SYSTEM_PROMPT = `You are a professional resume writer for Singapore's job market. The user has provided raw voice transcript answers to resume questions. The transcripts may have errors or incomplete sentences from speech recognition.
-
-Auto-correct the language, fix grammar, and compile the answers into a clean, professionally formatted resume. Keep all facts as stated. For a simplified entry-level resume, focus on clarity over complexity.
-
 Return ONLY a valid JSON object with exactly these fields:
 {
   "name": "string",
@@ -119,7 +114,6 @@ No text outside the JSON. If a field has no data, return an empty string for it.
 
 async function callLlm(prompt: string, language?: string): Promise<string> {
   const systemPrompt = buildLanguageInstruction(language) + BASE_COMPILATION_PROMPT;
-async function callLlm(prompt: string): Promise<string> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
@@ -128,7 +122,6 @@ async function callLlm(prompt: string): Promise<string> {
         model: OPENAI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: prompt },
         ],
         temperature: 0.2,
@@ -147,7 +140,6 @@ async function callLlm(prompt: string): Promise<string> {
     model: GROQ_FALLBACK_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: prompt },
     ],
     temperature: 0.2,
@@ -198,11 +190,6 @@ export async function POST(req: NextRequest) {
   const prompt = [
     answers.full_name ? `Full Name: ${answers.full_name}` : "",
     sanitizedAge ? `Age: ${sanitizedAge}` : "",
-  const answers = await req.json();
-
-  const prompt = [
-    answers.full_name ? `Full Name: ${answers.full_name}` : "",
-    answers.age ? `Age: ${answers.age}` : "",
     answers.job_title ? `Target Role: ${answers.job_title}` : "",
     answers.summary ? `Professional Summary (voice): ${answers.summary}` : "",
     answers.experience ? `Work Experience (voice): ${answers.experience}` : "",
@@ -216,7 +203,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const raw = await callLlm(prompt, language);
-    const raw = await callLlm(prompt);
     const braceStart = raw.indexOf("{");
     const braceEnd = raw.lastIndexOf("}");
     if (braceStart === -1 || braceEnd <= braceStart) {
@@ -249,9 +235,6 @@ export async function POST(req: NextRequest) {
     // in the review page can find it — that function filters lines containing "Name:".
     const rawText = [
       result.name || "",
-    // Build a raw_text representation so the resume is searchable/readable in Supabase
-    const rawText = [
-      result.name ? `Name: ${result.name}` : "",
       result.targetRole ? `Target Role: ${result.targetRole}` : "",
       result.summary ? `Summary:\n${result.summary}` : "",
       result.experience ? `Experience:\n${result.experience}` : "",
@@ -266,9 +249,6 @@ export async function POST(req: NextRequest) {
     const saved = await insertResume(user.id, fileName, rawText, profile, undefined, undefined, aiSuggestions);
 
     return NextResponse.json({ success: true, resumeId: saved.id, resumeData: result, feedback });
-    const saved = await insertResume(user.id, fileName, rawText, profile);
-
-    return NextResponse.json({ ...result, resume_id: saved.id });
   } catch (e) {
     return NextResponse.json(
       { detail: `Resume generation failed: ${e instanceof Error ? e.message : e}` },

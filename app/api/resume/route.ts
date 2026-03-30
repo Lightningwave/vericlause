@@ -34,19 +34,6 @@ function buildSystemPrompt(language?: string): string {
   const instruction = `IMPORTANT: You must respond entirely in ${langName}. All feedback, suggestions, and analysis must be written in ${langName}. Do not use English anywhere in your response.\n\n`;
   return instruction + BASE_SYSTEM_PROMPT;
 }
-const SYSTEM_PROMPT = `You are a professional resume coach specialising in Singapore's white-collar job market.
-
-Analyse the resume below and return ONLY a valid JSON object with exactly these fields:
-
-{
-  "overallImpression": "2 to 3 sentence summary",
-  "keyStrengths": ["strength 1", "strength 2", "strength 3"],
-  "areasToImprove": ["gap 1", "gap 2", "gap 3"],
-  "suggestedEdits": ["edit 1", "edit 2", "edit 3"],
-  "score": 7
-}
-
-Be specific to Singapore hiring standards. No generic advice. No text outside the JSON object.`;
 
 export interface ResumeFeedback {
   overallImpression: string;
@@ -82,7 +69,6 @@ function extractJson(text: string): string {
 
 async function callLlm(resumeText: string, language?: string): Promise<string> {
   const systemPrompt = buildSystemPrompt(language);
-async function callLlm(resumeText: string): Promise<string> {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
@@ -91,7 +77,6 @@ async function callLlm(resumeText: string): Promise<string> {
         model: OPENAI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: resumeText.slice(0, 120_000) },
         ],
         temperature: 0,
@@ -110,7 +95,6 @@ async function callLlm(resumeText: string): Promise<string> {
     model: GROQ_FALLBACK_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: resumeText.slice(0, 120_000) },
     ],
     temperature: 0,
@@ -161,26 +145,11 @@ export async function POST(req: NextRequest) {
     if (!resumeText.trim()) {
       return NextResponse.json({ detail: "File produced no text" }, { status: 422 });
     }
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const { text } = await extractText(uint8Array, { mergePages: true });
-    resumeText = text;
-  } catch (e) {
-    return NextResponse.json(
-      { detail: `File could not be read: ${e instanceof Error ? e.message : e}` },
-      { status: 422 },
-    );
-  }
-
-  if (!resumeText.trim()) {
-    return NextResponse.json({ detail: "File produced no text" }, { status: 422 });
   }
 
   let raw: string;
   try {
     raw = await callLlm(resumeText, language);
-    raw = await callLlm(resumeText);
   } catch (e) {
     return NextResponse.json(
       { detail: `AI analysis failed: ${e instanceof Error ? e.message : e}` },
