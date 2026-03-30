@@ -64,15 +64,6 @@ function ResumeOnboardingContent() {
     ];
     return () => timers.forEach(clearTimeout);
   }, [analysing]);
-  // AI feedback state
-  const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
-  const [analysing, setAnalysing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-
-  // Voice-to-text state
-  const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
-  const [voiceText, setVoiceText] = useState("");
-  const recognizerRef = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -110,9 +101,6 @@ function ResumeOnboardingContent() {
     setAnalysisError(null);
     setUploadComplete(false);
     setAnalysisComplete(false);
-    setSuccessMessage(null);
-    setFeedback(null);
-    setAnalysisError(null);
   }, []);
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -261,9 +249,6 @@ function ResumeOnboardingContent() {
       formData.append("voiceText", voiceText);
       formData.append("language", locale);
       if (translatedText) formData.append("translatedText", translatedText);
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
 
       const res = await fetch("/api/resume", { method: "POST", body: formData });
       const json = await res.json();
@@ -306,7 +291,6 @@ function ResumeOnboardingContent() {
       en: "en-SG", zh: "zh-CN", ms: "ms-MY", ta: "ta-IN",
     };
     recognition.lang = micLangMap[locale] ?? "en-SG";
-    recognition.lang = "en-US";
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[event.results.length - 1][0].transcript;
@@ -390,7 +374,6 @@ function ResumeOnboardingContent() {
                 <button
                   type="button"
                   onClick={handleMicClick}
-                  onClick={() => void handleMicClick()}
                   title={micState === "listening" ? "Stop recording" : "Start voice input"}
                   className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition ${
                     micState === "listening"
@@ -448,13 +431,11 @@ function ResumeOnboardingContent() {
             <div className="mt-5">
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 {t("voice_describe_label")}
-                Or describe your experience verbally
               </label>
               <textarea
                 value={voiceText}
                 onChange={(e) => setVoiceText(e.target.value)}
                 placeholder={t("voice_textarea_placeholder")}
-                placeholder="Your spoken input will appear here..."
                 rows={4}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
               />
@@ -510,15 +491,6 @@ function ResumeOnboardingContent() {
                 </div>
               </div>
             ) : null}
-
-            <button
-              type="button"
-              onClick={() => void handleAnalyse()}
-              disabled={!selectedFile || analysing}
-              className="mt-4 w-full rounded-xl border border-[#b88a44] px-4 py-3 text-sm font-medium text-[#b88a44] transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {analysing ? "Analysing..." : "Analyse My Resume"}
-            </button>
 
             {analysisError ? (
               <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -611,38 +583,6 @@ function ResumeOnboardingContent() {
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   {t("ai_overall_impression")}
-        {/* AI Feedback section */}
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-navy-950">AI Feedback</h2>
-            {feedback && (
-              <span className="text-sm font-semibold text-navy-950">
-                Score: <span className="text-2xl">{feedback.score}</span>
-                <span className="font-normal text-slate-400"> / 10</span>
-              </span>
-            )}
-          </div>
-
-          {!feedback ? (
-            <div className="mt-4 space-y-3">
-              <p className="text-sm text-slate-500">
-                Upload a file and click &ldquo;Analyse My Resume&rdquo; to see AI-powered feedback here.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {["Overall Impression", "Key Strengths", "Areas to Improve", "Suggested Edits"].map((section) => (
-                  <div key={section} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{section}</p>
-                    <div className="mt-2 h-3 w-3/4 rounded bg-slate-200" />
-                    <div className="mt-1.5 h-3 w-1/2 rounded bg-slate-200" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Overall Impression
                 </p>
                 <p className="text-sm leading-6 text-slate-700">{feedback.overallImpression}</p>
               </div>
@@ -650,7 +590,6 @@ function ResumeOnboardingContent() {
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-600">
                   {t("ai_key_strengths")}
-                  Key Strengths
                 </p>
                 <ul className="space-y-1.5">
                   {feedback.keyStrengths.map((s, i) => (
@@ -667,7 +606,6 @@ function ResumeOnboardingContent() {
               <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-600">
                   {t("ai_areas_to_improve")}
-                  Areas to Improve
                 </p>
                 <ul className="space-y-1.5">
                   {feedback.areasToImprove.map((s, i) => (
@@ -684,7 +622,6 @@ function ResumeOnboardingContent() {
               <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   {t("ai_suggested_edits")}
-                  Suggested Edits
                 </p>
                 <ul className="space-y-1.5">
                   {feedback.suggestedEdits.map((s, i) => (
@@ -777,9 +714,6 @@ function ResumeOnboardingContent() {
             </div>
           </div>
         ) : null}
-            </div>
-          )}
-        </div>
 
         <div className="mt-10 max-w-3xl">
           <ResumeList resumes={userResumes} onDeleted={handleResumeDeleted} className="mt-0" />
