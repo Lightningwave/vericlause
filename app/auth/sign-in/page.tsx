@@ -6,12 +6,18 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthForm, type AuthFormValues } from "@/components/auth/AuthForm";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { createClient } from "@/lib/supabase/client";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import Link from "next/link";
 
 function SignInContent() {
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const urlError =
+    searchParams.get("error") === "oauth"
+      ? "Google sign-in could not be completed. Try again."
+      : null;
+  const [error, setError] = useState<string | null>(null);
+  const displayError = error ?? urlError;
 
   const handleSubmit = async (values: AuthFormValues) => {
     setError(null);
@@ -44,7 +50,18 @@ function SignInContent() {
         </>
       }
     >
-      <AuthForm mode="sign-in" onSubmit={handleSubmit} error={error} />
+      <div className="space-y-4">
+        <GoogleSignInButton next={searchParams.get("next")} onError={setError} />
+        <div className="relative py-2">
+          <div className="absolute inset-0 flex items-center" aria-hidden>
+            <div className="w-full border-t border-slate-200" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-slate-400">or email</span>
+          </div>
+        </div>
+        <AuthForm mode="sign-in" onSubmit={handleSubmit} error={displayError} />
+      </div>
     </AuthShell>
   );
 }
