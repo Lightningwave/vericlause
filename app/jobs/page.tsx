@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
 
 type JobItem = {
@@ -50,12 +51,15 @@ export default function JobsPage() {
     <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
         rightSlot={
-          <Link
-            href="/contract"
-            className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-          >
-            {t("nav_dashboard")}
-          </Link>
+          <div className="flex items-center gap-4">
+            <UserMenu />
+            <Link
+              href="/contract"
+              className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            >
+              {t("nav_dashboard")}
+            </Link>
+          </div>
         }
       />
 

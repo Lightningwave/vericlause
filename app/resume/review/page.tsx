@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
 import { createClient } from "@/lib/supabase/client";
@@ -519,14 +520,7 @@ function ResumeReviewContent() {
   return (
     <div className="min-h-screen bg-white">
       <SiteNavbar
-        rightSlot={
-          <Link
-            href="/auth/sign-in"
-            className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-          >
-            {t("sign_in")}
-          </Link>
-        }
+        rightSlot={<UserMenu />}
       />
 
       <main className="mx-auto max-w-7xl px-6 py-14">
