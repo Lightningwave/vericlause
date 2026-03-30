@@ -4,16 +4,21 @@ import Link from "next/link";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { useLanguage } from "@/components/providers/language-provider";
-import { listResumes, getResumeById } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import { getResumeById, listResumes } from "@/lib/api";
+import type { ResumeTemplateData } from "@/lib/resume-templates/types";
+import { TemplatePickerModal } from "@/components/resume/TemplatePickerModal";
 
 type ExperienceItem = {
   id: string;
   jobTitle: string;
   company: string;
   location: string;
-  startDate: string;
-  endDate: string;
+  startMonth: number | null;
+  startYear: number | null;
+  endMonth: number | null;
+  endYear: number | null;
+  endIsPresent: boolean;
   description: string;
 };
 
@@ -22,8 +27,11 @@ type EducationItem = {
   school: string;
   qualification: string;
   fieldOfStudy: string;
-  startDate: string;
-  endDate: string;
+  startMonth: number | null;
+  startYear: number | null;
+  endMonth: number | null;
+  endYear: number | null;
+  endIsPresent: boolean;
 };
 
 type SkillItem = {
@@ -42,10 +50,98 @@ function createId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS: number[] = Array.from({ length: CURRENT_YEAR - 1969 }, (_, i) => CURRENT_YEAR - i);
+
+function sanitiseName(raw: string): string {
+  return raw.replace(/^[#\s]+|[#\s]+$/g, "").trim();
+}
+
+function formatDate(month: number | null, year: number | null): string {
+  if (!year) return "";
+  if (!month) return String(year);
+  return `${MONTHS[month - 1]} ${year}`;
+}
+
+function parseDate(str: string | null | undefined): { month: number | null; year: number | null } {
+  if (!str) return { month: null, year: null };
+  const trimmed = str.trim();
+  const mY = trimmed.match(/^([A-Za-z]{3,})\s+(\d{4})$/);
+  if (mY) {
+    const abbr = mY[1].slice(0, 3);
+    const idx = MONTHS.findIndex((m) => m.toLowerCase() === abbr.toLowerCase());
+    return { month: idx >= 0 ? idx + 1 : null, year: parseInt(mY[2]) };
+  }
+  const isoM = trimmed.match(/^(\d{4})-(\d{2})$/);
+  if (isoM) return { month: parseInt(isoM[2]), year: parseInt(isoM[1]) };
+  const yrM = trimmed.match(/^(\d{4})$/);
+  if (yrM) return { month: null, year: parseInt(yrM[1]) };
+  return { month: null, year: null };
+}
+
+function calcDuration(
+  sMonth: number | null, sYear: number | null,
+  eMonth: number | null, eYear: number | null,
+  isPresent: boolean,
+): string {
+  if (!sYear) return "";
+  const now = new Date();
+  const endY = isPresent ? now.getFullYear() : eYear;
+  const endM = isPresent ? now.getMonth() + 1 : eMonth;
+  if (!endY) return "";
+  const totalMonths = (endY - sYear) * 12 + ((endM ?? 6) - (sMonth ?? 1));
+  if (totalMonths <= 0) return "";
+  const yrs = Math.floor(totalMonths / 12);
+  const mos = totalMonths % 12;
+  if (yrs === 0) return `${mos} mo${mos !== 1 ? "s" : ""}`;
+  if (mos === 0) return `${yrs} yr${yrs !== 1 ? "s" : ""}`;
+  return `${yrs} yr${yrs !== 1 ? "s" : ""} ${mos} mo${mos !== 1 ? "s" : ""}`;
+}
+
+function MonthYearPicker({
+  month, year, onChange, disabled,
+}: {
+  month: number | null;
+  year: number | null;
+  onChange: (month: number | null, year: number | null) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-2">
+      <select
+        value={month ?? ""}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null, year)}
+        disabled={disabled}
+        className="flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none focus:border-navy-950 disabled:opacity-50"
+      >
+        <option value="">Month</option>
+        {MONTHS.map((m, i) => (
+          <option key={m} value={i + 1}>{m}</option>
+        ))}
+      </select>
+      <select
+        value={year ?? ""}
+        onChange={(e) => onChange(month, e.target.value ? Number(e.target.value) : null)}
+        disabled={disabled}
+        className="flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none focus:border-navy-950 disabled:opacity-50"
+      >
+        <option value="">Year</option>
+        {YEARS.map((y) => (
+          <option key={y} value={y}>{y}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export default function ResumeBuilderPage() {
   const { t } = useLanguage();
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [prefillLoading, setPrefillLoading] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
   const [fullName, setFullName] = useState("Your Name");
   const [targetRole, setTargetRole] = useState("Operations Executive");
@@ -62,8 +158,8 @@ export default function ResumeBuilderPage() {
       jobTitle: "Operations Coordinator",
       company: "Inter Group",
       location: "Singapore",
-      startDate: "2023",
-      endDate: "Present",
+      startMonth: null, startYear: 2023,
+      endMonth: null, endYear: null, endIsPresent: true,
       description:
         "Coordinated internal documentation, supported project follow-up, and assisted with daily workflow tracking and stakeholder communication.",
     },
@@ -75,8 +171,8 @@ export default function ResumeBuilderPage() {
       school: "ABC Institute",
       qualification: "Diploma",
       fieldOfStudy: "Business Administration",
-      startDate: "2019",
-      endDate: "2022",
+      startMonth: null, startYear: 2019,
+      endMonth: null, endYear: 2022, endIsPresent: false,
     },
   ]);
 
@@ -86,125 +182,168 @@ export default function ResumeBuilderPage() {
     { id: createId(), name: "Documentation", level: 90 },
   ]);
 
-  const [extraSections, setExtraSections] = useState<ExtraSection[]>([
+  const [extraSections, setExtraSections] = useState<ExtraSection[]>(() => [
     {
       id: createId(),
       title: "Certifications",
-      content: "Add certifications, awards, volunteer work, languages, or any other optional section here.",
+      content: t("builder_optional_placeholder"),
     },
   ]);
 
-  const [prefillLoading, setPrefillLoading] = useState(true);
-
   useEffect(() => {
+    let cancelled = false;
+
     async function prefillFromResume() {
+      setPrefillLoading(true);
       try {
+        // Get email from Supabase auth
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email) setEmail(user.email);
-
-        console.log("[ResumeBuilder] Fetching resumes from GET /api/resumes …");
-        const { resumes } = await listResumes();
-        console.log("[ResumeBuilder] listResumes response:", resumes);
-
-        const analyzed = resumes.find((r) => r.parsed_profile);
-        if (!analyzed) {
-          console.log("[ResumeBuilder] No resume with parsed_profile found. Resumes returned:", resumes.length);
-          return;
+        if (!cancelled && user?.email) {
+          console.log("[ResumeBuilder] Got user email:", user.email);
+          setEmail(user.email);
         }
-        console.log("[ResumeBuilder] Found analyzed resume:", analyzed.id, analyzed.file_name);
 
-        console.log(`[ResumeBuilder] Fetching resume detail from GET /api/resumes/${analyzed.id} …`);
-        const data = await getResumeById(analyzed.id);
-        console.log("[ResumeBuilder] getResumeById response:", data);
+        // Get most recent analyzed resume
+        console.log("[ResumeBuilder] Fetching resumes...");
+        const listed = await listResumes();
+        console.log("[ResumeBuilder] Listed resumes:", listed.resumes?.length ?? 0);
 
-        const profile = data?.resume?.parsed_profile;
-        if (!profile) {
-          console.log("[ResumeBuilder] parsed_profile is null on the fetched resume.");
-          return;
+        if (!listed.resumes?.length || cancelled) return;
+
+        const withProfile = listed.resumes.find((r) => r.parsed_profile);
+        const target = withProfile ?? listed.resumes[0];
+        if (!target) return;
+
+        console.log("[ResumeBuilder] Loading resume:", target.id, target.file_name);
+        const data = await getResumeById(target.id);
+        if (cancelled || !data?.resume) return;
+
+        const resume = data.resume;
+        const profile = resume.parsed_profile;
+
+        console.log("[ResumeBuilder] Profile:", profile);
+
+        // Extract name from raw_text first meaningful line
+        if (resume.raw_text) {
+          const firstMeaningfulLine = resume.raw_text.split("\n").find((line) => {
+            const trimmed = line.trim();
+            return (
+              trimmed.length > 0 &&
+              trimmed.length < 60 &&
+              !/[@\d+()[\]]|Summary|Experience|Skills|Education|Name:|Target/i.test(trimmed)
+            );
+          });
+          if (firstMeaningfulLine && !cancelled) {
+            console.log("[ResumeBuilder] Extracted name:", firstMeaningfulLine.trim());
+            setFullName(sanitiseName(firstMeaningfulLine));
+          }
         }
-        console.log("[ResumeBuilder] parsed_profile:", profile);
 
-        // full_name is not in the ResumeProfile schema — extract from the first
-        // non-empty line of raw_text, which is almost always the candidate's name.
-        const rawText = data?.resume?.raw_text ?? "";
-        const firstLine = rawText.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
-        const looksLikeName =
-          firstLine.length > 0 &&
-          firstLine.length < 60 &&
-          !/^\s*(email|phone|mobile|address|resume|curriculum|cv|summary|profile|objective)\b/i.test(firstLine) &&
-          !firstLine.includes("@") &&
-          !firstLine.includes("|");
-        console.log("[ResumeBuilder] Name candidate from raw_text first line:", JSON.stringify(firstLine), "→ using:", looksLikeName);
-        if (looksLikeName) setFullName(firstLine);
+        if (!profile || cancelled) return;
 
+        if (profile.headline) setTargetRole(profile.headline);
         if (profile.summary) setSummary(profile.summary);
+
+        if (profile.skills?.length) {
+          setSkills(profile.skills.map((name) => ({ id: createId(), name, level: 80 })));
+        }
 
         if (profile.experiences?.length) {
           setExperiences(
-            profile.experiences.map((e) => ({
-              id: createId(),
-              jobTitle: e.title ?? "",
-              company: e.company ?? "",
-              location: "",
-              startDate: e.start_date ?? "",
-              endDate: e.end_date ?? "",
-              description: e.description ?? "",
-            })),
+            profile.experiences.map((exp) => {
+              const isPresent =
+                !exp.end_date || exp.end_date.toLowerCase() === "present";
+              const start = parseDate(exp.start_date);
+              const end = isPresent ? { month: null, year: null } : parseDate(exp.end_date);
+              return {
+                id: createId(),
+                jobTitle: exp.title ?? "",
+                company: exp.company ?? "",
+                location: "",
+                startMonth: start.month,
+                startYear: start.year,
+                endMonth: end.month,
+                endYear: end.year,
+                endIsPresent: isPresent,
+                description: exp.description ?? "",
+              };
+            }),
           );
         }
 
         if (profile.education?.length) {
           setEducations(
-            profile.education.map((ed) => ({
+            profile.education.map((edu) => ({
               id: createId(),
-              school: ed.institution ?? "",
-              qualification: ed.qualification ?? "",
-              fieldOfStudy: ed.field_of_study ?? "",
-              startDate: "",
-              endDate: ed.graduation_year != null ? String(ed.graduation_year) : "",
+              school: edu.institution ?? "",
+              qualification: edu.qualification ?? "",
+              fieldOfStudy: edu.field_of_study ?? "",
+              startMonth: null, startYear: null,
+              endMonth: null,
+              endYear: edu.graduation_year ?? null,
+              endIsPresent: false,
             })),
           );
         }
-
-        if (profile.skills?.length) {
-          setSkills(
-            profile.skills.slice(0, 12).map((name) => ({
-              id: createId(),
-              name,
-              level: 75,
-            })),
-          );
-        }
-
-        if (profile.headline) setTargetRole(profile.headline);
-
-        console.log("[ResumeBuilder] Pre-fill complete.");
       } catch (err) {
         console.error("[ResumeBuilder] prefillFromResume error:", err);
       } finally {
-        setPrefillLoading(false);
+        if (!cancelled) setPrefillLoading(false);
       }
     }
 
-    void prefillFromResume();
+    prefillFromResume();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  async function toBase64DataUri(source: string): Promise<string> {
+    const response = await fetch(source);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
 
   function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhotoPreview(typeof reader.result === "string" ? reader.result : null);
-    };
-    reader.readAsDataURL(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPhotoPreview(objectUrl);
+
+    void toBase64DataUri(objectUrl)
+      .then((b64) => setPhotoBase64(b64))
+      .catch(() => setPhotoBase64(null));
   }
 
-  function updateExperience(id: string, field: keyof ExperienceItem, value: string) {
+  function updateExperience(
+    id: string,
+    field: keyof Omit<ExperienceItem, "id">,
+    value: string | number | boolean | null,
+  ) {
     setExperiences((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
     );
+  }
+
+  async function handleCompanyBlur(id: string, company: string) {
+    if (!company.trim()) return;
+    const item = experiences.find((e) => e.id === id);
+    if (!item || item.location.trim()) return;
+    try {
+      const res = await fetch(`/api/places?query=${encodeURIComponent(company + " Singapore")}`);
+      if (!res.ok) return;
+      const json = (await res.json()) as { place: { location: string } | null };
+      if (json.place?.location) updateExperience(id, "location", json.place.location);
+    } catch {
+      // fail silently
+    }
   }
 
   function addExperience() {
@@ -215,8 +354,8 @@ export default function ResumeBuilderPage() {
         jobTitle: "",
         company: "",
         location: "",
-        startDate: "",
-        endDate: "",
+        startMonth: null, startYear: null,
+        endMonth: null, endYear: null, endIsPresent: false,
         description: "",
       },
     ]);
@@ -226,7 +365,11 @@ export default function ResumeBuilderPage() {
     setExperiences((prev) => prev.filter((item) => item.id !== id));
   }
 
-  function updateEducation(id: string, field: keyof EducationItem, value: string) {
+  function updateEducation(
+    id: string,
+    field: keyof Omit<EducationItem, "id">,
+    value: string | number | boolean | null,
+  ) {
     setEducations((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
     );
@@ -240,8 +383,8 @@ export default function ResumeBuilderPage() {
         school: "",
         qualification: "",
         fieldOfStudy: "",
-        startDate: "",
-        endDate: "",
+        startMonth: null, startYear: null,
+        endMonth: null, endYear: null, endIsPresent: false,
       },
     ]);
   }
@@ -290,6 +433,42 @@ export default function ResumeBuilderPage() {
     [skills],
   );
 
+  function buildTemplateData(): ResumeTemplateData {
+    return {
+      name: sanitiseName(fullName),
+      jobTitle: targetRole || undefined,
+      email: email || undefined,
+      phone: phone || undefined,
+      location: location || undefined,
+      summary: summary || undefined,
+      experiences: experiences
+        .filter((e) => e.jobTitle.trim() || e.company.trim())
+        .map((e) => ({
+          title: e.jobTitle,
+          company: e.company,
+          location: e.location || undefined,
+          startDate: formatDate(e.startMonth, e.startYear),
+          endDate: e.endIsPresent ? "Present" : formatDate(e.endMonth, e.endYear),
+          description: e.description,
+        })),
+      educations: educations
+        .filter((ed) => ed.school.trim() || ed.qualification.trim())
+        .map((ed) => ({
+          institution: ed.school,
+          qualification: ed.qualification,
+          fieldOfStudy: ed.fieldOfStudy || undefined,
+          graduationYear: ed.endIsPresent
+            ? "Present"
+            : formatDate(ed.endMonth, ed.endYear) || undefined,
+        })),
+      skills: filledSkills.map((s) => ({ name: s.name, level: s.level })),
+      extras: extraSections
+        .filter((ex) => ex.title.trim() && ex.content.trim())
+        .map((ex) => ({ title: ex.title, content: ex.content })),
+      photoUrl: photoBase64 ?? undefined,
+    };
+  }
+
   return (
     <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
@@ -314,12 +493,6 @@ export default function ResumeBuilderPage() {
           <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
             {t("resume_builder_page_lead")}
           </p>
-          {prefillLoading ? (
-            <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-navy-950" />
-              Loading your resume data…
-            </p>
-          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-8">
@@ -403,7 +576,7 @@ export default function ResumeBuilderPage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm font-medium text-slate-700">Location</label>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">{t("resume_builder_label_location")}</label>
                     <input
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
@@ -461,9 +634,10 @@ export default function ResumeBuilderPage() {
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <input
-                        placeholder="Company"
+                        placeholder={t("resume_builder_ph_company")}
                         value={item.company}
                         onChange={(e) => updateExperience(item.id, "company", e.target.value)}
+                        onBlur={(e) => void handleCompanyBlur(item.id, e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
                       <input
@@ -472,19 +646,40 @@ export default function ResumeBuilderPage() {
                         onChange={(e) => updateExperience(item.id, "location", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          placeholder="Start"
-                          value={item.startDate}
-                          onChange={(e) => updateExperience(item.id, "startDate", e.target.value)}
-                          className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-500">{t("builder_start_date")}</p>
+                        <MonthYearPicker
+                          month={item.startMonth}
+                          year={item.startYear}
+                          onChange={(m, y) => {
+                            updateExperience(item.id, "startMonth", m);
+                            updateExperience(item.id, "startYear", y);
+                          }}
                         />
-                        <input
-                          placeholder="End"
-                          value={item.endDate}
-                          onChange={(e) => updateExperience(item.id, "endDate", e.target.value)}
-                          className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
-                        />
+                        <p className="pt-1 text-xs font-medium text-slate-500">{t("builder_end_date")}</p>
+                        {!item.endIsPresent && (
+                          <MonthYearPicker
+                            month={item.endMonth}
+                            year={item.endYear}
+                            onChange={(m, y) => {
+                              updateExperience(item.id, "endMonth", m);
+                              updateExperience(item.id, "endYear", y);
+                            }}
+                          />
+                        )}
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={item.endIsPresent}
+                            onChange={(e) => updateExperience(item.id, "endIsPresent", e.target.checked)}
+                            className="accent-navy-950"
+                          />
+                          {t("builder_present_only")}
+                        </label>
+                        {(() => {
+                          const dur = calcDuration(item.startMonth, item.startYear, item.endMonth, item.endYear, item.endIsPresent);
+                          return dur ? <p className="text-xs text-slate-500">{dur}</p> : null;
+                        })()}
                       </div>
                       <textarea
                         placeholder={t("resume_builder_ph_experience_body")}
@@ -556,13 +751,13 @@ export default function ResumeBuilderPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-xl font-semibold text-navy-950">Education</h2>
+                <h2 className="text-xl font-semibold text-navy-950">{t("resume_builder_education_title")}</h2>
                 <button
                   type="button"
                   onClick={addEducation}
                   className="rounded-lg bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
                 >
-                  Add Education
+                  {t("resume_builder_add_education")}
                 </button>
               </div>
 
@@ -586,7 +781,7 @@ export default function ResumeBuilderPage() {
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <input
-                        placeholder="School"
+                        placeholder={t("resume_builder_ph_school")}
                         value={item.school}
                         onChange={(e) => updateEducation(item.id, "school", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -603,19 +798,40 @@ export default function ResumeBuilderPage() {
                         onChange={(e) => updateEducation(item.id, "fieldOfStudy", e.target.value)}
                         className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
                       />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          placeholder="Start"
-                          value={item.startDate}
-                          onChange={(e) => updateEducation(item.id, "startDate", e.target.value)}
-                          className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-slate-500">{t("builder_start_date")}</p>
+                        <MonthYearPicker
+                          month={item.startMonth}
+                          year={item.startYear}
+                          onChange={(m, y) => {
+                            updateEducation(item.id, "startMonth", m);
+                            updateEducation(item.id, "startYear", y);
+                          }}
                         />
-                        <input
-                          placeholder="End"
-                          value={item.endDate}
-                          onChange={(e) => updateEducation(item.id, "endDate", e.target.value)}
-                          className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
-                        />
+                        <p className="pt-1 text-xs font-medium text-slate-500">{t("builder_end_date")}</p>
+                        {!item.endIsPresent && (
+                          <MonthYearPicker
+                            month={item.endMonth}
+                            year={item.endYear}
+                            onChange={(m, y) => {
+                              updateEducation(item.id, "endMonth", m);
+                              updateEducation(item.id, "endYear", y);
+                            }}
+                          />
+                        )}
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={item.endIsPresent}
+                            onChange={(e) => updateEducation(item.id, "endIsPresent", e.target.checked)}
+                            className="accent-navy-950"
+                          />
+                          {t("builder_present")}
+                        </label>
+                        {(() => {
+                          const dur = calcDuration(item.startMonth, item.startYear, item.endMonth, item.endYear, item.endIsPresent);
+                          return dur ? <p className="text-xs text-slate-500">{dur}</p> : null;
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -639,13 +855,15 @@ export default function ResumeBuilderPage() {
                 {extraSections.map((section, index) => (
                   <div key={section.id} className="rounded-2xl border border-slate-200 bg-white p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-slate-700">Optional Section {index + 1}</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {t("builder_optional_section").replace("{n}", String(index + 1))}
+                      </p>
                       <button
                         type="button"
                         onClick={() => removeExtraSection(section.id)}
                         className="text-sm font-medium text-red-600"
                       >
-                        Remove
+                        {t("resume_builder_remove")}
                       </button>
                     </div>
 
@@ -657,7 +875,7 @@ export default function ResumeBuilderPage() {
                     />
 
                     <textarea
-                      placeholder="Add section content"
+                      placeholder={t("resume_builder_ph_section_content")}
                       value={section.content}
                       onChange={(e) => updateExtraSection(section.id, "content", e.target.value)}
                       className="mt-4 min-h-[120px] w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-navy-950"
@@ -665,6 +883,22 @@ export default function ResumeBuilderPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Link
+                href="/resume/review"
+                className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                {t("builder_back_to_review")}
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowTemplatePicker(true)}
+                className="rounded-xl bg-navy-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-navy-800"
+              >
+                {t("builder_download")}
+              </button>
             </div>
           </section>
 
@@ -717,7 +951,11 @@ export default function ResumeBuilderPage() {
                               {item.company ? ` • ${item.company}` : ""}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {[item.location, item.startDate, item.endDate].filter(Boolean).join(" • ")}
+                              {[
+                                item.location,
+                                item.startYear ? formatDate(item.startMonth, item.startYear) : null,
+                                item.endIsPresent ? t("builder_present_only") : item.endYear ? formatDate(item.endMonth, item.endYear) : null,
+                              ].filter(Boolean).join(" • ")}
                             </p>
                             <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                               {item.description}
@@ -766,7 +1004,10 @@ export default function ResumeBuilderPage() {
                             </p>
                             <p className="text-sm text-slate-700">{item.school}</p>
                             <p className="text-xs text-slate-500">
-                              {[item.startDate, item.endDate].filter(Boolean).join(" - ")}
+                              {[
+                                item.startYear ? formatDate(item.startMonth, item.startYear) : null,
+                                item.endIsPresent ? t("builder_present_only") : item.endYear ? formatDate(item.endMonth, item.endYear) : null,
+                              ].filter(Boolean).join(" – ")}
                             </p>
                           </div>
                         ) : null
@@ -804,6 +1045,12 @@ export default function ResumeBuilderPage() {
           </aside>
         </div>
       </section>
+      {showTemplatePicker ? (
+        <TemplatePickerModal
+          data={buildTemplateData()}
+          onClose={() => setShowTemplatePicker(false)}
+        />
+      ) : null}
     </main>
   );
 }
