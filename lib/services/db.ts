@@ -1,5 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import type { ExtractedContract, ComplianceVerdict, ResumeProfile, ResumeSuggestion, ComparisonJobRow, ContractComparison } from "@/lib/types";
+import type {
+  ExtractedContract,
+  ComplianceVerdict,
+  ResumeProfile,
+  ResumeSuggestion,
+  ComparisonJobRow,
+  ContractComparison,
+  InterviewScoreResult,
+  InterviewTranscriptLine,
+} from "@/lib/types";
 
 export interface DocumentRow {
   id: string;
@@ -541,4 +550,43 @@ export async function getComparisonJob(
 
   if (error || !data) return null;
   return data as ComparisonJobRow;
+}
+
+// ---------------------------------------------------------------------------
+// Interview sessions
+// ---------------------------------------------------------------------------
+
+export interface InterviewSessionRow {
+  id: string;
+  user_id: string;
+  resume_id: string | null;
+  interviewer: "alex" | "sophia";
+  transcript: InterviewTranscriptLine[];
+  score: InterviewScoreResult;
+  overall_score: number;
+  created_at: string;
+}
+
+export async function insertInterviewSession(input: {
+  userId: string;
+  resumeId: string | null;
+  interviewer: "alex" | "sophia";
+  transcript: InterviewTranscriptLine[];
+  score: InterviewScoreResult;
+}): Promise<InterviewSessionRow> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("interview_sessions")
+    .insert({
+      user_id: input.userId,
+      resume_id: input.resumeId,
+      interviewer: input.interviewer,
+      transcript: input.transcript,
+      score: input.score,
+      overall_score: input.score.overall_score,
+    })
+    .select("*")
+    .single();
+  if (error) throw new Error(`Failed to save interview session: ${error.message}`);
+  return data as InterviewSessionRow;
 }
