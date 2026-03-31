@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
 import { createClient } from "@/lib/supabase/client";
 import { getResumeById, listResumes } from "@/lib/api";
@@ -472,14 +473,7 @@ export default function ResumeBuilderPage() {
   return (
     <main className="min-h-screen bg-[#f8f8f6]">
       <SiteNavbar
-        rightSlot={
-          <Link
-            href="/contract"
-            className="rounded-md bg-navy-950 px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-          >
-            {t("nav_dashboard")}
-          </Link>
-        }
+        rightSlot={<UserMenu />}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">

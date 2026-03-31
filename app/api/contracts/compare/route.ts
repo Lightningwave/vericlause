@@ -11,8 +11,8 @@ import {
 import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
 import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 import { runComplianceCheck, complianceScore } from "@/lib/services/rag";
-import { buildCompareUserPrompt, COMPARE_SYSTEM_MESSAGE } from "@/lib/services/compare";
-import type { ExtractedContract, ContractComparison, EmployeeContext } from "@/lib/types";
+import { buildCompareUserPrompt, buildNormalizedComparison, COMPARE_SYSTEM_MESSAGE } from "@/lib/services/compare";
+import type { ExtractedContract, EmployeeContext } from "@/lib/types";
 
 function getOpenAI() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -89,26 +89,35 @@ export async function POST(req: NextRequest) {
       ]);
 
       const openai = getOpenAI();
+      const userPrompt = buildCompareUserPrompt(
+        verdictsA,
+        verdictsB,
+        docA.extracted as ExtractedContract,
+        docB.extracted as ExtractedContract,
+      );
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         temperature: 0.2,
+        max_tokens: 8192,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: COMPARE_SYSTEM_MESSAGE },
-          { role: "user", content: buildCompareUserPrompt(verdictsA, verdictsB) },
+          { role: "user", content: userPrompt },
         ],
       });
 
       const raw = response.choices[0]?.message?.content ?? "{}";
       const parsed = JSON.parse(raw);
 
-      const result: ContractComparison = {
+      const result = buildNormalizedComparison({
         document_a_id,
         document_b_id,
-        key_terms: parsed.key_terms ?? [],
-        clauses: parsed.clauses ?? [],
-        summary: parsed.summary ?? "",
-      };
+        parsed,
+        verdictsA,
+        verdictsB,
+        extractedA: docA.extracted as ExtractedContract,
+        extractedB: docB.extracted as ExtractedContract,
+      });
 
       await updateComparisonJob(job.id, user.id, {
         status: "succeeded",

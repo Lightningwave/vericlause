@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { useConversation } from "@11labs/react";
+import type { InterviewScoreResult } from "@/lib/types";
 
 /** Fixed bar heights for speaking indicator (avoid Math.random on each render). */
 const SPEAKING_BAR_HEIGHTS_PX = [12, 20, 14, 18, 16];
@@ -43,6 +44,9 @@ function InterviewContent() {
     const [isIntermediate, setIsIntermediate] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [transcript, setTranscript] = useState<{ id: string; role: "user" | "agent"; text: string }[]>([]);
+    const [isScoring, setIsScoring] = useState(false);
+    const [scoreError, setScoreError] = useState<string | null>(null);
+    const [scoreResult, setScoreResult] = useState<InterviewScoreResult | null>(null);
     const transcriptLineIdRef = useRef(0);
     const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,6 +58,8 @@ function InterviewContent() {
             setLoading(false);
             setLastError(null);
             setIsIntermediate(false);
+            setScoreError(null);
+            setScoreResult(null);
         },
         onDisconnect: () => {
             setIsInterviewing(false);
@@ -139,9 +145,39 @@ function InterviewContent() {
         await conversation.endSession();
         setIsInterviewing(false);
         setTimeLeft(120);
+        setScoreError(null);
+        const transcriptPayload = transcript.map((line) => ({ role: line.role, text: line.text }));
+        if (transcriptPayload.length >= 2) {
+            try {
+                setIsScoring(true);
+                const res = await fetch("/api/interviews/score", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        interviewer: selectedInterviewer?.id ?? "alex",
+                        resume_id: resumeId,
+                        transcript: transcriptPayload,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Failed to score interview");
+                setScoreResult(data.score as InterviewScoreResult);
+            } catch (e: any) {
+                setScoreError(e.message || String(e));
+            } finally {
+                setIsScoring(false);
+            }
+        } else {
+            setScoreError("Not enough conversation to score yet. Try one full answer and end again.");
+        }
+    };
+
+    const resetPractice = () => {
         setSelectedInterviewer(null);
         transcriptLineIdRef.current = 0;
         setTranscript([]);
+        setScoreResult(null);
+        setScoreError(null);
     };
 
     const toggleMute = () => {
@@ -394,6 +430,74 @@ function InterviewContent() {
                             <div ref={transcriptEndRef} aria-hidden />
                         </div>
                     </section>
+
+                    {(isScoring || scoreResult || scoreError) && (
+                        <section className="rounded-2xl border border-white/[0.08] bg-[#16191c] p-4 md:col-span-2">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
+                                        Interview score
+                                    </p>
+                                    <p className="mt-1 text-sm text-white/70">
+                                        Evidence-backed AI feedback from this transcript.
+                                    </p>
+                                    {scoreResult?.confidence === "low" ? (
+                                        <p className="mt-1 text-xs text-amber-300/90">
+                                            Low confidence: this score is based on a short sample.
+                                        </p>
+                                    ) : null}
+                                </div>
+                                {scoreResult ? (
+                                    <div className="rounded-xl border border-[#b88a44]/40 bg-[#b88a44]/15 px-3 py-1.5 text-sm font-bold text-[#e8cc95]">
+                                        {scoreResult.overall_score}/100
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            {isScoring && (
+                                <div className="mt-4 flex items-center gap-3 text-sm text-white/70">
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#b88a44]" />
+                                    Scoring your interview…
+                                </div>
+                            )}
+
+                            {scoreError && !isScoring && (
+                                <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                                    {scoreError}
+                                </p>
+                            )}
+
+                            {scoreResult && !isScoring && (
+                                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-3">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Strengths</h3>
+                                        {scoreResult.strengths.map((s, i) => (
+                                            <p key={i} className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">{s}</p>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-3">
+                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Improve next</h3>
+                                        {scoreResult.improvements.map((s, i) => (
+                                            <p key={i} className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{s}</p>
+                                        ))}
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Summary</p>
+                                        <p className="mt-2 text-sm text-white/85">{scoreResult.summary}</p>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <button
+                                            type="button"
+                                            onClick={resetPractice}
+                                            className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
+                                        >
+                                            New practice
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    )}
                 </div>
             </main>
 
