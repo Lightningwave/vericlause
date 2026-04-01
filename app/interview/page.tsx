@@ -73,8 +73,9 @@ function InterviewContent() {
             setIsInterviewing(false);
             setLoading(false);
         },
-        onMessage: ({ role, message }) => {
+        onMessage: ({ source, message }: any) => {
             const id = `t-${++transcriptLineIdRef.current}`;
+            const role = source === "ai" ? "agent" : "user";
             setTranscript((prev) => [...prev, { id, role, text: message }]);
         },
     });
@@ -460,71 +461,90 @@ function InterviewContent() {
                     </section>
 
                     {(isScoring || scoreResult || scoreError) && (
-                        <section className="rounded-2xl border border-white/[0.08] bg-[#16191c] p-4 md:col-span-2">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div>
-                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-                                        Interview score
-                                    </p>
-                                    <p className="mt-1 text-sm text-white/70">
-                                        Evidence-backed AI feedback from this transcript.
-                                    </p>
-                                    {scoreResult?.confidence === "low" ? (
-                                        <p className="mt-1 text-xs text-amber-300/90">
-                                            Low confidence: this score is based on a short sample.
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-8 backdrop-blur-md sm:px-6">
+                            <section className="relative w-full max-w-3xl overflow-y-auto max-h-full rounded-3xl border border-white/10 bg-[#1e2124] p-6 shadow-2xl sm:p-8">
+                                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.06] pb-5">
+                                    <div>
+                                        <h2 className="text-xl font-bold tracking-tight text-white">Interview score</h2>
+                                        <p className="mt-1 text-sm text-white/50">
+                                            Evidence-backed AI feedback from this transcript.
                                         </p>
+                                        {scoreResult?.confidence === "low" ? (
+                                            <p className="mt-2 text-xs font-medium text-amber-400">
+                                                Low confidence: this score is based on a short sample.
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    {scoreResult ? (
+                                        <div className="flex shrink-0 h-16 w-16 items-center justify-center rounded-2xl border-[3px] border-[#b88a44]/40 bg-[#b88a44]/15 font-serif text-2xl font-bold text-[#e8cc95]">
+                                            {scoreResult.overall_score}
+                                        </div>
                                     ) : null}
                                 </div>
-                                {scoreResult ? (
-                                    <div className="rounded-xl border border-[#b88a44]/40 bg-[#b88a44]/15 px-3 py-1.5 text-sm font-bold text-[#e8cc95]">
-                                        {scoreResult.overall_score}/100
-                                    </div>
-                                ) : null}
-                            </div>
 
-                            {isScoring && (
-                                <div className="mt-4 flex items-center gap-3 text-sm text-white/70">
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#b88a44]" />
-                                    Scoring your interview…
-                                </div>
-                            )}
+                                {isScoring && (
+                                    <div className="mt-8 flex flex-col items-center justify-center gap-4 py-10">
+                                        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-white/10 border-t-[#b88a44]" />
+                                        <p className="text-sm font-medium text-white/70">Scoring your interview…</p>
+                                    </div>
+                                )}
 
-                            {scoreError && !isScoring && (
-                                <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                                    {scoreError}
-                                </p>
-                            )}
-
-                            {scoreResult && !isScoring && (
-                                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Strengths</h3>
-                                        {scoreResult.strengths.map((s, i) => (
-                                            <p key={i} className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">{s}</p>
-                                        ))}
-                                    </div>
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">Improve next</h3>
-                                        {scoreResult.improvements.map((s, i) => (
-                                            <p key={i} className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{s}</p>
-                                        ))}
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Summary</p>
-                                        <p className="mt-2 text-sm text-white/85">{scoreResult.summary}</p>
-                                    </div>
-                                    <div className="md:col-span-2">
+                                {scoreError && !isScoring && (
+                                    <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-center">
+                                        <p className="text-sm text-red-300">{scoreError}</p>
                                         <button
                                             type="button"
                                             onClick={resetPractice}
-                                            className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
+                                            className="mt-4 rounded-lg bg-red-500/20 px-4 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/30"
                                         >
-                                            New practice
+                                            Try again
                                         </button>
                                     </div>
-                                </div>
-                            )}
-                        </section>
+                                )}
+
+                                {scoreResult && !isScoring && (
+                                    <div className="mt-6 space-y-8">
+                                        <div className="grid gap-6 md:grid-cols-2">
+                                            <div className="space-y-4">
+                                                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-400">
+                                                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Strengths
+                                                </h3>
+                                                <div className="space-y-2">
+                                                    {scoreResult.strengths.map((s, i) => (
+                                                        <div key={i} className="rounded-xl border border-emerald-500/10 bg-emerald-500/5 p-4 text-sm leading-relaxed text-emerald-200/90">{s}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-amber-400">
+                                                    <span className="h-2 w-2 rounded-full bg-amber-500" /> Improve next
+                                                </h3>
+                                                <div className="space-y-2">
+                                                    {scoreResult.improvements.map((s, i) => (
+                                                        <div key={i} className="rounded-xl border border-amber-500/10 bg-amber-500/5 p-4 text-sm leading-relaxed text-amber-200/90">{s}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="rounded-2xl bg-white/[0.02] p-6">
+                                            <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">Summary</h3>
+                                            <p className="mt-3 text-sm leading-relaxed text-white/85">{scoreResult.summary}</p>
+                                        </div>
+
+                                        <div className="flex justify-end border-t border-white/[0.06] pt-6">
+                                            <button
+                                                type="button"
+                                                onClick={resetPractice}
+                                                className="rounded-xl bg-white text-navy-950 px-6 py-3 text-sm font-bold shadow-lg transition hover:bg-white/90"
+                                            >
+                                                Start new practice
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </section>
+                        </div>
                     )}
                 </div>
             </main>
