@@ -43,7 +43,11 @@ export async function uploadPdf(file: File): Promise<{
 export async function analyzeDocument(body: {
   document_id: string;
   employee_context?: import("./types").EmployeeContext;
-}): Promise<{ job_id: string; status: string; report?: import("./types").ComplianceReport }> {
+}): Promise<{
+  job_id: string;
+  status: string;
+  report?: import("./types").ComplianceReport;
+}> {
   const res = await fetch("/api/contracts/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -63,7 +67,6 @@ export async function getAnalyzeJob(jobId: string): Promise<{
     status: string;
     error: string | null;
     report_id: string | null;
-    /** 0–100 from analysis_jobs while running */
     progress?: number;
     stage?: string | null;
     created_at: string;
@@ -80,7 +83,9 @@ export async function getAnalyzeJob(jobId: string): Promise<{
   const res = await fetch(`/api/contracts/analyze/${encodeURIComponent(jobId)}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || res.statusText || "Failed to fetch analysis job");
+    throw new Error(
+      err.detail || res.statusText || "Failed to fetch analysis job",
+    );
   }
   return res.json();
 }
@@ -107,11 +112,18 @@ export async function translateVerdicts(
 export async function compareContracts(
   documentAId: string,
   documentBId: string,
-): Promise<{ job_id: string; status: string; result?: import("./types").ContractComparison }> {
+): Promise<{
+  job_id: string;
+  status: string;
+  result?: import("./types").ContractComparison;
+}> {
   const res = await fetch("/api/contracts/compare", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ document_a_id: documentAId, document_b_id: documentBId }),
+    body: JSON.stringify({
+      document_a_id: documentAId,
+      document_b_id: documentBId,
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -126,7 +138,9 @@ export async function getComparisonJob(jobId: string): Promise<{
   const res = await fetch(`/api/contracts/compare/${encodeURIComponent(jobId)}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || res.statusText || "Failed to fetch comparison job");
+    throw new Error(
+      err.detail || res.statusText || "Failed to fetch comparison job",
+    );
   }
   return res.json();
 }
@@ -137,6 +151,8 @@ export interface DocumentSummary {
   created_at: string;
   extracted: import("./types").ExtractedContract | null;
   latest_score: number | null;
+  compliance_score?: number | null;
+  job_title?: string | null;
 }
 
 export async function listDocuments(): Promise<DocumentSummary[]> {
@@ -164,9 +180,18 @@ export async function getDocumentWithReport(documentId: string): Promise<{
   return res.json();
 }
 
-export async function deleteDocumentById(documentId: string): Promise<boolean> {
-  const res = await fetch(`/api/contracts/${encodeURIComponent(documentId)}`, { method: "DELETE" });
+export async function deleteDocumentById(
+  documentId: string,
+): Promise<boolean> {
+  const res = await fetch(`/api/contracts/${encodeURIComponent(documentId)}`, {
+    method: "DELETE",
+  });
   return res.ok;
+}
+
+/** Backward-compatible export for DocumentList.tsx */
+export async function deleteDocument(documentId: string): Promise<boolean> {
+  return deleteDocumentById(documentId);
 }
 
 export async function benchmarkContract(body: {
@@ -233,7 +258,9 @@ export type UploadResumeResponse =
       profiling_error: string;
     };
 
-export async function uploadResume(file: File): Promise<UploadResumeResponse> {
+export async function uploadResume(
+  file: File,
+): Promise<UploadResumeResponse> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch("/api/resumes", {
@@ -258,87 +285,11 @@ export type ResumeSummary = {
 export async function listResumes(): Promise<{ resumes: ResumeSummary[] }> {
   const res = await fetch("/api/resumes");
   if (res.status === 401) {
-    throw new ApiUnauthorizedError();
-  }
-  if (!res.ok) {
     return { resumes: [] };
   }
-  return res.json();
-}
-
-export async function deleteResumeById(resumeId: string): Promise<boolean> {
-  const res = await fetch(`/api/resumes/${encodeURIComponent(resumeId)}`, { method: "DELETE" });
-  if (res.status === 401) {
-    throw new ApiUnauthorizedError();
-  }
-  return res.ok;
-}
-
-export async function profileResume(resume_id: string): Promise<{
-  job_id: string;
-  status: string;
-  profile?: import("./types").ResumeProfile;
-  suggestions?: import("./types").ResumeSuggestion[];
-}> {
-  const res = await fetch("/api/resumes/profile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ resume_id }),
-  });
-  if (res.status === 401) {
-    throw new ApiUnauthorizedError();
-  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || res.statusText || "Profiling failed");
-  }
-  return res.json();
-}
-
-export async function getProfileJob(jobId: string): Promise<{
-  job: {
-    id: string;
-    resume_id: string;
-    status: string;
-    error: string | null;
-  };
-  resume: {
-    id: string;
-    parsed_profile: import("./types").ResumeProfile | null;
-    ai_suggestions: import("./types").ResumeSuggestion[] | null;
-  } | null;
-}> {
-  const res = await fetch(`/api/resumes/profile/${jobId}`);
-  if (res.status === 401) {
-    throw new ApiUnauthorizedError();
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || res.statusText || "Failed to fetch profiling job");
-  }
-  return res.json();
-}
-
-export async function getResumeById(resumeId: string): Promise<{
-  resume: {
-    id: string;
-    file_name: string;
-    raw_text: string;
-    parsed_profile: import("./types").ResumeProfile | null;
-    ai_suggestions: import("./types").ResumeSuggestion[] | null;
-    created_at: string;
-  };
-} | null> {
-  const res = await fetch(`/api/resumes/${resumeId}`);
-  if (res.status === 401) {
-    throw new ApiUnauthorizedError();
-  }
-  if (res.status === 404) {
-    return null;
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail || res.statusText || "Failed to load resume");
+    throw new Error(err.detail || res.statusText || "Failed to load resumes");
   }
   return res.json();
 }

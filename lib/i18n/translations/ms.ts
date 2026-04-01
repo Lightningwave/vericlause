@@ -747,6 +747,83 @@ jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
   ai_keywords_missing: "Kata Kunci Tidak Ada",
   ai_career_progression: "Perkembangan Kerjaya",
   ai_salary_benchmark: "Penanda Aras Gaji",
+    nav_pricing: "Harga",
+
+  pricing_eyebrow: "Harga",
+  pricing_title: "Pelan fleksibel untuk semakan kontrak AI",
+  pricing_subtitle:
+    "Pilih pelan yang sesuai dengan kekerapan anda menyemak kontrak, membandingkan tawaran, dan menggunakan alat AI dalam aliran kerja anda.",
+  pricing_per_month: "/bulan",
+
+  pricing_free_title: "Percuma",
+  pricing_free_description:
+    "Sesuai untuk pengguna kali pertama yang ingin mencuba analisis kontrak sebelum naik taraf.",
+  pricing_free_feature_1: "Analisis 1 kontrak secara keseluruhan",
+  pricing_free_feature_2: "2 semakan AI sehari",
+  pricing_free_feature_3: "Pengesanan risiko klausa asas",
+  pricing_free_feature_4: "Akses papan pemuka standard",
+  pricing_free_feature_5: "Sokongan komuniti",
+  pricing_free_cta: "Mula Percuma",
+
+  pricing_pro_title: "Pro",
+  pricing_pro_description:
+    "Sesuai untuk pencari kerja aktif dan profesional yang menyemak kontrak dengan lebih kerap.",
+  pricing_pro_feature_1: "Analisis sehingga 10 kontrak sebulan",
+  pricing_pro_feature_2: "10 semakan AI sehari",
+  pricing_pro_feature_3: "Alat perbandingan kontrak",
+  pricing_pro_feature_4: "Pemprosesan AI keutamaan",
+  pricing_pro_feature_5: "Termasuk alat resume, pekerjaan, dan temu duga",
+  pricing_pro_feature_6: "Eksport laporan ringkasan",
+  pricing_pro_cta: "Mula Pro",
+
+  pricing_business_title: "Business",
+  pricing_business_description:
+    "Untuk pasukan HR, perekrut, perunding, dan pengguna berjumlah tinggi yang memerlukan lebih banyak penggunaan serta sokongan lebih pantas.",
+  pricing_business_feature_1: "Analisis sehingga 40 kontrak sebulan",
+  pricing_business_feature_2: "Semakan AI harian tanpa had",
+  pricing_business_feature_3: "Penanda aras dan perbandingan lanjutan",
+  pricing_business_feature_4: "Ruang kerja pasukan bersama",
+  pricing_business_feature_5: "Sokongan keutamaan",
+  pricing_business_cta: "Hubungi Jualan",
+
+  pricing_value_1_title: "Keputusan lebih pantas",
+  pricing_value_1_description:
+    "Semak klausa, bandingkan tawaran, dan fahami risiko utama tanpa proses manual yang panjang.",
+  pricing_value_2_title: "Dibina untuk kejelasan",
+  pricing_value_2_description:
+    "Dapatkan hasil yang tersusun, bahasa yang lebih mudah, dan langkah seterusnya yang lebih jelas.",
+  pricing_value_3_title: "Sesuai untuk pasukan juga",
+  pricing_value_3_description:
+    "Sesuai untuk pengguna individu hari ini dan boleh dikembangkan untuk perekrut, perunding, dan pasukan HR.",
+
+  pricing_guidance_eyebrow: "Panduan Pelan",
+  pricing_guidance_title: "Pilih pelan yang sesuai dengan aliran kerja anda",
+  pricing_guidance_description:
+    "Daripada penerangan harga yang panjang, bahagian ini membantu pengguna membuat keputusan dengan cepat.",
+  pricing_guidance_free:
+    "Terbaik untuk pengguna kali pertama yang ingin menguji satu kontrak sebenar sebelum membuat keputusan untuk naik taraf.",
+  pricing_guidance_pro:
+    "Terbaik untuk individu yang memerlukan sokongan AI berterusan merentasi kontrak, semakan resume, dan persediaan temu duga.",
+  pricing_guidance_business:
+    "Terbaik untuk perunding, perekrut, atau pasukan yang memerlukan penggunaan lebih tinggi, kolaborasi, dan sokongan.",
+
+  pricing_all_plans_title: "Termasuk dalam setiap pelan",
+  pricing_all_plans_1: "Aliran muat naik kontrak yang selamat",
+  pricing_all_plans_2: "Analisis klausa dibantu AI",
+  pricing_all_plans_3: "Pengalaman berasaskan kesimpulan yang jelas",
+  pricing_all_plans_4: "Akses kepada kemas kini produk teras",
+
+  pricing_faq_eyebrow: "Soalan Lazim",
+  pricing_faq_title: "Soalan yang mungkin ditanya pengguna",
+  pricing_faq_q1: "Bolehkah saya tukar pelan kemudian?",
+  pricing_faq_a1:
+    "Ya. Anda boleh bermula dengan pelan percuma dan naik taraf kemudian apabila anda memerlukan lebih banyak analisis kontrak atau lebih banyak penggunaan AI harian.",
+  pricing_faq_q2: "Mengapa letakkan Pro pada S$9/bulan?",
+  pricing_faq_a2:
+    "Bagi pengguna tetap, Pro ialah pilihan paling seimbang kerana ia menawarkan lebih banyak penggunaan, lebih banyak alat, dan pengalaman yang lebih lancar tanpa mencapai harga tahap pasukan.",
+  pricing_faq_q3: "Business sesuai untuk siapa?",
+  pricing_faq_a3:
+    "Business sesuai untuk perekrut, perunding, pasukan HR, atau mana-mana pengguna berkekerapan tinggi yang memerlukan kuota lebih besar, kolaborasi, dan sokongan lebih pantas.",
 };
 
 export default ms;
