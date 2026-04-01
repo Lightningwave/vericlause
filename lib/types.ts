@@ -52,12 +52,12 @@ export interface ComplianceReport {
 
 export interface ResumeSuggestion {
   type:
-    | "critical_fix"
-    | "enhancement"
-    | "design_feedback"
-    | "content_gap"
-    | "impact_opportunity"
-    | "ats_optimization";
+  | "critical_fix"
+  | "enhancement"
+  | "design_feedback"
+  | "content_gap"
+  | "impact_opportunity"
+  | "ats_optimization";
   priority: "high" | "medium" | "low";
   category: "formatting" | "content" | "structure" | "keywords" | "impact";
   suggestion: string;
@@ -151,12 +151,12 @@ export interface InterviewTranscriptLine {
 
 export interface InterviewScoreDimension {
   key:
-    | "clarity_communication"
-    | "role_relevance"
-    | "technical_or_leadership_depth"
-    | "problem_solving_examples"
-    | "structure_conciseness"
-    | "confidence_presence";
+  | "clarity_communication"
+  | "role_relevance"
+  | "technical_or_leadership_depth"
+  | "problem_solving_examples"
+  | "structure_conciseness"
+  | "confidence_presence";
   label: string;
   score: number; // 0-10
   reason: string;

@@ -163,7 +163,7 @@ function toCanonicalTopic(value: string | null | undefined): string {
   if (!raw || raw === "n/a") return "other_terms";
 
   const t = raw;
-  if (t.includes("position") || t.includes("duty") || t.includes("duties") || t.includes("role") || t.includes("scope")) {
+  if (t.includes("position") || t.includes("duty") || t.includes("duties") || t.includes("role") || t.includes("scope") || t.includes("responsibilities") || t.includes("job title")) {
     return "position_and_duties";
   }
   if (t.includes("probation") || t.includes("commencement") || t.includes("start date") || t.includes("confirmation")) {
@@ -172,7 +172,7 @@ function toCanonicalTopic(value: string | null | undefined): string {
   if (t.includes("salary") || t.includes("remuneration") || (t.includes("pay") && !t.includes("overtime")) || t.includes("cpf") || t.includes("allowance")) {
     return "salary_and_benefits";
   }
-  if (t.includes("working hours") || t.includes("work hours") || t.includes("working arrangements") || t.includes("hybrid") || t.includes("remote") || t.includes("working conditions")) {
+  if (t.includes("working hours") || t.includes("work hours") || t.includes("working arrangements") || t.includes("hybrid") || t.includes("remote") || t.includes("working conditions") || t.includes("work location") || t.includes("place of work") || t.includes("workplace")) {
     return "working_conditions";
   }
   if (t.includes("leave") || t.includes("sick") || t.includes("hospitalisation") || t.includes("medical")) {
@@ -181,19 +181,19 @@ function toCanonicalTopic(value: string | null | undefined): string {
   if (t.includes("termination") || t.includes("notice") || t.includes("dismissal") || t.includes("resignation")) {
     return "termination_and_notice";
   }
-  if (t.includes("confidentiality") || t.includes("disclosure") || t.includes("nda") || t.includes("intellectual property") || t.includes("ip")) {
+  if (t.includes("confidentiality") || t.includes("disclosure") || t.includes("nda") || t.includes("intellectual property") || t.includes("ip") || t.includes("data protection") || t.includes("privacy")) {
     return "confidentiality_and_ip";
   }
-  if (t.includes("non-compete") || t.includes("restrictive") || t.includes("non compete") || t.includes("solicitation")) {
+  if (t.includes("non compete") || t.includes("restrictive") || t.includes("non compete") || t.includes("solicitation")) {
     return "restrictive_clauses";
   }
-  if (t.includes("governing law") || t.includes("dispute") || t.includes("jurisdiction") || t.includes("mediation") || t.includes("arbitration")) {
+  if (t.includes("governing law") || t.includes("dispute") || t.includes("jurisdiction") || t.includes("mediation") || t.includes("arbitration") || t.includes("miscellaneous") || t.includes("provisions") || t.includes("acknowledgement")) {
     return "governance_and_disputes";
   }
   if (t.includes("key employment terms") || t.includes("ket")) {
     return "kets_completeness";
   }
-  if (t.includes("entire agreement") || t.includes("variation") || t.includes("amendment") || t.includes("governance")) {
+  if (t.includes("entire agreement") || t.includes("variation") || t.includes("amendment") || t.includes("governance") || t.includes("policies")) {
     return "governance_and_disputes";
   }
 
@@ -503,20 +503,20 @@ export function buildNormalizedComparison(
 
   const rawModelTerms = Array.isArray(parsed?.key_terms)
     ? parsed.key_terms
-        .map(parseModelKeyTerm)
-        .filter((item: KeyTermComparison | null): item is KeyTermComparison => !!item)
+      .map(parseModelKeyTerm)
+      .filter((item: KeyTermComparison | null): item is KeyTermComparison => !!item)
     : [];
   const modelTerms = withKeyTermFallbacks(rawModelTerms, extractedA, extractedB, verdictsA, verdictsB);
   const rawCanonical = Array.isArray(parsed?.canonical_terms)
     ? parsed.canonical_terms
-        .map(parseModelCanonicalTerm)
-        .filter((item: CanonicalTermComparison | null): item is CanonicalTermComparison => !!item)
+      .map(parseModelCanonicalTerm)
+      .filter((item: CanonicalTermComparison | null): item is CanonicalTermComparison => !!item)
     : [];
   const canonicalTerms = buildCanonicalTerms(rawCanonical, extractedA, extractedB, verdictsA, verdictsB);
   const modelClauses = Array.isArray(parsed?.clauses)
     ? parsed.clauses
-        .map(parseModelClause)
-        .filter((item: ClauseComparison | null): item is ClauseComparison => !!item)
+      .map(parseModelClause)
+      .filter((item: ClauseComparison | null): item is ClauseComparison => !!item)
     : [];
 
   const clauseByTopic = new Map<string, ClauseComparison>();
@@ -535,7 +535,7 @@ export function buildNormalizedComparison(
     existing.contract_b_value = existing.contract_b_value ?? clause.contract_b_value;
     existing.verdict_a = existing.verdict_a ?? clause.verdict_a;
     existing.verdict_b = existing.verdict_b ?? clause.verdict_b;
-    
+
     // Update assessment if we just filled a gap
     if (existing.contract_a_value && existing.contract_b_value) {
       existing.assessment = existing.contract_a_value === existing.contract_b_value ? "equal" : "different";

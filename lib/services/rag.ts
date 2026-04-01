@@ -10,13 +10,13 @@ import type {
 const INDEX_NAME = process.env.PINECONE_INDEX || "vericlause-laws";
 const NAMESPACE = "employment_act";
 const TOP_K = 6;
-const MAX_AGENT_ITERATIONS = 8;
+const MAX_AGENT_ITERATIONS = 4;
 const OPENAI_MODEL = "gpt-4o-mini";
 const GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant";
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
-const CONCURRENCY = 4;
-const MAX_CLAUSES_DEFAULT = 40;
+const CONCURRENCY = 8;
+const MAX_CLAUSES_DEFAULT = 50;
 const MAX_CLAUSE_CHARS_DEFAULT = 6000;
 
 // ---------------------------------------------------------------------------

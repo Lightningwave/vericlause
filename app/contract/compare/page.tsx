@@ -213,7 +213,7 @@ export default function ComparePage() {
 
     try {
       const response = await compareContracts(slotA.documentId, slotB.documentId);
-      
+
       if (response.status === "succeeded" && response.result) {
         setComparison(response.result);
         setCompareState("ready");
@@ -322,11 +322,10 @@ export default function ComparePage() {
               disabled={
                 !slotA.documentId || !slotB.documentId || compareState === "comparing"
               }
-              className={`inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition ${
-                slotA.documentId && slotB.documentId && compareState !== "comparing"
+              className={`inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition ${slotA.documentId && slotB.documentId && compareState !== "comparing"
                   ? "bg-navy-950 text-white hover:bg-navy-900"
                   : "cursor-not-allowed bg-slate-200 text-slate-500"
-              }`}
+                }`}
             >
               {compareState === "comparing" ? t("compare_button_comparing") : t("compare_button_run")}
             </button>
@@ -376,11 +375,10 @@ export default function ComparePage() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`rounded-xl px-3 py-2 text-xs font-medium transition ${
-                    activeTab === tab
+                  className={`rounded-xl px-3 py-2 text-xs font-medium transition ${activeTab === tab
                       ? "bg-navy-950 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   {tab === "summary"
                     ? t("compare_tab_summary")
