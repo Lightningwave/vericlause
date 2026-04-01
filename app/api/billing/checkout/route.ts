@@ -10,7 +10,7 @@ if (!stripeSecretKey) {
 
 const stripe = stripeSecretKey
   ? new Stripe(stripeSecretKey, {
-      apiVersion: "2025-02-24.acacia",
+      apiVersion: "2025-08-27.basil",
     })
   : null;
 
@@ -21,6 +21,21 @@ const PLAN_CONFIG = {
     amount: 900,
   },
 } as const;
+
+function getStripeLocale(locale?: string): Stripe.Checkout.SessionCreateParams.Locale {
+  switch (locale) {
+    case "en":
+      return "en";
+    case "zh":
+      return "zh";
+    case "ms":
+      return "ms";
+    case "ta":
+      return "auto";
+    default:
+      return "auto";
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -39,22 +54,20 @@ export async function POST(request: Request) {
     const selectedPlan = body.plan || "pro";
 
     if (!(selectedPlan in PLAN_CONFIG)) {
-      return NextResponse.json({ error: "Invalid plan selected." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid plan selected." },
+        { status: 400 },
+      );
     }
 
     const plan = PLAN_CONFIG[selectedPlan];
+    const stripeLocale = getStripeLocale(body.locale);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/checkout/cancel`,
-      locale:
-        body.locale === "en" ||
-        body.locale === "zh" ||
-        body.locale === "ms" ||
-        body.locale === "ta"
-          ? body.locale
-          : "en",
+      locale: stripeLocale,
       line_items: [
         {
           quantity: 1,
