@@ -234,3 +234,30 @@ create policy "Users can delete their own resumes"
     bucket_id = 'resumes'
     and auth.uid()::text = (storage.foldername(name))[1]
   );
+
+-- 6. Interview sessions (transcript + AI scoring)
+create table if not exists public.interview_sessions (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  resume_id     uuid references public.resumes(id) on delete set null,
+  interviewer   text not null check (interviewer in ('alex','sophia')),
+  transcript    jsonb not null default '[]', -- InterviewTranscriptLine[]
+  score         jsonb not null,              -- InterviewScoreResult
+  overall_score integer not null default 0,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.interview_sessions enable row level security;
+
+drop policy if exists "Users can insert their own interview sessions" on public.interview_sessions;
+create policy "Users can insert their own interview sessions"
+  on public.interview_sessions for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can view their own interview sessions" on public.interview_sessions;
+create policy "Users can view their own interview sessions"
+  on public.interview_sessions for select
+  using (auth.uid() = user_id);
+
+create index if not exists idx_interview_sessions_user_id on public.interview_sessions(user_id);
+create index if not exists idx_interview_sessions_resume_id on public.interview_sessions(resume_id);
