@@ -286,7 +286,7 @@ export default function ContractPage() {
           return;
         }
 
-        const deadline = Date.now() + 180_000;
+        const deadline = Date.now() + 300_000;
         while (Date.now() < deadline) {
           const { job } = await getAnalyzeJob(started.job_id);
           setAnalysisJobProgress(typeof job.progress === "number" ? job.progress : 0);
