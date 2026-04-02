@@ -4,6 +4,7 @@ import { safeNextPath } from "@/lib/auth/safe-next-path";
 
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/") return true;
+  if (pathname.startsWith("/pricing")) return true;
   if (pathname.startsWith("/auth/sign-in")) return true;
   if (pathname.startsWith("/auth/sign-up")) return true;
   if (pathname.startsWith("/auth/callback")) return true;

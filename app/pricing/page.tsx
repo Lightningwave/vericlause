@@ -290,6 +290,11 @@ export default function PricingPage() {
 
       const data = (await response.json()) as { url?: string; error?: string };
 
+      if (response.status === 401) {
+        window.location.href = "/auth/sign-in?next=/pricing";
+        return;
+      }
+
       if (!response.ok || !data.url) {
         throw new Error(data.error || "Unable to create checkout session.");
       }
