@@ -297,13 +297,13 @@ ${effectiveTargetRole ?? "null"}
 ${seedQuestionsText}
   `.trim();
 
-  const firstQuestion =
-    personaQuestions[0] ??
-    `Could you briefly introduce yourself and your most relevant experience for ${
-      effectiveTargetRole ?? "this role"
-    }?`;
+  const headlineHint =
+    safeString(parsedProfile.headline) ?? effectiveTargetRole ?? "your background";
 
-  const firstMessage = `Hi — I'm ${interviewer.name}. ${firstQuestion}`;
+  const firstMessage =
+    interviewerId === "sophia"
+      ? `Hi — I'm ${interviewer.name}. I’ve had a chance to look at your background around ${headlineHint}. Whenever you’re ready, tell me a bit about yourself and what you’re aiming for next.`
+      : `Hi — I'm ${interviewer.name}. I’ve skimmed your profile around ${headlineHint}; we’ll keep this efficient. When you’re ready, give me a quick intro and what role you’re targeting.`;
 
   return NextResponse.json({
     agent_id: agentId,
