@@ -3,7 +3,8 @@ export type PlanKey = "free" | "pro" | "business";
 export type PlanLimits = {
   fullContractAnalysesLifetime?: number | null;
   fullContractAnalysesPerMonth?: number | null;
-  aiReviewsPerDay?: number | null;
+  resumeReviewsPerWeek?: number | null;
+  resumeReviewsPerMonth?: number | null;
 };
 
 export type PlanFeatures = {
@@ -32,13 +33,13 @@ export const PLAN_DEFINITIONS: Record<
     displayName: "Free",
     limits: {
       fullContractAnalysesLifetime: 1,
-      aiReviewsPerDay: 2,
+      resumeReviewsPerWeek: 2,
     },
     features: {
       contractComparison: false,
-      verdictTranslation: false,
+      verdictTranslation: true,
       resumeImprove: false,
-      voiceResume: false,
+      voiceResume: true,
       interviewPractice: false,
       prioritySupport: false,
       exportReports: false,
@@ -52,7 +53,7 @@ export const PLAN_DEFINITIONS: Record<
     displayName: "Pro",
     limits: {
       fullContractAnalysesPerMonth: 10,
-      aiReviewsPerDay: 10,
+      resumeReviewsPerMonth: 20,
     },
     features: {
       contractComparison: true,
@@ -71,13 +72,14 @@ export const PLAN_DEFINITIONS: Record<
     key: "business",
     displayName: "Business",
     limits: {
-      fullContractAnalysesPerMonth: 40,
-      aiReviewsPerDay: null,
+      fullContractAnalysesPerMonth: null,
+      resumeReviewsPerMonth: null,
     },
     features: {
       contractComparison: true,
       verdictTranslation: true,
-      resumeImprove: true,
+      // AI suggestions (Apply AI Suggestions) should be Pro-only.
+      resumeImprove: false,
       voiceResume: true,
       interviewPractice: true,
       prioritySupport: true,

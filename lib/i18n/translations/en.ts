@@ -757,9 +757,9 @@ jobs_continue_interview: "Continue to Interview Prep",
 
   pricing_free_title: "Free",
   pricing_free_description:
-    "Try VeriClause for free with either one full contract analysis or up to 5 minutes of AI interview practice, plus daily resume tools.",
-  pricing_free_feature_1: "1 full contract analysis or up to 5 minutes of AI interview practice",
-  pricing_free_feature_2: "2 AI reviews per day",
+    "Try VeriClause for free with 1 full contract analysis (lifetime) and 2 AI resume reviews per week.",
+  pricing_free_feature_1: "1 full contract analysis (lifetime)",
+  pricing_free_feature_2: "2 AI resume reviews per week",
   pricing_free_feature_3: "Basic clause risk detection",
   pricing_free_feature_4: "Standard dashboard access",
   pricing_free_feature_5: "Community support",
@@ -767,10 +767,10 @@ jobs_continue_interview: "Continue to Interview Prep",
 
   pricing_pro_title: "Pro",
   pricing_pro_description:
-    "Best for active job seekers and professionals who split time between contracts and interview practice.",
+    "Best for active job seekers and professionals who want up to 10 contract analyses per month, plus full interview practice.",
   pricing_pro_feature_1:
-    "Up to 10 full contract analyses or AI interview sessions per month (shared quota)",
-  pricing_pro_feature_2: "10 AI resume reviews per day",
+    "Up to 10 full contract analyses per month",
+  pricing_pro_feature_2: "20 AI resume reviews per month",
   pricing_pro_feature_3: "Contract comparison tools",
   pricing_pro_feature_4: "Priority AI processing",
   pricing_pro_feature_5: "Resume, job discovery, and interview tools included",
@@ -779,10 +779,10 @@ jobs_continue_interview: "Continue to Interview Prep",
 
   pricing_business_title: "Business",
   pricing_business_description:
-    "For HR teams, recruiters, and consultants who need a higher shared quota for contracts and interviews.",
+    "For teams who want unlimited contract analyses, full interview practice, and unlimited AI resume reviews.",
   pricing_business_feature_1:
-    "Up to 40 full contract analyses or AI interview sessions per month (shared quota)",
-  pricing_business_feature_2: "Unlimited daily AI resume reviews",
+    "Unlimited full contract analyses",
+  pricing_business_feature_2: "Unlimited AI resume reviews",
   pricing_business_feature_3: "Advanced benchmarking and comparison",
   pricing_business_feature_4: "Shared team workspace",
   pricing_business_feature_5: "Priority support",
@@ -803,11 +803,11 @@ jobs_continue_interview: "Continue to Interview Prep",
   pricing_guidance_description:
     "Instead of a long pricing explanation, this section helps users quickly decide which plan suits them best.",
   pricing_guidance_free:
-    "Best when you want to sample the product using either one contract analysis or a short AI interview session before upgrading.",
+    "Best when you want to sample contract analysis (1 lifetime) and limited resume reviews before upgrading.",
   pricing_guidance_pro:
-    "Best when you use both contract review and AI interview practice regularly—the monthly cap applies to those together.",
+    "Best when you want regular contract analyses with a monthly cap, plus full interview practice.",
   pricing_guidance_business:
-    "Best for higher-volume teams that need a larger monthly pool for contract analyses and interview sessions combined.",
+    "Best for higher-volume teams that need unlimited contract analyses and full interview practice.",
 
   pricing_all_plans_title: "Included in every plan",
   pricing_all_plans_1: "Secure contract upload flow",
@@ -819,7 +819,7 @@ jobs_continue_interview: "Continue to Interview Prep",
   pricing_faq_title: "Questions users may ask",
   pricing_faq_q1: "Can I switch plans later?",
   pricing_faq_a1:
-    "Yes. Start on Free, then move to Pro or Business when you need a higher monthly pool. On paid plans, full contract analyses and AI interview sessions draw from the same monthly quota; resume reviews use separate daily limits.",
+    "Yes. Start on Free for 1 contract analysis (lifetime) and 2 resume reviews per week. Upgrade to Pro for up to 10 contract analyses per month and 20 resume reviews per month. Business is unlimited.",
   pricing_faq_q2: "Why position Pro at S$9/month?",
   pricing_faq_a2:
     "For regular users, Pro is the most balanced option because it offers more usage, more tools, and a smoother experience without reaching team-level pricing.",

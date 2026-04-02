@@ -8,7 +8,6 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { useConversation } from "@11labs/react";
 import { useLanguage } from "@/components/providers/language-provider";
 import { usePlan } from "@/hooks/use-plan";
-import { useUsage } from "@/hooks/use-usage";
 import type { InterviewScoreResult } from "@/lib/types";
 
 
@@ -42,6 +41,8 @@ const INTERVIEW_COPY = {
     title: "Choose your interviewer",
     subtitle:
       "Pick a style that matches how you want to rehearse. Each host uses a different focus and question style — both use your resume for context.",
+    pickGuide:
+      "How to choose: Alex asks direct, technical, problem-solving questions. Sophia asks warm behavioral questions focused on leadership, collaboration, and motivation.",
     alexRole: "Hiring Manager",
     alexDescription:
       "Direct, practical, and focuses on your technical expertise.",
@@ -79,7 +80,7 @@ const INTERVIEW_COPY = {
     wrapUp: "Wrap up",
     endSession: "End session",
     footerHint:
-      "2-minute practice timer · Allow microphone when prompted",
+      "5-minute practice timer · Allow microphone when prompted",
     notEnough:
       "Not enough conversation to score yet. Try one full answer and end again.",
     createResume: "Create or Upload Resume",
@@ -89,6 +90,8 @@ const INTERVIEW_COPY = {
     title: "选择你的面试官",
     subtitle:
       "选择适合你练习方式的风格。每位主持人都有不同的提问重点和风格，但都会基于你的简历进行提问。",
+    pickGuide:
+      "如何选择：选择 Alex 获取更直接的技术与问题解决类问题；选择 Sophia 获取更温暖的行为面试问题，重点在领导力、协作与动机。",
     alexRole: "招聘经理",
     alexDescription: "直接、务实，重点考察你的技术能力与执行能力。",
     sophiaRole: "高级招聘主管",
@@ -122,7 +125,7 @@ const INTERVIEW_COPY = {
     unmuteTitle: "取消静音（仅界面显示）",
     wrapUp: "结束总结",
     endSession: "结束会话",
-    footerHint: "2 分钟练习计时器 · 出现提示时请允许麦克风权限",
+    footerHint: "5 分钟练习计时器 · 出现提示时请允许麦克风权限",
     notEnough:
       "当前对话内容不足以评分。请至少完成一次完整回答后再结束。",
     createResume: "创建或上传简历",
@@ -132,6 +135,8 @@ const INTERVIEW_COPY = {
     title: "Pilih penemu duga anda",
     subtitle:
       "Pilih gaya yang paling sesuai dengan cara anda mahu berlatih. Setiap hos mempunyai fokus dan gaya soalan yang berbeza — kedua-duanya menggunakan resume anda sebagai konteks.",
+    pickGuide:
+      "Cara memilih: Pilih Alex untuk soalan teknikal dan penyelesaian masalah secara langsung. Pilih Sophia untuk soalan tingkah laku yang mesra, fokus pada kepimpinan, kerjasama dan motivasi.",
     alexRole: "Pengurus Pengambilan",
     alexDescription:
       "Terus, praktikal, dan memfokus pada kepakaran teknikal anda.",
@@ -169,7 +174,7 @@ const INTERVIEW_COPY = {
     unmuteTitle: "Buka senyap (paparan sahaja)",
     wrapUp: "Tamatkan",
     endSession: "Tamatkan sesi",
-    footerHint: "Pemasa latihan 2 minit · Benarkan mikrofon apabila diminta",
+    footerHint: "Pemasa latihan 5 minit · Benarkan mikrofon apabila diminta",
     notEnough:
       "Perbualan belum cukup untuk dinilai. Cuba beri satu jawapan penuh dan tamatkan semula.",
     createResume: "Cipta atau muat naik resume",
@@ -179,6 +184,8 @@ const INTERVIEW_COPY = {
     title: "உங்கள் நேர்முக அதிகாரியைத் தேர்வு செய்யுங்கள்",
     subtitle:
       "நீங்கள் எப்படிப் பயிற்சி செய்ய விரும்புகிறீர்களோ அதற்கேற்ற முறையைத் தேர்ந்தெடுக்கவும். ஒவ்வொரு ஹோஸ்டும் வேறுபட்ட கேள்வி முறை மற்றும் கவனத்தை கொண்டிருப்பார் — இருவரும் உங்கள் ரெஸ்யூமேயை அடிப்படையாகக் கொள்வார்கள்.",
+    pickGuide:
+      "எப்படி தேர்வு செய்வது: Alex நேரடியாக தொழில்நுட்பம் மற்றும் பிரச்சினைத் தீர்வு கேள்விகள் கேட்கும். Sophia நட்பு/நடத்தை சார்ந்த கேள்விகள் கேட்கும்; கவனம் தலைமை, ஒத்துழைப்பு மற்றும் ஊக்கம் மீது.",
     alexRole: "நியமன மேலாளர்",
     alexDescription:
       "நேரடி, நடைமுறை சார்ந்த, உங்கள் தொழில்நுட்ப திறனை மையமாகக் கொண்டவர்.",
@@ -217,7 +224,7 @@ const INTERVIEW_COPY = {
     wrapUp: "முடிக்கவும்",
     endSession: "அமர்வை முடி",
     footerHint:
-      "2 நிமிடப் பயிற்சி டைமர் · கேட்கப்பட்டால் மைக்ரோஃபோனுக்கு அனுமதி வழங்கவும்",
+      "5 நிமிடப் பயிற்சி டைமர் · கேட்கப்பட்டால் மைக்ரோஃபோனுக்கு அனுமதி வழங்கவும்",
     notEnough:
       "மதிப்பிட உரையாடல் போதவில்லை. ஒரு முழு பதிலை வழங்கி மீண்டும் முடிக்கவும்.",
     createResume: "ரெஸ்யூமே உருவாக்க அல்லது பதிவேற்றம் செய்யவும்",
@@ -230,10 +237,6 @@ function InterviewContent() {
   const { locale } = useLanguage();
   const resumeId = searchParams.get("resume_id");
   const { hasFeature, loading: planLoading } = usePlan();
-  const { usage } = useUsage();
-  
-  const contractUsage = usage?.contracts;
-  const isLimitReached = contractUsage?.limit != null && contractUsage.used >= contractUsage.limit;
   const canPractice = hasFeature("interviewPractice");
 
   const copy =
@@ -255,7 +258,10 @@ function InterviewContent() {
   >(null);
   const [isInterviewing, setIsInterviewing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(120);
+  const [timeLeft, setTimeLeft] = useState(300);
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">(
+    "medium",
+  );
   const [lastError, setLastError] = useState<string | null>(null);
   const [isIntermediate, setIsIntermediate] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -283,7 +289,7 @@ function InterviewContent() {
     },
     onDisconnect: () => {
       setIsInterviewing(false);
-      setTimeLeft(120);
+      setTimeLeft(300);
       setLoading(false);
       setIsIntermediate(false);
     },
@@ -355,6 +361,7 @@ function InterviewContent() {
       const url = new URL("/api/interviews/session", window.location.origin);
       if (resumeId) url.searchParams.set("resume_id", resumeId);
       url.searchParams.set("interviewer", selectedInterviewer.id);
+      url.searchParams.set("difficulty", difficulty);
 
       const res = await fetch(url.toString());
       const data = (await res.json()) as {
@@ -362,15 +369,13 @@ function InterviewContent() {
         agent_id: string;
         dynamic_instructions: string;
         first_message: string;
-        use_voice_override?: boolean;
-        voice_id?: string;
       };
 
       if (!res.ok) {
         throw new Error(data.detail || "Failed to fetch session config");
       }
 
-      setTimeLeft(120);
+      setTimeLeft(300);
       setIsIntermediate(true);
 
       await conversation.startSession({
@@ -382,9 +387,6 @@ function InterviewContent() {
               prompt: data.dynamic_instructions,
             },
             firstMessage: data.first_message,
-          },
-          tts: {
-            ...(data.use_voice_override ? { voiceId: data.voice_id } : {}),
           },
         },
       });
@@ -401,7 +403,7 @@ function InterviewContent() {
   const stopInterview = async () => {
     await conversation.endSession();
     setIsInterviewing(false);
-    setTimeLeft(120);
+    setTimeLeft(300);
     setScoreError(null);
 
     const transcriptPayload = transcript.map((line) => ({
@@ -466,29 +468,56 @@ function InterviewContent() {
             <p className="mt-4 text-lg leading-relaxed text-slate-600">
               {copy.subtitle}
             </p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-500">
+              {copy.pickGuide}
+            </p>
           </header>
 
-          {isLimitReached ? (
-            <div className="mb-8 rounded-[20px] border border-amber-200 bg-amber-50 px-6 py-5">
-               <h3 className="text-sm font-semibold text-amber-900">
-                  You have reached your contract analysis limit.
-               </h3>
-               <p className="mt-1 text-sm text-amber-700">
-                  Because interviews share the same tier quotas, please upgrade your plan via the profile dashboard to start more interviews.
-               </p>
+          <div className="mb-10 flex flex-wrap items-center gap-3">
+            <div className="text-sm font-semibold text-slate-700">
+              Difficulty
             </div>
-          ) : null}
+            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+              {(
+                [
+                  { key: "easy", label: "Easy" },
+                  { key: "medium", label: "Medium" },
+                  { key: "hard", label: "Hard" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setDifficulty(opt.key)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    difficulty === opt.key
+                      ? "bg-navy-950 text-white"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="text-xs text-slate-500">
+              Hard asks for more specifics and trade-offs; easy is more guided.
+            </div>
+          </div>
 
           <div className="grid gap-6 md:grid-cols-2 md:gap-8">
             {interviewers.map((person) => (
               <button
                 key={person.id}
                 type="button"
-                disabled={isLimitReached}
+                disabled={!canPractice}
                 onClick={() => {
-                  if (!isLimitReached) setSelectedInterviewer(person);
+                  if (canPractice) setSelectedInterviewer(person);
                 }}
-                className={`group relative rounded-2xl border border-slate-200 bg-white p-8 text-left transition-all ${isLimitReached ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-0.5 hover:border-navy-950 hover:shadow-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950'}`}
+                className={`group relative rounded-2xl border border-slate-200 bg-white p-8 text-left transition-all ${
+                  !canPractice
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:-translate-y-0.5 hover:border-navy-950 hover:shadow-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950"
+                }`}
               >
                 <div className="mb-6 flex items-start gap-5">
                   <div
@@ -788,89 +817,91 @@ function InterviewContent() {
           </section>
 
           {(isScoring || scoreResult || scoreError) && (
-            <section className="rounded-2xl border border-white/[0.08] bg-[#16191c] p-4 md:col-span-2">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-                    {copy.interviewScore}
-                  </p>
-                  <p className="mt-1 text-sm text-white/70">
-                    {copy.interviewScoreDesc}
-                  </p>
-                  {scoreResult?.confidence === "low" ? (
-                    <p className="mt-1 text-xs text-amber-300/90">
-                      {copy.lowConfidence}
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6">
+              <section className="w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#16191c] p-4 md:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
+                      {copy.interviewScore}
                     </p>
+                    <p className="mt-1 text-sm text-white/70">
+                      {copy.interviewScoreDesc}
+                    </p>
+                    {scoreResult?.confidence === "low" ? (
+                      <p className="mt-1 text-xs text-amber-300/90">
+                        {copy.lowConfidence}
+                      </p>
+                    ) : null}
+                  </div>
+                  {scoreResult ? (
+                    <div className="rounded-xl border border-[#b88a44]/40 bg-[#b88a44]/15 px-3 py-1.5 text-sm font-bold text-[#e8cc95]">
+                      {scoreResult.overall_score}/100
+                    </div>
                   ) : null}
                 </div>
-                {scoreResult ? (
-                  <div className="rounded-xl border border-[#b88a44]/40 bg-[#b88a44]/15 px-3 py-1.5 text-sm font-bold text-[#e8cc95]">
-                    {scoreResult.overall_score}/100
+
+                {isScoring && (
+                  <div className="mt-4 flex items-center gap-3 text-sm text-white/70">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#b88a44]" />
+                    {copy.scoring}
                   </div>
-                ) : null}
-              </div>
+                )}
 
-              {isScoring && (
-                <div className="mt-4 flex items-center gap-3 text-sm text-white/70">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#b88a44]" />
-                  {copy.scoring}
-                </div>
-              )}
+                {scoreError && !isScoring && (
+                  <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                    {scoreError}
+                  </p>
+                )}
 
-              {scoreError && !isScoring && (
-                <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                  {scoreError}
-                </p>
-              )}
-
-              {scoreResult && !isScoring && (
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">
-                      {copy.strengths}
-                    </h3>
-                    {scoreResult.strengths.map((s, i) => (
-                      <p
-                        key={i}
-                        className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
-                      >
-                        {s}
+                {scoreResult && !isScoring && (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                        {copy.strengths}
+                      </h3>
+                      {scoreResult.strengths.map((s, i) => (
+                        <p
+                          key={i}
+                          className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200"
+                        >
+                          {s}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                        {copy.improveNext}
+                      </h3>
+                      {scoreResult.improvements.map((s, i) => (
+                        <p
+                          key={i}
+                          className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
+                        >
+                          {s}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                        {copy.summary}
                       </p>
-                    ))}
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">
-                      {copy.improveNext}
-                    </h3>
-                    {scoreResult.improvements.map((s, i) => (
-                      <p
-                        key={i}
-                        className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200"
-                      >
-                        {s}
+                      <p className="mt-2 text-sm text-white/85">
+                        {scoreResult.summary}
                       </p>
-                    ))}
+                    </div>
+                    <div className="md:col-span-2">
+                      <button
+                        type="button"
+                        onClick={resetPractice}
+                        className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
+                      >
+                        {copy.newPractice}
+                      </button>
+                    </div>
                   </div>
-                  <div className="md:col-span-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
-                      {copy.summary}
-                    </p>
-                    <p className="mt-2 text-sm text-white/85">
-                      {scoreResult.summary}
-                    </p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <button
-                      type="button"
-                      onClick={resetPractice}
-                      className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
-                    >
-                      {copy.newPractice}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </section>
+                )}
+              </section>
+            </div>
           )}
         </div>
       </main>

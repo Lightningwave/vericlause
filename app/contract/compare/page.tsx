@@ -120,7 +120,7 @@ export default function ComparePage() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [userDocs, setUserDocs] = useState<DocumentSummary[]>([]);
-  const { hasFeature, loading: planLoading } = usePlan();
+  const { plan, hasFeature, loading: planLoading } = usePlan();
   const canCompare = hasFeature("contractComparison");
 
   const [slotA, setSlotA] = useState<SlotState>(EMPTY_SLOT);
@@ -453,7 +453,7 @@ export default function ComparePage() {
                 </div>
 
                 {/* AI Recommendation */}
-                {comparison.recommendation && (
+                {comparison.recommendation && plan?.key === "pro" && (
                   <div className="rounded-2xl border border-navy-900/20 bg-white p-6 shadow-sm">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-[#b88a44]" aria-hidden />

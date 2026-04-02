@@ -757,9 +757,9 @@ jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
 
   pricing_free_title: "Percuma",
   pricing_free_description:
-    "Cuba VeriClause percuma dengan sama ada 1 analisis kontrak penuh atau sehingga 5 minit latihan temu duga AI, serta alat resume harian.",
-  pricing_free_feature_1: "1 analisis kontrak penuh atau sehingga 5 minit latihan temu duga AI",
-  pricing_free_feature_2: "2 semakan AI sehari",
+    "Cuba VeriClause percuma dengan 1 analisis kontrak penuh (seumur hidup) dan 2 semakan resume AI seminggu.",
+  pricing_free_feature_1: "1 analisis kontrak penuh (seumur hidup)",
+  pricing_free_feature_2: "2 semakan AI resume seminggu",
   pricing_free_feature_3: "Pengesanan risiko klausa asas",
   pricing_free_feature_4: "Akses papan pemuka standard",
   pricing_free_feature_5: "Sokongan komuniti",
@@ -767,10 +767,10 @@ jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
 
   pricing_pro_title: "Pro",
   pricing_pro_description:
-    "Sesuai untuk pencari kerja aktif dan profesional yang membahagikan masa antara semakan kontrak dan latihan temu duga.",
+    "Sesuai untuk pencari kerja aktif dan profesional yang mahu sehingga 10 analisis kontrak sebulan, dengan latihan temu duga penuh.",
   pricing_pro_feature_1:
-    "Sehingga 10 analisis kontrak penuh atau sesi latihan temu duga AI sebulan (perkongsian kuota)",
-  pricing_pro_feature_2: "10 semakan resume AI sehari",
+    "Sehingga 10 analisis kontrak sebulan",
+  pricing_pro_feature_2: "20 semakan resume AI sebulan",
   pricing_pro_feature_3: "Alat perbandingan kontrak",
   pricing_pro_feature_4: "Pemprosesan AI keutamaan",
   pricing_pro_feature_5: "Alat resume, carian pekerjaan, dan temu duga disertakan",
@@ -779,10 +779,10 @@ jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
 
   pricing_business_title: "Business",
   pricing_business_description:
-    "Untuk pasukan HR, perekrut, dan perunding yang memerlukan kuota perkongsian lebih tinggi untuk kontrak dan temu duga.",
+    "Untuk pasukan berfrekuensi tinggi yang mahu analisis kontrak tanpa had, latihan temu duga penuh, dan semakan resume AI tanpa had.",
   pricing_business_feature_1:
-    "Sehingga 40 analisis kontrak penuh atau sesi latihan temu duga AI sebulan (perkongsian kuota)",
-  pricing_business_feature_2: "Semakan resume AI harian tanpa had",
+    "Analisis kontrak tanpa had",
+  pricing_business_feature_2: "Semakan resume AI tanpa had",
   pricing_business_feature_3: "Penanda aras dan perbandingan lanjutan",
   pricing_business_feature_4: "Ruang kerja pasukan bersama",
   pricing_business_feature_5: "Sokongan keutamaan",
@@ -803,11 +803,11 @@ jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
   pricing_guidance_description:
     "Daripada penerangan harga yang panjang, bahagian ini membantu pengguna membuat keputusan dengan cepat.",
   pricing_guidance_free:
-    "Terbaik jika anda ingin mencuba sama ada satu analisis kontrak atau sesi temu duga AI yang singkat sebelum naik taraf.",
+    "Terbaik jika anda ingin mencuba analisis kontrak (1 seumur hidup) dan semakan resume yang terhad sebelum naik taraf.",
   pricing_guidance_pro:
-    "Terbaik jika anda kerap menggunakan semakan kontrak dan latihan temu duga AI—had bulanan dikongsi antara keduanya.",
+    "Terbaik jika anda mahu semakan kontrak dengan had bulanan, dan latihan temu duga penuh.",
   pricing_guidance_business:
-    "Terbaik untuk pasukan berjumlah tinggi yang memerlukan kolam bulanan lebih besar untuk analisis kontrak dan sesi temu duga digabungkan.",
+    "Terbaik untuk pasukan yang perlukan analisis kontrak tanpa had dan latihan temu duga penuh.",
 
   pricing_all_plans_title: "Termasuk dalam setiap pelan",
   pricing_all_plans_1: "Aliran muat naik kontrak yang selamat",
@@ -819,7 +819,7 @@ jobs_continue_interview: "Teruskan ke Persediaan Temu Duga",
   pricing_faq_title: "Soalan yang mungkin ditanya pengguna",
   pricing_faq_q1: "Bolehkah saya tukar pelan kemudian?",
   pricing_faq_a1:
-    "Ya. Mulakan dengan Percuma, kemudian naik taraf ke Pro atau Business apabila anda memerlukan kolam bulanan lebih tinggi. Pada pelan berbayar, analisis kontrak penuh dan sesi latihan temu duga AI berkongsi kuota bulanan yang sama; semakan resume menggunakan had harian berasingan.",
+    "Ya. Mulakan dengan Percuma (1 analisis kontrak seumur hidup dan 2 semakan resume AI seminggu). Naik taraf ke Pro untuk sehingga 10 analisis kontrak sebulan dan 20 semakan resume AI sebulan. Business adalah tanpa had.",
   pricing_faq_q2: "Mengapa letakkan Pro pada S$9/bulan?",
   pricing_faq_a2:
     "Bagi pengguna tetap, Pro ialah pilihan paling seimbang kerana ia menawarkan lebih banyak penggunaan, lebih banyak alat, dan pengalaman yang lebih lancar tanpa mencapai harga tahap pasukan.",

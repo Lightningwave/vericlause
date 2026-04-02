@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, getResume, listResumes } from "@/lib/services/db";
 import { getJobRecommendations } from "@/lib/services/jobRecommendation";
+import { getUserPlanKey } from "@/lib/billing/access";
 
 /** Uses Supabase auth (cookies); avoid static analysis during `next build`. */
 export const dynamic = "force-dynamic";
@@ -12,6 +13,14 @@ export async function GET(req: Request) {
     const user = await getAuthenticatedUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const planKey = await getUserPlanKey(user.id);
+    if (planKey !== "pro") {
+      return NextResponse.json(
+        { error: "Job matching is available on Pro." },
+        { status: 403 },
+      );
     }
 
     const { searchParams } = new URL(req.url);

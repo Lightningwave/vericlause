@@ -9,6 +9,7 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
 import { createClient } from "@/lib/supabase/client";
+import { usePlan } from "@/hooks/use-plan";
 import {
   getProfileJob,
   getResumeById,
@@ -182,6 +183,8 @@ function ResumeReviewContent() {
   const { refetch: refetchResumeStatus } = useResumeStatus();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const { plan, loading: planLoading } = usePlan();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -961,14 +964,39 @@ function ResumeReviewContent() {
               ) : null}
 
               <div className="flex items-center justify-between border-t border-slate-100 pt-6">
-                <button
-                  type="button"
-                  onClick={() => void handleApplyAiSuggestions()}
-                  disabled={improving}
-                  className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {improving ? "Applying…" : t("resume_review_apply_ai")}
-                </button>
+                {planLoading ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Loading…
+                  </button>
+                ) : plan?.key !== "pro" ? (
+                  <div className="flex flex-col items-start gap-2">
+                    <button
+                      type="button"
+                      disabled
+                      className="rounded-md bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 transition-all disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {t("resume_review_apply_ai")}
+                    </button>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs leading-relaxed text-amber-700">
+                        Upgrade to Pro to apply AI suggestions to your resume.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleApplyAiSuggestions()}
+                    disabled={improving}
+                    className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {improving ? "Applying…" : t("resume_review_apply_ai")}
+                  </button>
+                )}
 
                 <div className="flex flex-wrap gap-3">
                   <button
