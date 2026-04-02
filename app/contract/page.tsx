@@ -44,6 +44,7 @@ import {
   type ContractFlowStep,
 } from "@/components/contract/contract-flow-stepper";
 import { SummaryCard } from "@/components/contract/summary-card";
+import { useUsage } from "@/hooks/use-usage";
 
 type WorkspaceState = "idle" | "uploading" | "analyzing" | "ready" | "error";
 type ReportTab = "overview" | "risks" | "clauses" | "benchmark";
@@ -148,6 +149,10 @@ function verdictLangFromLocale(locale: Locale): TranslationLanguage | "en" {
 export default function ContractPage() {
   const router = useRouter();
   const { locale, t } = useLanguage();
+  const { usage } = useUsage();
+
+  const contractUsage = usage?.contracts;
+  const isLimitReached = contractUsage?.limit != null && contractUsage.used >= contractUsage.limit;
 
   const [authChecked, setAuthChecked] = useState(false);
   const [disclaimerAccepted, acceptDisclaimer] = useDisclaimerAccepted();
@@ -652,6 +657,7 @@ export default function ContractPage() {
                 className="mt-5"
                 onSubmit={(e) => {
                   e.preventDefault();
+                  if (isLimitReached) return;
                   const input =
                     (e.currentTarget as HTMLFormElement).querySelector<HTMLInputElement>(
                       'input[type="file"]',
@@ -660,27 +666,41 @@ export default function ContractPage() {
                   if (selectedFile) void handleUpload(selectedFile);
                 }}
               >
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setUploadInputReady(!!e.target.files?.[0])}
-                  className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100"
-                />
+                {isLimitReached ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-center">
+                     <p className="text-sm font-semibold text-amber-900">
+                        You have reached your contract analysis limit.
+                     </p>
+                     <p className="mt-1 text-xs text-amber-700">
+                        Upgrade your plan via the profile dashboard to analyze more contracts.
+                     </p>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      disabled={isLimitReached}
+                      onChange={(e) => setUploadInputReady(!!e.target.files?.[0])}
+                      className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100 disabled:opacity-50"
+                    />
 
-                <button
-                  type="submit"
-                  disabled={!uploadInputReady}
-                  className={`mt-4 w-full rounded-lg px-4 py-3 text-sm font-medium transition ${
-                    uploadInputReady
-                      ? "bg-navy-950 text-white hover:bg-navy-900"
-                      : "cursor-not-allowed bg-slate-200 text-slate-500"
-                  }`}
-                >
-                  {workspaceState === "uploading" ||
-                  workspaceState === "analyzing"
-                    ? t("dash_upload_processing")
-                    : t("dash_upload_analyze")}
-                </button>
+                    <button
+                      type="submit"
+                      disabled={!uploadInputReady || isLimitReached}
+                      className={`mt-4 w-full rounded-lg px-4 py-3 text-sm font-medium transition ${
+                        uploadInputReady && !isLimitReached
+                          ? "bg-navy-950 text-white hover:bg-navy-900"
+                          : "cursor-not-allowed bg-slate-200 text-slate-500"
+                      }`}
+                    >
+                      {workspaceState === "uploading" ||
+                      workspaceState === "analyzing"
+                        ? t("dash_upload_processing")
+                        : t("dash_upload_analyze")}
+                    </button>
+                  </>
+                )}
               </form>
 
               {uploadError ? (

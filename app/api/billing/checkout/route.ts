@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createClient } from "@/lib/supabase/server";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://vericlause.vercel.app";
 
 if (!stripeSecretKey) {
   console.warn("Missing STRIPE_SECRET_KEY");
@@ -45,6 +46,14 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const body = (await request.json()) as {
       plan?: keyof typeof PLAN_CONFIG;
@@ -84,6 +93,8 @@ export async function POST(request: Request) {
           },
         },
       ],
+      client_reference_id: user.id,
+      customer_email: user.email,
       allow_promotion_codes: true,
       billing_address_collection: "auto",
     });

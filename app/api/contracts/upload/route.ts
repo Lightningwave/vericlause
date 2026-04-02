@@ -9,11 +9,40 @@ import {
 } from "@/lib/services/db";
 import { assertUploadSize, maxUploadBytes } from "@/lib/api/limits";
 import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
+import { getContractAnalysisLimit } from "@/lib/billing/access";
+import { buildUsageLimitMessage, isWithinUsageLimit } from "@/lib/billing/usage";
+
 
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+
+  const contractLimit = await getContractAnalysisLimit(user.id);
+  const usage = await isWithinUsageLimit({
+    userId: user.id,
+    kind: "contract_full_analysis",
+    window: contractLimit.window,
+    limit: contractLimit.limit,
+  });
+
+  if (!usage.allowed) {
+    return NextResponse.json(
+      {
+        detail: buildUsageLimitMessage({
+          kind: "contract_full_analysis",
+          window: contractLimit.window,
+          limit: contractLimit.limit,
+        }),
+        code: "contract_analysis_limit_reached",
+        used: usage.used,
+        remaining: usage.remaining,
+        limit: usage.limit,
+        window: contractLimit.window,
+      },
+      { status: 403 },
+    );
   }
 
   if (!allowRateLimit(user.id, "upload")) {

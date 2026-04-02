@@ -3,8 +3,7 @@ export type PlanKey = "free" | "pro" | "business";
 export type PlanLimits = {
   fullContractAnalysesLifetime?: number | null;
   fullContractAnalysesPerMonth?: number | null;
-  fullResumeReviewsPerWeek?: number | null;
-  fullResumeReviewsPerMonth?: number | null;
+  aiReviewsPerDay?: number | null;
 };
 
 export type PlanFeatures = {
@@ -14,6 +13,7 @@ export type PlanFeatures = {
   voiceResume: boolean;
   interviewPractice: boolean;
   prioritySupport: boolean;
+  exportReports: boolean;
   seats: number | "custom";
   billingMode: "none" | "stripe" | "manual";
 };
@@ -32,7 +32,7 @@ export const PLAN_DEFINITIONS: Record<
     displayName: "Free",
     limits: {
       fullContractAnalysesLifetime: 1,
-      fullResumeReviewsPerWeek: 2,
+      aiReviewsPerDay: 2,
     },
     features: {
       contractComparison: false,
@@ -41,6 +41,7 @@ export const PLAN_DEFINITIONS: Record<
       voiceResume: false,
       interviewPractice: false,
       prioritySupport: false,
+      exportReports: false,
       seats: 1,
       billingMode: "none",
     },
@@ -51,7 +52,7 @@ export const PLAN_DEFINITIONS: Record<
     displayName: "Pro",
     limits: {
       fullContractAnalysesPerMonth: 10,
-      fullResumeReviewsPerMonth: 20,
+      aiReviewsPerDay: 10,
     },
     features: {
       contractComparison: true,
@@ -60,6 +61,7 @@ export const PLAN_DEFINITIONS: Record<
       voiceResume: true,
       interviewPractice: true,
       prioritySupport: true,
+      exportReports: true,
       seats: 1,
       billingMode: "stripe",
     },
@@ -69,8 +71,8 @@ export const PLAN_DEFINITIONS: Record<
     key: "business",
     displayName: "Business",
     limits: {
-      fullContractAnalysesPerMonth: null,
-      fullResumeReviewsPerMonth: null,
+      fullContractAnalysesPerMonth: 40,
+      aiReviewsPerDay: null,
     },
     features: {
       contractComparison: true,
@@ -79,6 +81,7 @@ export const PLAN_DEFINITIONS: Record<
       voiceResume: true,
       interviewPractice: true,
       prioritySupport: true,
+      exportReports: true,
       seats: "custom",
       billingMode: "manual",
     },

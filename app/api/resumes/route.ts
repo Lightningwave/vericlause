@@ -6,11 +6,39 @@ import { executeProfilingForResume } from "@/lib/services/resumeProfiling";
 import { createClient } from "@/lib/supabase/server";
 import { assertUploadSize, maxUploadBytes } from "@/lib/api/limits";
 import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
+import { getResumeReviewLimit } from "@/lib/billing/access";
+import { buildUsageLimitMessage, isWithinUsageLimit } from "@/lib/billing/usage";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+
+  const reviewLimit = await getResumeReviewLimit(user.id);
+  const usage = await isWithinUsageLimit({
+    userId: user.id,
+    kind: "resume_full_review",
+    window: reviewLimit.window,
+    limit: reviewLimit.limit,
+  });
+
+  if (!usage.allowed) {
+    return NextResponse.json(
+      {
+        detail: buildUsageLimitMessage({
+          kind: "resume_full_review",
+          window: reviewLimit.window,
+          limit: reviewLimit.limit,
+        }),
+        code: "resume_review_limit_reached",
+        used: usage.used,
+        remaining: usage.remaining,
+        limit: usage.limit,
+        window: reviewLimit.window,
+      },
+      { status: 403 },
+    );
   }
 
   if (!allowRateLimit(user.id, "upload")) {

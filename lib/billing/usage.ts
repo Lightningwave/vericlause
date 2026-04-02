@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type UsageWindow = "lifetime" | "week" | "month";
+export type UsageWindow = "lifetime" | "day" | "week" | "month";
 export type UsageKind = "contract_full_analysis" | "resume_full_review";
+
+function startOfDay(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 function startOfWeek(date = new Date()) {
   const d = new Date(date);
@@ -25,6 +31,7 @@ function toIso(value: Date) {
 
 function getWindowStart(window: UsageWindow): string | null {
   if (window === "lifetime") return null;
+  if (window === "day") return toIso(startOfDay());
   if (window === "week") return toIso(startOfWeek());
   return toIso(startOfMonth());
 }
@@ -148,6 +155,9 @@ export function buildUsageLimitMessage(params: {
   }
 
   if (kind === "resume_full_review") {
+    if (window === "day") {
+      return `You have reached your daily limit of ${limit} AI reviews.`;
+    }
     if (window === "week") {
       return `You have reached your weekly limit of ${limit} full resume reviews. Upgrade to Pro for more monthly reviews.`;
     }
