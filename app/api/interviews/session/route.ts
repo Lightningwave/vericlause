@@ -115,11 +115,24 @@ ${profileJson}
 Target role (if provided): ${targetRole || "not specified"}
 Difficulty: ${difficulty} — ${difficultyGuidance}
 
-Write exactly 5 concise interview questions.
-- Ground them in the candidate's skills/experience.
-- Vary the question types (delivery/impact, problem-solving, collaboration/leadership/motivation depending on persona).
-- Do not reference "JSON" or "parsed profile" in the questions.
-- Output ONLY a JSON array of strings (no markdown, no extra keys).
+Write exactly 5 interview practice questions in the style of common online interview prep (realistic, widely used patterns), but tailored to this candidate.
+
+Hard requirements:
+- Each question must reference at least one concrete detail from the candidate profile (e.g., a skill, role title, company, project/impact detail, seniority, or target role). Do not write purely generic questions.
+- Keep each question to 1–2 sentences and make it sound like something a real interviewer would ask.
+- Do not mention "JSON", "parsed profile", or "resume" explicitly.
+
+Coverage requirements (exactly one question per slot, in order):
+1) Role-fit / intro: ask for a concise intro tailored to the target role.
+2) Experience deep-dive: pick one recent or high-signal experience and probe scope + outcomes.
+3) Persona-specific deep-dive:
+   - Alex: drill into a concrete skill/tool/process mentioned in the profile; ask for how they used it + how they measured success.
+   - Sophia: drill into leadership/collaboration/motivation grounded in a specific experience; ask for stakeholders + what changed.
+4) Behavioural: a common behavioural pattern (conflict, feedback, ambiguity, or prioritization) grounded in their background.
+5) Scenario/trade-off: a realistic scenario for the target role requiring trade-offs; adjust difficulty accordingly (easy=more guided, hard=more probing).
+
+Output format:
+- Output ONLY a JSON array of 5 strings, in the same order as the slots above. No markdown, no extra text.
 `.trim();
 
   try {
