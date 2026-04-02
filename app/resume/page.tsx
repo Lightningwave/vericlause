@@ -8,6 +8,7 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { ResumeList } from "@/components/resume/ResumeList";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
+import { useUsage } from "@/hooks/use-usage";
 import { createClient } from "@/lib/supabase/client";
 import {
   getProfileJob,
@@ -85,9 +86,14 @@ function StatusBanner({
 function ResumeOnboardingContent() {
   const { t, locale } = useLanguage();
   const { status: resumeStatus, refetch: refetchResumeStatus } = useResumeStatus();
+  const { usage } = useUsage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const reviewUsage = usage?.aiReviews;
+  const isLimitReached = reviewUsage?.limit != null && reviewUsage.used >= reviewUsage.limit;
+
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string>("");
@@ -445,47 +451,72 @@ function ResumeOnboardingContent() {
             >
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                disabled={isLimitReached}
+                onClick={() => {
+                  if (!isLimitReached) fileInputRef.current?.click();
+                }}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  setDragActive(true);
+                  if (!isLimitReached) setDragActive(true);
                 }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={handleDrop}
+                onDragLeave={() => {
+                  if (!isLimitReached) setDragActive(false);
+                }}
+                onDrop={isLimitReached ? undefined : handleDrop}
                 className={`group flex w-full flex-col items-center justify-center rounded-[24px] border border-dashed px-6 py-8 text-center transition ${
-                  dragActive
-                    ? "border-navy-950 bg-navy-50"
-                    : selectedFileName
-                      ? "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400"
-                      : "border-slate-300 bg-slate-50 hover:border-navy-950 hover:bg-white"
+                  isLimitReached
+                    ? "border-amber-200 bg-amber-50 cursor-not-allowed opacity-90"
+                    : dragActive
+                      ? "border-navy-950 bg-navy-50"
+                      : selectedFileName
+                        ? "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400"
+                        : "border-slate-300 bg-slate-50 hover:border-navy-950 hover:bg-white"
                 }`}
               >
-                <div
-                  className={`flex h-14 w-14 items-center justify-center rounded-2xl transition ${
-                    selectedFileName ? "bg-emerald-100 text-emerald-700" : "bg-white text-navy-950 shadow-sm"
-                  }`}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
-                    <path
-                      d="M12 16V4m0 0-4 4m4-4 4 4M5 16.5v1.25A2.25 2.25 0 0 0 7.25 20h9.5A2.25 2.25 0 0 0 19 17.75V16.5"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
+                {isLimitReached ? (
+                  <>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth="1.8">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <p className="mt-4 text-base font-semibold text-amber-900">
+                      AI Review Limit Reached
+                    </p>
+                    <p className="mt-2 text-sm text-amber-700">
+                      Upgrade via your dashboard to review more resumes today.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className={`flex h-14 w-14 items-center justify-center rounded-2xl transition ${
+                        selectedFileName ? "bg-emerald-100 text-emerald-700" : "bg-white text-navy-950 shadow-sm"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
+                        <path
+                          d="M12 16V4m0 0-4 4m4-4 4 4M5 16.5v1.25A2.25 2.25 0 0 0 7.25 20h9.5A2.25 2.25 0 0 0 19 17.75V16.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
 
-                <p className="mt-4 text-base font-semibold text-navy-950">
-                  {selectedFileName || t("resume_upload_button")}
-                </p>
-                <p className="mt-2 text-sm text-slate-500">
-                  PDF / DOCX
-                </p>
+                    <p className="mt-4 text-base font-semibold text-navy-950">
+                      {selectedFileName || t("resume_upload_button")}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      PDF / DOCX
+                    </p>
 
-                <span className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition group-hover:border-navy-950 group-hover:text-navy-950">
-                  Choose File
-                </span>
+                    <span className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition group-hover:border-navy-950 group-hover:text-navy-950">
+                      Choose File
+                    </span>
+                  </>
+                )}
               </button>
 
               <input
@@ -511,9 +542,9 @@ function ResumeOnboardingContent() {
               <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
                 <button
                   type="submit"
-                  disabled={stage !== 1 || uploading || profiling}
+                  disabled={stage !== 1 || uploading || profiling || isLimitReached}
                   className={`inline-flex h-12 items-center justify-center rounded-xl px-5 text-sm font-semibold text-white transition ${
-                    stage === 1 && !uploading && !profiling
+                    stage === 1 && !uploading && !profiling && !isLimitReached
                       ? "bg-navy-950 hover:-translate-y-0.5 hover:opacity-95"
                       : "bg-slate-300"
                   } disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-60`}

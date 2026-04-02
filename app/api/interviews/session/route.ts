@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser, listResumes } from "@/lib/services/db";
-import { hasFeatureAccess } from "@/lib/billing/access";
+import { getContractAnalysisLimit, hasFeatureAccess } from "@/lib/billing/access";
+import { buildUsageLimitMessage, isWithinUsageLimit } from "@/lib/billing/usage";
+
 
 const INTERVIEWERS = {
   alex: {
@@ -47,6 +49,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         detail: "Interview practice is available on Pro and Business plans.",
+      },
+      { status: 403 },
+    );
+  }
+
+  const contractLimit = await getContractAnalysisLimit(user.id);
+  const usage = await isWithinUsageLimit({
+    userId: user.id,
+    kind: "contract_full_analysis",
+    window: contractLimit.window,
+    limit: contractLimit.limit,
+  });
+
+  if (!usage.allowed) {
+    return NextResponse.json(
+      {
+        detail: buildUsageLimitMessage({
+          kind: "contract_full_analysis",
+          window: contractLimit.window,
+          limit: contractLimit.limit,
+        }),
+        code: "contract_analysis_limit_reached",
+        used: usage.used,
+        remaining: usage.remaining,
+        limit: usage.limit,
+        window: contractLimit.window,
       },
       { status: 403 },
     );

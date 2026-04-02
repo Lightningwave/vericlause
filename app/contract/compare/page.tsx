@@ -11,6 +11,7 @@ import { uploadPdf, compareContracts, getComparisonJob, listDocuments, type Docu
 import type { ContractComparison } from "@/lib/types";
 import { useLanguage } from "@/components/providers/language-provider";
 import type { Locale } from "@/lib/i18n/types";
+import { usePlan } from "@/hooks/use-plan";
 
 function dateLocaleForUi(locale: Locale): string {
   const map: Record<Locale, string> = { en: "en-SG", zh: "zh-SG", ms: "ms-SG", ta: "ta-SG" };
@@ -119,6 +120,8 @@ export default function ComparePage() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [userDocs, setUserDocs] = useState<DocumentSummary[]>([]);
+  const { hasFeature, loading: planLoading } = usePlan();
+  const canCompare = hasFeature("contractComparison");
 
   const [slotA, setSlotA] = useState<SlotState>(EMPTY_SLOT);
   const [slotB, setSlotB] = useState<SlotState>(EMPTY_SLOT);
@@ -317,18 +320,44 @@ export default function ComparePage() {
               <p className="mt-2 text-sm text-slate-600">{t("compare_ai_action_desc")}</p>
             </div>
 
-            <button
-              onClick={handleCompare}
-              disabled={
-                !slotA.documentId || !slotB.documentId || compareState === "comparing"
-              }
-              className={`inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition ${slotA.documentId && slotB.documentId && compareState !== "comparing"
-                  ? "bg-navy-950 text-white hover:bg-navy-900"
-                  : "cursor-not-allowed bg-slate-200 text-slate-500"
-                }`}
-            >
-              {compareState === "comparing" ? t("compare_button_comparing") : t("compare_button_run")}
-            </button>
+            {canCompare ? (
+              <button
+                onClick={handleCompare}
+                disabled={
+                  !slotA.documentId || !slotB.documentId || compareState === "comparing"
+                }
+                className={`inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition ${slotA.documentId && slotB.documentId && compareState !== "comparing"
+                    ? "bg-navy-950 text-white hover:bg-navy-900"
+                    : "cursor-not-allowed bg-slate-200 text-slate-500"
+                  }`}
+              >
+                {compareState === "comparing" ? t("compare_button_comparing") : t("compare_button_run")}
+              </button>
+            ) : (
+              <div className="flex items-center gap-4">
+                <p className="max-w-[200px] text-right text-xs text-slate-500">
+                  AI Comparison is a Pro feature.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/billing/checkout", {
+                        method: "POST",
+                        body: JSON.stringify({ plan: "pro" }),
+                      });
+                      const { url } = await res.json();
+                      if (url) window.location.href = url;
+                    } catch (err) {
+                      console.error("Checkout error:", err);
+                    }
+                  }}
+                  className="rounded-lg bg-[#b88a44] px-6 py-3 text-sm font-bold text-navy-950 shadow-sm transition hover:bg-[#a67a39]"
+                >
+                  Upgrade
+                </button>
+              </div>
+            )}
           </div>
 
           {compareError ? (

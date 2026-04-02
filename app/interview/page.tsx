@@ -7,7 +7,10 @@ import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { useConversation } from "@11labs/react";
 import { useLanguage } from "@/components/providers/language-provider";
+import { usePlan } from "@/hooks/use-plan";
+import { useUsage } from "@/hooks/use-usage";
 import type { InterviewScoreResult } from "@/lib/types";
+
 
 /** Fixed bar heights for speaking indicator (avoid Math.random on each render). */
 const SPEAKING_BAR_HEIGHTS_PX = [12, 20, 14, 18, 16];
@@ -226,6 +229,12 @@ function InterviewContent() {
   const searchParams = useSearchParams();
   const { locale } = useLanguage();
   const resumeId = searchParams.get("resume_id");
+  const { hasFeature, loading: planLoading } = usePlan();
+  const { usage } = useUsage();
+  
+  const contractUsage = usage?.contracts;
+  const isLimitReached = contractUsage?.limit != null && contractUsage.used >= contractUsage.limit;
+  const canPractice = hasFeature("interviewPractice");
 
   const copy =
     INTERVIEW_COPY[
@@ -459,13 +468,27 @@ function InterviewContent() {
             </p>
           </header>
 
+          {isLimitReached ? (
+            <div className="mb-8 rounded-[20px] border border-amber-200 bg-amber-50 px-6 py-5">
+               <h3 className="text-sm font-semibold text-amber-900">
+                  You have reached your contract analysis limit.
+               </h3>
+               <p className="mt-1 text-sm text-amber-700">
+                  Because interviews share the same tier quotas, please upgrade your plan via the profile dashboard to start more interviews.
+               </p>
+            </div>
+          ) : null}
+
           <div className="grid gap-6 md:grid-cols-2 md:gap-8">
             {interviewers.map((person) => (
               <button
                 key={person.id}
                 type="button"
-                onClick={() => setSelectedInterviewer(person)}
-                className="group relative rounded-2xl border border-slate-200 bg-white p-8 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-navy-950 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950"
+                disabled={isLimitReached}
+                onClick={() => {
+                  if (!isLimitReached) setSelectedInterviewer(person);
+                }}
+                className={`group relative rounded-2xl border border-slate-200 bg-white p-8 text-left transition-all ${isLimitReached ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-0.5 hover:border-navy-950 hover:shadow-md shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950'}`}
               >
                 <div className="mb-6 flex items-start gap-5">
                   <div
@@ -486,6 +509,11 @@ function InterviewContent() {
                       {person.role}
                     </p>
                   </div>
+                  {!canPractice && !planLoading && (
+                    <div className="ml-auto rounded-md bg-navy-950 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                      Pro
+                    </div>
+                  )}
                 </div>
                 <p className="mb-6 text-sm leading-relaxed text-slate-600">
                   {person.description}
@@ -638,13 +666,39 @@ function InterviewContent() {
               </div>
 
               {!isInterviewing && !isIntermediate && !loading && (
-                <button
-                  type="button"
-                  onClick={() => void startInterview()}
-                  className="mt-8 rounded-xl bg-[#b88a44] px-8 py-3.5 text-sm font-bold text-navy-950 shadow-lg shadow-[#b88a44]/20 transition hover:bg-[#a67a39] active:scale-[0.98]"
-                >
-                  {copy.startConversation}
-                </button>
+                canPractice ? (
+                  <button
+                    type="button"
+                    onClick={() => void startInterview()}
+                    className="mt-8 rounded-xl bg-[#b88a44] px-8 py-3.5 text-sm font-bold text-navy-950 shadow-lg shadow-[#b88a44]/20 transition hover:bg-[#a67a39] active:scale-[0.98]"
+                  >
+                    {copy.startConversation}
+                  </button>
+                ) : (
+                  <div className="mt-8 flex flex-col items-center gap-4">
+                    <p className="max-w-[240px] text-center text-xs text-white/50">
+                      Interview practice is a Pro feature. Upgrade to start your live session.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/billing/checkout", {
+                            method: "POST",
+                            body: JSON.stringify({ plan: "pro" }),
+                          });
+                          const { url } = await res.json();
+                          if (url) window.location.href = url;
+                        } catch (err) {
+                          console.error("Checkout error:", err);
+                        }
+                      }}
+                      className="rounded-xl border border-[#b88a44] bg-[#b88a44]/10 px-8 py-3.5 text-sm font-bold text-[#e8cc95] shadow-lg transition hover:bg-[#b88a44]/20 active:scale-[0.98]"
+                    >
+                      Upgrade to Pro
+                    </button>
+                  </div>
+                )
               )}
 
               {(loading || isIntermediate) && !isInterviewing && (

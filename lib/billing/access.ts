@@ -7,25 +7,21 @@ export type BillingFeature =
   | "resumeImprove"
   | "voiceResume"
   | "interviewPractice"
-  | "prioritySupport";
+  | "prioritySupport"
+  | "exportReports";
 
-const MANUAL_PRO_EMAILS = new Set(["test123@gmail.com"]);
-const MANUAL_BUSINESS_EMAILS = new Set<string>([]);
-
-export async function getUserPlanKey(_userId: string): Promise<PlanKey> {
+export async function getUserPlanKey(userId: string): Promise<PlanKey> {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  const email = user?.email?.toLowerCase();
+  // Get plan from database profile
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", userId)
+    .single();
 
-  if (email && MANUAL_BUSINESS_EMAILS.has(email)) {
-    return "business";
-  }
-
-  if (email && MANUAL_PRO_EMAILS.has(email)) {
-    return "pro";
+  if (profile?.plan) {
+    return profile.plan as PlanKey;
   }
 
   return "free";
@@ -33,7 +29,18 @@ export async function getUserPlanKey(_userId: string): Promise<PlanKey> {
 
 export async function getUserPlan(userId: string) {
   const planKey = await getUserPlanKey(userId);
-  return PLAN_DEFINITIONS[planKey];
+  const supabase = createClient();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("current_period_end")
+    .eq("id", userId)
+    .single();
+
+  return {
+    ...PLAN_DEFINITIONS[planKey],
+    currentPeriodEnd: profile?.current_period_end || null,
+  };
 }
 
 export async function hasFeatureAccess(
@@ -63,16 +70,9 @@ export async function getContractAnalysisLimit(userId: string) {
 export async function getResumeReviewLimit(userId: string) {
   const plan = await getUserPlan(userId);
 
-  if (plan.key === "free") {
-    return {
-      window: "week" as const,
-      limit: plan.limits.fullResumeReviewsPerWeek ?? null,
-    };
-  }
-
   return {
-    window: "month" as const,
-    limit: plan.limits.fullResumeReviewsPerMonth ?? null,
+    window: "day" as const,
+    limit: plan.limits.aiReviewsPerDay ?? null,
   };
 }
 
