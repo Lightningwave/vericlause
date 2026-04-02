@@ -87,17 +87,37 @@ function InterviewContent() {
         let timer: NodeJS.Timeout;
         if (isInterviewing && timeLeft > 0) {
             timer = setInterval(() => {
-                setTimeLeft((prev) => {
-                    if (prev <= 1) {
-                        conversation.endSession();
-                        return 0;
-                    }
-                    return prev - 1;
-                });
+                setTimeLeft((prev) => prev - 1);
             }, 1000);
         }
         return () => clearInterval(timer);
-    }, [isInterviewing, timeLeft, conversation]);
+    }, [isInterviewing, timeLeft]);
+
+    // Handle auto-stop when time runs out
+    useEffect(() => {
+        if (timeLeft === 0 && isInterviewing) {
+            void stopInterview();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [timeLeft, isInterviewing]);
+
+    // Save transcript if user leaves early
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isInterviewing && transcript.length >= 2) {
+                // Try to send beacon with transcript data so it's not lost
+                const transcriptPayload = transcript.map((line) => ({ role: line.role, text: line.text }));
+                const body = JSON.stringify({
+                    interviewer: selectedInterviewer?.id ?? "alex",
+                    resume_id: resumeId,
+                    transcript: transcriptPayload,
+                });
+                navigator.sendBeacon("/api/interviews/score", body);
+            }
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [isInterviewing, transcript, selectedInterviewer, resumeId]);
 
     const startInterview = async () => {
         if (!selectedInterviewer || loading || isInterviewing || isIntermediate) return;
@@ -181,8 +201,9 @@ function InterviewContent() {
     };
 
     const toggleMute = () => {
-        // The SDK doesn't have a direct mute method in this version, but we can simulate UI state
-        // or actually stop the mic if we had access to the stream. 
+        // The SDK doesn't have a direct mic mute method in this version.
+        // For a full fix, we would need to pass a custom MediaStream to the conversation, 
+        // or wait for the SDK to support setMicrophoneEnabled().
         // For now, let's just toggle the UI state.
         setIsMuted(!isMuted);
     };
@@ -378,7 +399,14 @@ function InterviewContent() {
 
                             {lastError ? (
                                 <div className="mt-6 max-w-sm rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-center text-xs leading-relaxed text-red-300">
-                                    {lastError}
+                                    <p>{lastError}</p>
+                                    {(lastError.toLowerCase().includes("no resume") || lastError.toLowerCase().includes("upload a resume")) && (
+                                        <div className="mt-3">
+                                            <Link href="/resume" className="inline-block rounded-lg bg-red-500/20 px-4 py-2 font-semibold text-red-200 hover:bg-red-500/30 transition">
+                                                Create or Upload Resume
+                                            </Link>
+                                        </div>
+                                    )}
                                 </div>
                             ) : null}
                         </div>
@@ -526,7 +554,7 @@ function InterviewContent() {
                                 </svg>
                             )}
                         </button>
-                        <span className="hidden text-xs text-white/35 sm:inline">Mic status is visual only in this build</span>
+                        <span className="hidden text-xs text-white/35 sm:inline">Mute your microphone</span>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 sm:gap-4">

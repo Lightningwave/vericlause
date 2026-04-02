@@ -5,8 +5,16 @@ function triggerDownload(blob: Blob, filename: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  
+  // Append to body to ensure it's in the DOM for older browsers/stricter environments
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  
+  // Clean up after a delay to ensure the browser has started the download
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }
 
 export async function downloadResume(
@@ -19,6 +27,8 @@ export async function downloadResume(
 
   if (format === "pdf") {
     const { pdf } = await import("@react-pdf/renderer");
+    const { registerResumePdfFonts } = await import("./register-pdf-fonts");
+    registerResumePdfFonts();
 
     let Component: React.ComponentType<{ data: ResumeTemplateData }>;
     switch (templateId) {

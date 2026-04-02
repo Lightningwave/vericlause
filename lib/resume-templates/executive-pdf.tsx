@@ -1,11 +1,9 @@
 import React from "react";
-import { Document, Page, View, Text, Image, StyleSheet, Font } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { ResumeTemplateData } from "./types";
 
-Font.register({ family: "NotoSansSC", src: "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2" });
-
 const styles = StyleSheet.create({
-  page: { padding: 40, fontFamily: "NotoSansSC", backgroundColor: "#ffffff", fontSize: 9.5 },
+  page: { padding: 40, backgroundColor: "#ffffff", fontSize: 9.5 },
   nameRow: { flexDirection: "row", justifyContent: "center", marginBottom: 4 },
   nameText: { fontSize: 18, fontFamily: "NotoSansSC", color: "#111111" },
   contactBar: {
@@ -47,7 +45,7 @@ const styles = StyleSheet.create({
   expRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
   companyText: { fontSize: 9, color: "#333333" },
   dateText: { fontSize: 8.5, color: "#777777" },
-  expTitle: { fontSize: 10, fontFamily: "NotoSansSC", color: "#111111", marginBottom: 4 },
+  expTitle: { fontSize: 10, color: "#111111", marginBottom: 4 },
   expDesc: { fontSize: 9, lineHeight: 1.55, color: "#333333", marginBottom: 6 },
   bulletRow: { flexDirection: "row", marginBottom: 3 },
   bulletDot: { fontSize: 9, color: "#333333", marginRight: 4 },
