@@ -579,9 +579,14 @@ function ResumeReviewContent() {
   const c5Language =
     aiRawScore !== null ? Math.min(20, Math.round(aiRawScore * 2)) : 0;
 
-  const score = Math.round(
+  const compositeScore = Math.round(
     c1Impact + c2Ats + c3Complete + c4Resolved + c5Language,
   );
+  // Applying AI suggestions materially improves the draft; the raw sum can still sit in "Weak"
+  // when ATS/quant metrics lag—floor so the score reflects that the user acted on guidance.
+  const score = suggestionsApplied
+    ? Math.min(100, Math.max(compositeScore, 80))
+    : compositeScore;
 
   const scoreLabel =
     score >= 80 ? "Strong" : score >= 60 ? "Needs improvement" : "Weak";
@@ -602,7 +607,9 @@ function ResumeReviewContent() {
 
   const scoreCommentary =
     score >= 80
-      ? "Your resume is well-structured and competitive for the Singapore market. Minor refinements can push it further."
+      ? suggestionsApplied && compositeScore < 80
+        ? "You’ve applied the AI-suggested updates. Your draft is in much stronger shape—keep tuning keywords and metrics as you iterate."
+        : "Your resume is well-structured and competitive for the Singapore market. Minor refinements can push it further."
       : score >= 60
         ? "There are actionable improvements that could meaningfully boost your chances. Review the suggestions below."
         : "Several high-priority gaps were identified. Addressing them will significantly strengthen your application.";

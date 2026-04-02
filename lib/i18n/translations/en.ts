@@ -757,8 +757,8 @@ jobs_continue_interview: "Continue to Interview Prep",
 
   pricing_free_title: "Free",
   pricing_free_description:
-    "Best for first-time users who want to try contract analysis before upgrading.",
-  pricing_free_feature_1: "Analyze 1 contract in total",
+    "Try VeriClause for free with either one full contract analysis or up to 5 minutes of AI interview practice, plus daily resume tools.",
+  pricing_free_feature_1: "1 full contract analysis or up to 5 minutes of AI interview practice",
   pricing_free_feature_2: "2 AI reviews per day",
   pricing_free_feature_3: "Basic clause risk detection",
   pricing_free_feature_4: "Standard dashboard access",
@@ -767,20 +767,22 @@ jobs_continue_interview: "Continue to Interview Prep",
 
   pricing_pro_title: "Pro",
   pricing_pro_description:
-    "Best for active job seekers and professionals who review contracts more often.",
-  pricing_pro_feature_1: "Analyze up to 10 contracts per month",
-  pricing_pro_feature_2: "10 AI reviews per day",
+    "Best for active job seekers and professionals who split time between contracts and interview practice.",
+  pricing_pro_feature_1:
+    "Up to 10 full contract analyses or AI interview sessions per month (shared quota)",
+  pricing_pro_feature_2: "10 AI resume reviews per day",
   pricing_pro_feature_3: "Contract comparison tools",
   pricing_pro_feature_4: "Priority AI processing",
-  pricing_pro_feature_5: "Resume, jobs, and interview tools included",
+  pricing_pro_feature_5: "Resume, job discovery, and interview tools included",
   pricing_pro_feature_6: "Export summary reports",
   pricing_pro_cta: "Start Pro",
 
   pricing_business_title: "Business",
   pricing_business_description:
-    "For HR teams, recruiters, consultants, and higher-volume users who need more usage and faster support.",
-  pricing_business_feature_1: "Analyze up to 40 contracts per month",
-  pricing_business_feature_2: "Unlimited daily AI reviews",
+    "For HR teams, recruiters, and consultants who need a higher shared quota for contracts and interviews.",
+  pricing_business_feature_1:
+    "Up to 40 full contract analyses or AI interview sessions per month (shared quota)",
+  pricing_business_feature_2: "Unlimited daily AI resume reviews",
   pricing_business_feature_3: "Advanced benchmarking and comparison",
   pricing_business_feature_4: "Shared team workspace",
   pricing_business_feature_5: "Priority support",
@@ -801,11 +803,11 @@ jobs_continue_interview: "Continue to Interview Prep",
   pricing_guidance_description:
     "Instead of a long pricing explanation, this section helps users quickly decide which plan suits them best.",
   pricing_guidance_free:
-    "Best for first-time users who want to test one real contract before deciding to upgrade.",
+    "Best when you want to sample the product using either one contract analysis or a short AI interview session before upgrading.",
   pricing_guidance_pro:
-    "Best for individuals who need ongoing AI support across contracts, resume review, and interview preparation.",
+    "Best when you use both contract review and AI interview practice regularly—the monthly cap applies to those together.",
   pricing_guidance_business:
-    "Best for consultants, recruiters, or teams that need higher usage, collaboration, and support.",
+    "Best for higher-volume teams that need a larger monthly pool for contract analyses and interview sessions combined.",
 
   pricing_all_plans_title: "Included in every plan",
   pricing_all_plans_1: "Secure contract upload flow",
@@ -817,7 +819,7 @@ jobs_continue_interview: "Continue to Interview Prep",
   pricing_faq_title: "Questions users may ask",
   pricing_faq_q1: "Can I switch plans later?",
   pricing_faq_a1:
-    "Yes. You can start with the free plan and upgrade later when you need more contract analysis or more daily AI usage.",
+    "Yes. Start on Free, then move to Pro or Business when you need a higher monthly pool. On paid plans, full contract analyses and AI interview sessions draw from the same monthly quota; resume reviews use separate daily limits.",
   pricing_faq_q2: "Why position Pro at S$9/month?",
   pricing_faq_a2:
     "For regular users, Pro is the most balanced option because it offers more usage, more tools, and a smoother experience without reaching team-level pricing.",

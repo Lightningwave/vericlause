@@ -12,6 +12,12 @@ const stripe = stripeSecretKey
     })
   : null;
 
+function stripeCustomerId(
+  customer: string | Stripe.Customer | Stripe.DeletedCustomer,
+): string | null {
+  return typeof customer === "string" ? customer : customer?.id ?? null;
+}
+
 export async function POST(req: Request) {
   if (!stripe || !webhookSecret) {
     console.error("Stripe or Webhook secret not configured");
@@ -69,6 +75,7 @@ export async function POST(req: Request) {
             stripe_customer_id: customerId,
             stripe_subscription_id: subscriptionId,
             current_period_end: periodEnd,
+            subscription_cancel_at_period_end: false,
             updated_at: new Date().toISOString(),
           })
           .eq("id", userId)
@@ -86,9 +93,49 @@ export async function POST(req: Request) {
         break;
       }
 
+      case "customer.subscription.updated": {
+        // Add `customer.subscription.updated` to your Stripe webhook (same endpoint).
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = stripeCustomerId(subscription.customer);
+        if (!customerId) break;
+
+        const periodEndTs = subscription.items.data[0]?.current_period_end;
+        const patch: {
+          subscription_cancel_at_period_end: boolean;
+          stripe_subscription_id: string;
+          updated_at: string;
+          current_period_end?: string;
+        } = {
+          subscription_cancel_at_period_end: subscription.cancel_at_period_end,
+          stripe_subscription_id: subscription.id,
+          updated_at: new Date().toISOString(),
+        };
+        if (periodEndTs != null) {
+          patch.current_period_end = new Date(periodEndTs * 1000).toISOString();
+        }
+
+        const { data: synced, error } = await supabase
+          .from("profiles")
+          .update(patch)
+          .eq("stripe_customer_id", customerId)
+          .select("id");
+
+        if (error) {
+          console.error(`Error syncing subscription: ${error.message}`);
+          return NextResponse.json({ error: "Profile update failed" }, { status: 500 });
+        }
+        if (synced?.length) {
+          console.log(
+            `Synced subscription for ${customerId} (cancel_at_period_end=${subscription.cancel_at_period_end})`,
+          );
+        }
+        break;
+      }
+
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
-        const customerId = subscription.customer as string;
+        const customerId = stripeCustomerId(subscription.customer);
+        if (!customerId) break;
 
         // Revert user to free plan
         const { data: downgraded, error } = await supabase
@@ -97,6 +144,7 @@ export async function POST(req: Request) {
             plan: "free",
             stripe_subscription_id: null,
             current_period_end: null,
+            subscription_cancel_at_period_end: false,
             updated_at: new Date().toISOString(),
           })
           .eq("stripe_customer_id", customerId)

@@ -17,16 +17,15 @@ import {
   ArrowLeft,
   Loader2
 } from "lucide-react";
-import Link from "next/link";
-
 export default function ProfilePage() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { locale } = useLanguage();
   const { plan, loading: planLoading, getDaysRemaining } = usePlan();
   const { usage, loading: usageLoading } = useUsage();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [resetStatus, setResetStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   useEffect(() => {
@@ -40,6 +39,28 @@ export default function ProfilePage() {
       }
     });
   }, [router]);
+
+  const handleUpgradeToPro = async () => {
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro", locale }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Could not start checkout.");
+      }
+    } catch (err) {
+      console.error("Checkout error:", err);
+      alert("Could not start checkout.");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
@@ -169,6 +190,24 @@ export default function ProfilePage() {
               )}
             </div>
 
+            {plan &&
+              plan.key !== "free" &&
+              plan.subscriptionCancelAtPeriodEnd &&
+              plan.currentPeriodEnd && (
+                <div className="mt-6 rounded-xl border border-amber-200/80 bg-amber-50/80 px-5 py-4 text-sm text-amber-950">
+                  <p className="font-semibold text-amber-900">Subscription canceled</p>
+                  <p className="mt-1 text-amber-900/80">
+                    Your Pro access continues until{" "}
+                    <span className="font-medium text-amber-950">
+                      {new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
+                        new Date(plan.currentPeriodEnd),
+                      )}
+                    </span>
+                    . You can resubscribe anytime from Manage billing.
+                  </p>
+                </div>
+              )}
+
             <div className="mt-10 grid gap-4 sm:grid-cols-2 bg-slate-50/50 rounded-xl p-6 border border-slate-50">
               {Object.entries(plan?.features || {}).map(([key, enabled]) => (
                 <div key={key} className="flex items-center gap-2">
@@ -182,12 +221,23 @@ export default function ProfilePage() {
 
             <div className="mt-10">
               {plan?.key === "free" ? (
-                <Link
-                  href="/contract"
-                  className="inline-flex rounded-full bg-navy-950 px-8 py-3 text-sm font-bold text-white transition hover:opacity-90"
-                >
-                  Upgrade to Pro
-                </Link>
+                <div className="flex max-w-md flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleUpgradeToPro()}
+                    disabled={checkoutLoading}
+                    className="inline-flex w-fit items-center gap-2 rounded-full bg-navy-950 px-8 py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    {checkoutLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : null}
+                    Upgrade to Pro
+                  </button>
+                  <p className="text-xs leading-relaxed text-slate-500">
+                    Tip: use your remaining free contract analysis and resume review quota before
+                    upgrading—allowances do not carry over from the free tier.
+                  </p>
+                </div>
               ) : (
                 <button
                   onClick={handleManageSubscription}

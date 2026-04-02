@@ -7,6 +7,8 @@ type PlanInfo = {
   limits: PlanLimits;
   features: PlanFeatures;
   currentPeriodEnd: string | null;
+  /** True when Stripe subscription is set to cancel at period end; access until currentPeriodEnd. */
+  subscriptionCancelAtPeriodEnd: boolean;
 };
 
 export function usePlan() {
@@ -22,7 +24,10 @@ export function usePlan() {
           throw new Error("Failed to fetch plan info");
         }
         const data = await response.json();
-        setPlan(data);
+        setPlan({
+          ...data,
+          subscriptionCancelAtPeriodEnd: Boolean(data.subscriptionCancelAtPeriodEnd),
+        });
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Unknown error"));
       } finally {

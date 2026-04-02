@@ -33,13 +33,16 @@ export async function getUserPlan(userId: string) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("current_period_end")
+    .select("current_period_end, subscription_cancel_at_period_end")
     .eq("id", userId)
     .single();
 
   return {
     ...PLAN_DEFINITIONS[planKey],
     currentPeriodEnd: profile?.current_period_end || null,
+    subscriptionCancelAtPeriodEnd: Boolean(
+      profile?.subscription_cancel_at_period_end,
+    ),
   };
 }
 

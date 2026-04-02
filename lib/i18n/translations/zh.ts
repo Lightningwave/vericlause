@@ -711,8 +711,9 @@ jobs_continue_interview: "继续面试准备",
   pricing_per_month: "/月",
 
   pricing_free_title: "免费版",
-  pricing_free_description: "适合首次使用、想先体验合同分析功能的用户。",
-  pricing_free_feature_1: "总共可分析 1 份合同",
+  pricing_free_description:
+    "免费体验：可选择 1 次完整合同分析，或最多 5 分钟 AI 模拟面试练习，另含每日简历相关工具。",
+  pricing_free_feature_1: "1 次完整合同分析或最多 5 分钟 AI 模拟面试练习",
   pricing_free_feature_2: "每日 2 次 AI 审阅",
   pricing_free_feature_3: "基础条款风险识别",
   pricing_free_feature_4: "标准仪表板访问",
@@ -720,20 +721,23 @@ jobs_continue_interview: "继续面试准备",
   pricing_free_cta: "免费开始",
 
   pricing_pro_title: "专业版",
-  pricing_pro_description: "适合更频繁审阅合同的活跃求职者与专业人士。",
-  pricing_pro_feature_1: "每月最多分析 10 份合同",
-  pricing_pro_feature_2: "每日 10 次 AI 审阅",
+  pricing_pro_description:
+    "适合在合同审阅与面试练习之间切换的活跃求职者与专业人士。",
+  pricing_pro_feature_1:
+    "每月最多 10 次完整合同分析或 AI 模拟面试（共用额度）",
+  pricing_pro_feature_2: "每日 10 次 AI 简历审阅",
   pricing_pro_feature_3: "合同比较工具",
   pricing_pro_feature_4: "优先 AI 处理",
-  pricing_pro_feature_5: "包含简历、职位与面试工具",
+  pricing_pro_feature_5: "简历、职位与面试相关工具",
   pricing_pro_feature_6: "导出摘要报告",
   pricing_pro_cta: "开始专业版",
 
   pricing_business_title: "企业版",
   pricing_business_description:
-    "适合 HR 团队、招聘人员、顾问以及需要更高使用量和更快支持的用户。",
-  pricing_business_feature_1: "每月最多分析 40 份合同",
-  pricing_business_feature_2: "每日无限 AI 审阅",
+    "适合 HR、招聘与顾问团队，需要更高「合同 + 面试」共用月度额度。",
+  pricing_business_feature_1:
+    "每月最多 40 次完整合同分析或 AI 模拟面试（共用额度）",
+  pricing_business_feature_2: "每日无限次 AI 简历审阅",
   pricing_business_feature_3: "高级基准分析与比较",
   pricing_business_feature_4: "共享团队工作区",
   pricing_business_feature_5: "优先支持",
@@ -750,9 +754,12 @@ jobs_continue_interview: "继续面试准备",
   pricing_guidance_title: "选择最适合你工作流程的方案",
   pricing_guidance_description:
     "无需阅读冗长说明，这里可帮助用户快速判断哪一个方案最合适。",
-  pricing_guidance_free: "适合首次用户，想先用一份真实合同测试后再决定是否升级。",
-  pricing_guidance_pro: "适合需要持续 AI 支持的个人用户，包括合同、简历和面试准备。",
-  pricing_guidance_business: "适合顾问、招聘人员或需要更高配额与协作支持的团队。",
+  pricing_guidance_free:
+    "适合想先用「一份合同分析」或「短时间的 AI 面试体验」再决定是否升级的用户。",
+  pricing_guidance_pro:
+    "适合同时使用合同审阅与 AI 面试练习的用户——月度上限为两者合计。",
+  pricing_guidance_business:
+    "适合需要更大月度池的团队，合同分析与模拟面试共用该额度。",
 
   pricing_all_plans_title: "所有方案均包含",
   pricing_all_plans_1: "安全的合同上传流程",
@@ -763,7 +770,8 @@ jobs_continue_interview: "继续面试准备",
   pricing_faq_eyebrow: "常见问题",
   pricing_faq_title: "用户可能会问的问题",
   pricing_faq_q1: "之后可以切换方案吗？",
-  pricing_faq_a1: "可以。你可以先从免费版开始，之后在需要更多合同分析或更多每日 AI 使用量时升级。",
+  pricing_faq_a1:
+    "可以。可先使用免费版，需要更高月度额度时再升级专业版或企业版。付费方案中，完整合同分析与 AI 模拟面试共用月度额度；简历相关 AI 审阅另有每日上限。",
   pricing_faq_q2: "为什么将专业版定价为 S$9/月？",
   pricing_faq_a2:
     "对于一般用户来说，专业版是最平衡的方案，在不达到团队级定价的前提下提供更多使用量、更多工具和更顺畅的体验。",
