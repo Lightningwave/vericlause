@@ -702,6 +702,74 @@ jobs_continue_interview: "继续面试准备",
   ai_keywords_missing: "缺少关键词",
   ai_career_progression: "职业发展",
   ai_salary_benchmark: "薪资基准",
+    nav_pricing: "定价",
+
+  pricing_eyebrow: "定价",
+  pricing_title: "灵活的 AI 合同审阅方案",
+  pricing_subtitle:
+    "选择适合你合同审阅频率、报价比较需求，以及在工作流程中使用 AI 工具习惯的方案。",
+  pricing_per_month: "/月",
+
+  pricing_free_title: "免费版",
+  pricing_free_description: "适合首次使用、想先体验合同分析功能的用户。",
+  pricing_free_feature_1: "总共可分析 1 份合同",
+  pricing_free_feature_2: "每日 2 次 AI 审阅",
+  pricing_free_feature_3: "基础条款风险识别",
+  pricing_free_feature_4: "标准仪表板访问",
+  pricing_free_feature_5: "社区支持",
+  pricing_free_cta: "免费开始",
+
+  pricing_pro_title: "专业版",
+  pricing_pro_description: "适合更频繁审阅合同的活跃求职者与专业人士。",
+  pricing_pro_feature_1: "每月最多分析 10 份合同",
+  pricing_pro_feature_2: "每日 10 次 AI 审阅",
+  pricing_pro_feature_3: "合同比较工具",
+  pricing_pro_feature_4: "优先 AI 处理",
+  pricing_pro_feature_5: "包含简历、职位与面试工具",
+  pricing_pro_feature_6: "导出摘要报告",
+  pricing_pro_cta: "开始专业版",
+
+  pricing_business_title: "企业版",
+  pricing_business_description:
+    "适合 HR 团队、招聘人员、顾问以及需要更高使用量和更快支持的用户。",
+  pricing_business_feature_1: "每月最多分析 40 份合同",
+  pricing_business_feature_2: "每日无限 AI 审阅",
+  pricing_business_feature_3: "高级基准分析与比较",
+  pricing_business_feature_4: "共享团队工作区",
+  pricing_business_feature_5: "优先支持",
+  pricing_business_cta: "联系销售",
+
+  pricing_value_1_title: "更快做决定",
+  pricing_value_1_description: "更快理解关键条款、比较报价，并识别主要风险点。",
+  pricing_value_2_title: "更清晰的体验",
+  pricing_value_2_description: "以结构化输出和更易理解的说明帮助用户快速采取下一步。",
+  pricing_value_3_title: "也适合团队",
+  pricing_value_3_description: "既适合个人用户，也能在日后扩展给招聘、顾问和 HR 团队。",
+
+  pricing_guidance_eyebrow: "方案指引",
+  pricing_guidance_title: "选择最适合你工作流程的方案",
+  pricing_guidance_description:
+    "无需阅读冗长说明，这里可帮助用户快速判断哪一个方案最合适。",
+  pricing_guidance_free: "适合首次用户，想先用一份真实合同测试后再决定是否升级。",
+  pricing_guidance_pro: "适合需要持续 AI 支持的个人用户，包括合同、简历和面试准备。",
+  pricing_guidance_business: "适合顾问、招聘人员或需要更高配额与协作支持的团队。",
+
+  pricing_all_plans_title: "所有方案均包含",
+  pricing_all_plans_1: "安全的合同上传流程",
+  pricing_all_plans_2: "AI 辅助条款分析",
+  pricing_all_plans_3: "清晰的结论式体验",
+  pricing_all_plans_4: "核心产品更新访问",
+
+  pricing_faq_eyebrow: "常见问题",
+  pricing_faq_title: "用户可能会问的问题",
+  pricing_faq_q1: "之后可以切换方案吗？",
+  pricing_faq_a1: "可以。你可以先从免费版开始，之后在需要更多合同分析或更多每日 AI 使用量时升级。",
+  pricing_faq_q2: "为什么将专业版定价为 S$9/月？",
+  pricing_faq_a2:
+    "对于一般用户来说，专业版是最平衡的方案，在不达到团队级定价的前提下提供更多使用量、更多工具和更顺畅的体验。",
+  pricing_faq_q3: "企业版适合谁？",
+  pricing_faq_a3:
+    "企业版适合招聘人员、顾问、HR 团队，或任何需要更高配额、协作功能与更快支持的高频用户。",
 };
 
 export default zh;

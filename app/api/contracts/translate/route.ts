@@ -3,18 +3,45 @@ import OpenAI from "openai";
 import { getAuthenticatedUser } from "@/lib/services/db";
 import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
 import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
+import { hasFeatureAccess } from "@/lib/billing/access";
 import type { ComplianceVerdict, TranslationLanguage } from "@/lib/types";
 
-const LANGUAGE_LABELS: Record<TranslationLanguage, string> = {
-  zh: "Simplified Chinese (简体中文)",
-  ta: "Tamil (தமிழ்)",
-  ms: "Malay (Bahasa Melayu, standard formal register suitable for legal text)",
-};
+const SUPPORTED_LANGUAGES: TranslationLanguage[] = ["zh", "ms", "ta"];
 
 function getOpenAI() {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not set");
+  }
   return new OpenAI({ apiKey });
+}
+
+function isSupportedLanguage(value: string): value is TranslationLanguage {
+  return SUPPORTED_LANGUAGES.includes(value as TranslationLanguage);
+}
+
+function buildTranslationPrompt(
+  verdicts: ComplianceVerdict[],
+  language: TranslationLanguage,
+) {
+  return `
+Translate the explanation fields of these compliance verdicts into "${language}".
+
+Rules:
+- Preserve the JSON structure exactly.
+- Do not remove or rename keys.
+- Only translate user-facing natural language fields such as:
+  - explanation
+  - recommendation
+  - clause_summary
+  - translated_explanation
+- Keep legal meaning accurate and concise.
+- Do not add markdown fences.
+- Return valid JSON only.
+
+Input JSON:
+${JSON.stringify(verdicts)}
+`.trim();
 }
 
 export async function POST(req: NextRequest) {
@@ -23,72 +50,89 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
+  const canTranslate = await hasFeatureAccess(user.id, "verdictTranslation");
+  if (!canTranslate) {
+    return NextResponse.json(
+      {
+        detail:
+          "Verdict translation is available on Pro and Business plans.",
+      },
+      { status: 403 },
+    );
+  }
+
   if (!allowRateLimit(user.id, "llm")) {
     return rateLimitedResponse(60);
   }
 
   const jsonIn = await parseJsonBody<{
     verdicts: ComplianceVerdict[];
-    language: TranslationLanguage;
+    language: string;
   }>(req, maxJsonBodyBytes());
+
   if (!jsonIn.ok) {
     return jsonIn.response;
   }
+
   const { verdicts, language } = jsonIn.data;
 
-  if (!verdicts?.length || !language || !LANGUAGE_LABELS[language]) {
+  if (!Array.isArray(verdicts) || verdicts.length === 0) {
     return NextResponse.json(
-      { detail: "verdicts array and language (zh | ta | ms) are required" },
+      { detail: "A non-empty verdicts array is required." },
       { status: 400 },
     );
   }
 
-  const langLabel = LANGUAGE_LABELS[language];
-
-  const toTranslate = verdicts.map((v, i) => ({
-    i,
-    contract_value: v.contract_value ?? "",
-    law_value: v.law_value ?? "",
-    explanation: v.explanation ?? "",
-  }));
-
-  const openai = getOpenAI();
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
+  if (!language || !isSupportedLanguage(language)) {
+    return NextResponse.json(
       {
-        role: "system",
-        content: `You are a professional legal translator. Translate the user-provided JSON array of verdict fields into ${langLabel}. Keep legal terminology accurate. Return a JSON object with key "translations" containing an array of objects, each with fields: i (index), contract_value, law_value, explanation — all translated. Do not translate statute section numbers or act names (keep those in English).`,
+        detail: `Unsupported language. Supported languages: ${SUPPORTED_LANGUAGES.join(", ")}`,
       },
-      {
-        role: "user",
-        content: JSON.stringify(toTranslate),
-      },
-    ],
-  });
-
-  const raw = response.choices[0]?.message?.content ?? "{}";
-  let llmJson: { translations?: Array<{ i: number; contract_value: string; law_value: string; explanation: string }> };
-  try {
-    llmJson = JSON.parse(raw);
-  } catch {
-    return NextResponse.json({ detail: "Translation LLM returned invalid JSON" }, { status: 502 });
+      { status: 400 },
+    );
   }
 
-  const translations = llmJson.translations ?? [];
+  try {
+    const openai = getOpenAI();
 
-  const translatedVerdicts: ComplianceVerdict[] = verdicts.map((v, idx) => {
-    const t = translations.find((tr) => tr.i === idx);
-    return {
-      ...v,
-      translated_contract_value: t?.contract_value ?? null,
-      translated_law_value: t?.law_value ?? null,
-      translated_explanation: t?.explanation ?? null,
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a precise legal translation assistant. Return valid JSON only.",
+        },
+        {
+          role: "user",
+          content: buildTranslationPrompt(verdicts, language),
+        },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as {
+      verdicts?: ComplianceVerdict[];
     };
-  });
 
-  return NextResponse.json({ verdicts: translatedVerdicts, language });
+    if (!Array.isArray(parsed.verdicts)) {
+      throw new Error("Model returned invalid translation payload.");
+    }
+
+    return NextResponse.json({
+      verdicts: parsed.verdicts,
+      language,
+    });
+  } catch (error) {
+    console.error("Translation failed:", error);
+    return NextResponse.json(
+      {
+        detail:
+          error instanceof Error ? error.message : "Translation failed",
+      },
+      { status: 500 },
+    );
+  }
 }
