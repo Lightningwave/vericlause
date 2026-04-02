@@ -1,57 +1,62 @@
-export const runtime = "nodejs";
-
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import Groq from "groq-sdk";
 import { getAuthenticatedUser } from "@/lib/services/db";
+import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
+import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
+import { hasFeatureAccess } from "@/lib/billing/access";
+import type { ResumeProfile, ResumeSuggestion } from "@/lib/types";
 
-const OPENAI_MODEL = "gpt-4o-mini";
-const GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant";
+function getOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not set");
+  }
+  return new OpenAI({ apiKey });
+}
 
-const SYSTEM_PROMPT = `You are a professional resume writer specialising in Singapore's white-collar job market.
+function buildImprovePrompt(params: {
+  rawText: string;
+  profile?: ResumeProfile | null;
+  suggestions?: ResumeSuggestion[] | null;
+  targetRole?: string | null;
+}) {
+  const { rawText, profile, suggestions, targetRole } = params;
 
-You will be given an original resume and a list of AI feedback suggestions. Rewrite the resume incorporating ALL the suggestions to produce a stronger, more competitive version.
+  return `
+You are an expert resume coach.
+
+Rewrite and improve the user's resume content so it is clearer, stronger, and more professional while staying truthful to the original experience.
 
 Rules:
-- Keep all factual information (dates, companies, roles) exactly as they are
-- Improve the language, structure and impact of each bullet point
-- Add stronger action verbs and quantifiable outcomes where missing
-- Make it ATS-friendly with relevant Singapore market keywords
-- Return ONLY the improved resume as plain text, ready to copy
-- Do not add fictional achievements or qualifications`;
+- Do not invent experience, metrics, employers, dates, skills, or qualifications.
+- Improve clarity, grammar, structure, and impact.
+- Prefer concise, achievement-oriented bullet points where possible.
+- Keep the content ATS-friendly.
+- If a target role is provided, tailor phrasing toward that role without fabricating anything.
+- Return valid JSON only.
+- Do not include markdown fences.
 
-async function callLlm(prompt: string): Promise<string> {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey) {
-    try {
-      const client = new OpenAI({ apiKey: openaiKey });
-      const response = await client.chat.completions.create({
-        model: OPENAI_MODEL,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.3,
-      });
-      return response.choices[0]?.message?.content ?? "";
-    } catch (err) {
-      console.warn("OpenAI improve failed, falling back to Groq:", err);
-    }
-  }
+Return JSON with this exact shape:
+{
+  "summary": "string",
+  "improved_experience": ["string"],
+  "improved_skills": ["string"],
+  "improved_projects": ["string"],
+  "additional_recommendations": ["string"]
+}
 
-  const groqKey = process.env.GROQ_API_KEY;
-  if (!groqKey) throw new Error("Neither OPENAI_API_KEY nor GROQ_API_KEY is set");
+Target role:
+${targetRole ?? ""}
 
-  const client = new Groq({ apiKey: groqKey });
-  const response = await client.chat.completions.create({
-    model: GROQ_FALLBACK_MODEL,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.3,
-  });
-  return response.choices[0]?.message?.content ?? "";
+Resume profile JSON:
+${JSON.stringify(profile ?? null)}
+
+Resume suggestions JSON:
+${JSON.stringify(suggestions ?? [])}
+
+Raw resume text:
+${rawText}
+`.trim();
 }
 
 export async function POST(req: NextRequest) {
@@ -60,25 +65,99 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
-  const { resumeText, feedback } = await req.json();
-
-  if (!resumeText?.trim()) {
-    return NextResponse.json({ detail: "No resume text provided" }, { status: 400 });
+  const canImprove = await hasFeatureAccess(user.id, "resumeImprove");
+  if (!canImprove) {
+    return NextResponse.json(
+      {
+        detail: "Resume improve is available on Pro and Business plans.",
+      },
+      { status: 403 },
+    );
   }
 
-  const feedbackLines = Array.isArray(feedback) && feedback.length > 0
-    ? feedback.map((f: string, i: number) => `${i + 1}. ${f}`).join("\n")
-    : "No specific feedback provided — improve overall quality.";
+  if (!allowRateLimit(user.id, "llm")) {
+    return rateLimitedResponse(60);
+  }
 
-  const prompt = `ORIGINAL RESUME:\n${resumeText}\n\nAI FEEDBACK TO INCORPORATE:\n${feedbackLines}`;
+  const jsonIn = await parseJsonBody<{
+    rawText: string;
+    profile?: ResumeProfile | null;
+    suggestions?: ResumeSuggestion[] | null;
+    targetRole?: string | null;
+  }>(req, maxJsonBodyBytes());
+
+  if (!jsonIn.ok) {
+    return jsonIn.response;
+  }
+
+  const { rawText, profile, suggestions, targetRole } = jsonIn.data;
+
+  if (!rawText || !rawText.trim()) {
+    return NextResponse.json(
+      { detail: "rawText is required." },
+      { status: 400 },
+    );
+  }
 
   try {
-    const improvedResume = await callLlm(prompt);
-    return NextResponse.json({ improvedResume });
-  } catch (e) {
+    const openai = getOpenAI();
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a precise resume improvement assistant. Return valid JSON only.",
+        },
+        {
+          role: "user",
+          content: buildImprovePrompt({
+            rawText,
+            profile,
+            suggestions,
+            targetRole,
+          }),
+        },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as {
+      summary?: string;
+      improved_experience?: string[];
+      improved_skills?: string[];
+      improved_projects?: string[];
+      additional_recommendations?: string[];
+    };
+
+    return NextResponse.json({
+      summary: parsed.summary ?? "",
+      improved_experience: Array.isArray(parsed.improved_experience)
+        ? parsed.improved_experience
+        : [],
+      improved_skills: Array.isArray(parsed.improved_skills)
+        ? parsed.improved_skills
+        : [],
+      improved_projects: Array.isArray(parsed.improved_projects)
+        ? parsed.improved_projects
+        : [],
+      additional_recommendations: Array.isArray(
+        parsed.additional_recommendations,
+      )
+        ? parsed.additional_recommendations
+        : [],
+    });
+  } catch (error) {
+    console.error("Resume improve failed:", error);
     return NextResponse.json(
-      { detail: `Failed to generate improved resume: ${e instanceof Error ? e.message : e}` },
-      { status: 502 },
+      {
+        detail:
+          error instanceof Error ? error.message : "Resume improve failed",
+      },
+      { status: 500 },
     );
   }
 }

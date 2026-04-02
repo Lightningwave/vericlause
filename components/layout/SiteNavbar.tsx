@@ -79,11 +79,11 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
         href: "/resume",
         label: "nav_resume",
         items: [
-  { href: "/resume", label: "nav_resume_review" },
-  { href: "/resume/voice", label: "nav_voice_resume" },
-  { href: "/resume/builder", label: "nav_resume_builder" },
-  { href: "/jobs", label: "nav_job_matching" },
-],
+          { href: "/resume", label: "nav_resume_review" },
+          { href: "/resume/voice", label: "nav_voice_resume" },
+          { href: "/resume/builder", label: "nav_resume_builder" },
+          { href: "/jobs", label: "nav_job_matching" },
+        ],
       },
       {
         href: "/contract",
@@ -97,13 +97,16 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
         href: "/interview",
         label: "nav_interview",
       },
+      {
+        href: "/pricing",
+        label: "nav_pricing",
+      },
     ],
     [],
   );
 
   function isPathActive(href: string) {
     if (href === "/") return pathname === "/";
-    /** Analysis vs compare are sibling routes under `/contract/*` — do not let `/contract` match `/contract/compare`. */
     if (href === "/contract") {
       return pathname === "/contract" || pathname === "/contract/";
     }
@@ -117,7 +120,6 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
     if (!group.items?.length) {
       return isPathActive(group.href);
     }
-
     return group.items.some((item) => isPathActive(item.href));
   }
 
@@ -143,11 +145,7 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className={`flex items-center justify-between ${compact ? "py-3" : "py-4"}`}>
-          <Link
-            href="/"
-            className="flex items-center gap-3"
-            onClick={() => setMobileOpen(false)}
-          >
+          <Link href="/" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
             <span className="font-sans text-lg font-semibold tracking-tight text-navy-950 sm:text-xl">
               veri<span className="font-bold">\</span>clause
             </span>
@@ -240,17 +238,13 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
                       <button
                         type="button"
                         onClick={() =>
-                          setOpenMobileGroup((prev) =>
-                            prev === group.label ? null : group.label,
-                          )
+                          setOpenMobileGroup((prev) => (prev === group.label ? null : group.label))
                         }
                         className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
                         aria-label={`Toggle ${t(group.label)} submenu`}
                       >
                         <ChevronDownIcon
-                          className={`h-4 w-4 transition-transform ${
-                            expanded ? "rotate-180" : ""
-                          }`}
+                          className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`}
                         />
                       </button>
                     </div>
