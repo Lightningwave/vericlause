@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
+import { usePlan } from "@/hooks/use-plan";
 import type { JobRecommendation, ScrapedJob } from "@/lib/services/jobRecommendation";
 
 type Tab = "recommendations" | "scrape";
@@ -357,6 +358,7 @@ function ScrapeTab() {
 export default function JobsPage() {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("recommendations");
+  const { plan, loading: planLoading } = usePlan();
 
   return (
     <main className="min-h-screen bg-[#f8f8f6]">
@@ -401,7 +403,30 @@ export default function JobsPage() {
         </div>
 
         {tab === "recommendations" ? (
-          <RecommendationsTab t={t} />
+          planLoading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">
+              Loading…
+            </div>
+          ) : plan?.key !== "pro" ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+              <p className="text-sm font-semibold text-amber-900">
+                Job matching is available on Pro.
+              </p>
+              <p className="mt-1 text-sm text-amber-800">
+                Upgrade your plan to start matching jobs with your resume.
+              </p>
+              <div className="mt-4 flex justify-center">
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center justify-center rounded-xl bg-navy-950 px-5 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                >
+                  Go to Profile →
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <RecommendationsTab t={t} />
+          )
         ) : (
           <ScrapeTab />
         )}

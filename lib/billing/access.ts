@@ -73,9 +73,23 @@ export async function getContractAnalysisLimit(userId: string) {
 export async function getResumeReviewLimit(userId: string) {
   const plan = await getUserPlan(userId);
 
+  if (plan.key === "free") {
+    return {
+      window: "week" as const,
+      limit: plan.limits.resumeReviewsPerWeek ?? null,
+    };
+  }
+
+  if (plan.key === "pro") {
+    return {
+      window: "month" as const,
+      limit: plan.limits.resumeReviewsPerMonth ?? null,
+    };
+  }
+
   return {
-    window: "day" as const,
-    limit: plan.limits.aiReviewsPerDay ?? null,
+    window: "month" as const,
+    limit: plan.limits.resumeReviewsPerMonth ?? null,
   };
 }
 
