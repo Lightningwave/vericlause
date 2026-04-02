@@ -1,154 +1,324 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
-import { getAuthenticatedUser, getResume, insertInterviewSession } from "@/lib/services/db";
-import type { InterviewScoreResult, InterviewTranscriptLine } from "@/lib/types";
+import { getAuthenticatedUser } from "@/lib/services/db";
+import { hasFeatureAccess } from "@/lib/billing/access";
+import type { InterviewScoreResult } from "@/lib/types";
 
 function getOpenAI() {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not set");
+  }
   return new OpenAI({ apiKey });
 }
 
-function clampScore(value: unknown, min: number, max: number): number {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return min;
-  return Math.max(min, Math.min(max, Math.round(n)));
+const INTERVIEWER_CONTEXT = {
+  alex: {
+    name: "Alex",
+    style:
+      "Hiring Manager. Evaluate clarity, technical depth, structured thinking, ownership, and practical delivery.",
+  },
+  sophia: {
+    name: "Sophia",
+    style:
+      "Senior Executive Recruiter. Evaluate communication, leadership, collaboration, motivation, and behavioural examples.",
+  },
+} as const;
+
+const ALLOWED_DIMENSION_KEYS = [
+  "clarity_communication",
+  "role_relevance",
+  "technical_or_leadership_depth",
+  "problem_solving_examples",
+  "structure_conciseness",
+  "confidence_presence",
+] as const;
+
+type AllowedDimensionKey = (typeof ALLOWED_DIMENSION_KEYS)[number];
+
+function buildPrompt(params: {
+  interviewer: "alex" | "sophia";
+  transcript: Array<{ role: "user" | "agent"; text: string }>;
+}) {
+  const interviewer =
+    INTERVIEWER_CONTEXT[params.interviewer] ?? INTERVIEWER_CONTEXT.alex;
+
+  return `
+You are scoring a mock interview transcript.
+
+Interviewer:
+${interviewer.name}
+${interviewer.style}
+
+Return valid JSON only with this exact shape:
+{
+  "overall_score": number,
+  "confidence": "low" | "medium" | "high",
+  "strengths": ["string"],
+  "improvements": ["string"],
+  "summary": "string",
+  "dimensions": [
+    {
+      "key": "clarity_communication" | "role_relevance" | "technical_or_leadership_depth" | "problem_solving_examples" | "structure_conciseness" | "confidence_presence",
+      "label": "string",
+      "score": number,
+      "reason": "string"
+    }
+  ],
+  "evidence_quotes": ["string"]
 }
 
-function asStringArray(value: unknown, fallback: string[]): string[] {
-  if (!Array.isArray(value)) return fallback;
-  const items = value
-    .map((v) => (typeof v === "string" ? v.trim() : ""))
-    .filter(Boolean)
-    .slice(0, 5);
-  return items.length > 0 ? items : fallback;
+Scoring rules:
+- Score from 0 to 100.
+- Be fair and concise.
+- Base feedback only on the transcript provided.
+- If the transcript is short, lower confidence.
+- strengths and improvements should each contain 2 to 4 short items.
+- summary should be 1 to 3 sentences.
+- dimensions should contain 3 to 6 scoring dimensions.
+- evidence_quotes should contain 1 to 3 short quotes copied from the transcript.
+- For each dimension, use exactly one of the allowed key values above.
+- Use key, label, score, and reason.
+
+Transcript:
+${JSON.stringify(params.transcript)}
+`.trim();
 }
 
-function normalizeScore(raw: any): InterviewScoreResult {
-  const rawDims = Array.isArray(raw?.dimensions) ? raw.dimensions : [];
-  const dimensions = rawDims
-    .filter((d: any) => d && typeof d === "object")
-    .map((d: any) => ({
-      key: String(d.key ?? "clarity_communication") as InterviewScoreResult["dimensions"][number]["key"],
-      label: typeof d.label === "string" ? d.label : "Dimension",
-      score: clampScore(d.score, 0, 10),
-      reason: typeof d.reason === "string" ? d.reason : "No reason provided.",
-    }))
-    .slice(0, 6);
+function inferDimensionKey(value: {
+  key?: unknown;
+  label?: unknown;
+  name?: unknown;
+}): AllowedDimensionKey {
+  const raw =
+    typeof value.key === "string"
+      ? value.key
+      : typeof value.label === "string"
+        ? value.label
+        : typeof value.name === "string"
+          ? value.name
+          : "";
 
-  const overall = clampScore(raw?.overall_score, 0, 100);
+  const normalized = raw.toLowerCase().trim();
+
+  if (
+    normalized.includes("clarity") ||
+    normalized.includes("communication")
+  ) {
+    return "clarity_communication";
+  }
+
+  if (
+    normalized.includes("role") ||
+    normalized.includes("relevance") ||
+    normalized.includes("fit")
+  ) {
+    return "role_relevance";
+  }
+
+  if (
+    normalized.includes("technical") ||
+    normalized.includes("leadership") ||
+    normalized.includes("depth")
+  ) {
+    return "technical_or_leadership_depth";
+  }
+
+  if (
+    normalized.includes("problem") ||
+    normalized.includes("solving") ||
+    normalized.includes("example")
+  ) {
+    return "problem_solving_examples";
+  }
+
+  if (
+    normalized.includes("structure") ||
+    normalized.includes("concise") ||
+    normalized.includes("conciseness") ||
+    normalized.includes("organized")
+  ) {
+    return "structure_conciseness";
+  }
+
+  if (
+    normalized.includes("confidence") ||
+    normalized.includes("presence")
+  ) {
+    return "confidence_presence";
+  }
+
+  if (
+    ALLOWED_DIMENSION_KEYS.includes(normalized as AllowedDimensionKey)
+  ) {
+    return normalized as AllowedDimensionKey;
+  }
+
+  return "clarity_communication";
+}
+
+function defaultLabelForKey(key: AllowedDimensionKey): string {
+  switch (key) {
+    case "clarity_communication":
+      return "Clarity & Communication";
+    case "role_relevance":
+      return "Role Relevance";
+    case "technical_or_leadership_depth":
+      return "Technical or Leadership Depth";
+    case "problem_solving_examples":
+      return "Problem Solving Examples";
+    case "structure_conciseness":
+      return "Structure & Conciseness";
+    case "confidence_presence":
+      return "Confidence & Presence";
+  }
+}
+
+function normalizeDimension(d: unknown): {
+  key: AllowedDimensionKey;
+  label: string;
+  score: number;
+  reason: string;
+} {
+  const value = (d ?? {}) as {
+    key?: unknown;
+    label?: unknown;
+    score?: unknown;
+    reason?: unknown;
+    name?: unknown;
+    comment?: unknown;
+  };
+
+  const key = inferDimensionKey(value);
+
+  const label =
+    typeof value.label === "string" && value.label.trim()
+      ? value.label
+      : typeof value.name === "string" && value.name.trim()
+        ? value.name
+        : defaultLabelForKey(key);
+
+  const score =
+    typeof value.score === "number"
+      ? Math.max(0, Math.min(100, Math.round(value.score)))
+      : 0;
+
+  const reason =
+    typeof value.reason === "string" && value.reason.trim()
+      ? value.reason
+      : typeof value.comment === "string" && value.comment.trim()
+        ? value.comment
+        : "";
+
   return {
-    overall_score: overall,
-    dimensions,
-    strengths: asStringArray(raw?.strengths, ["Clear response structure", "Good role relevance"]),
-    improvements: asStringArray(raw?.improvements, ["Use more specific examples", "Quantify outcomes"]),
-    evidence_quotes: asStringArray(raw?.evidence_quotes, ["No quote captured"]),
-    summary:
-      typeof raw?.summary === "string" && raw.summary.trim()
-        ? raw.summary.trim()
-        : "Solid practice session with clear room for more concrete, metric-backed examples.",
-    confidence:
-      raw?.confidence === "low" || raw?.confidence === "medium" || raw?.confidence === "high"
-        ? raw.confidence
-        : "medium",
+    key,
+    label,
+    score,
+    reason,
   };
 }
 
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
-  if (!user) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
-  if (!allowRateLimit(user.id, "llm")) return rateLimitedResponse(60);
 
-  const body = (await req.json().catch(() => null)) as {
+  if (!user) {
+    return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+
+  const canUseInterview = await hasFeatureAccess(user.id, "interviewPractice");
+  if (!canUseInterview) {
+    return NextResponse.json(
+      {
+        detail: "Interview practice is available on Pro and Business plans.",
+      },
+      { status: 403 },
+    );
+  }
+
+  let body: {
     interviewer?: "alex" | "sophia";
     resume_id?: string | null;
-    transcript?: InterviewTranscriptLine[];
-  } | null;
+    transcript?: Array<{ role: "user" | "agent"; text: string }>;
+  };
 
-  const interviewer = body?.interviewer === "sophia" ? "sophia" : "alex";
-  const transcript = (body?.transcript ?? []).filter(
-    (t): t is InterviewTranscriptLine =>
-      !!t &&
-      (t.role === "user" || t.role === "agent") &&
-      typeof t.text === "string" &&
-      t.text.trim().length > 0,
-  );
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ detail: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const interviewer = body.interviewer ?? "alex";
+  const transcript = Array.isArray(body.transcript) ? body.transcript : [];
 
   if (transcript.length < 2) {
-    return NextResponse.json({ detail: "Not enough transcript data to score." }, { status: 400 });
-  }
-  const shortTranscript = transcript.length < 6;
-
-  const resume = body?.resume_id ? await getResume(body.resume_id, user.id) : null;
-  const profileSummary = resume?.parsed_profile
-    ? JSON.stringify(resume.parsed_profile).slice(0, 3000)
-    : "No parsed profile available.";
-
-  const transcriptBlock = transcript
-    .map((line, idx) => `${idx + 1}. ${line.role === "user" ? "Candidate" : "Interviewer"}: ${line.text}`)
-    .join("\n");
-
-  const prompt = `
-Score this mock interview for role readiness.
-
-Interviewer style: ${interviewer}
-Candidate profile summary:
-${profileSummary}
-
-Transcript:
-${transcriptBlock}
-
-Return JSON only with shape:
-{
-  "overall_score": 0-100,
-  "dimensions": [
-    {"key":"clarity_communication","label":"Clarity & Communication","score":0-10,"reason":"..."},
-    {"key":"role_relevance","label":"Role Relevance","score":0-10,"reason":"..."},
-    {"key":"technical_or_leadership_depth","label":"Technical or Leadership Depth","score":0-10,"reason":"..."},
-    {"key":"problem_solving_examples","label":"Problem Solving Examples","score":0-10,"reason":"..."},
-    {"key":"structure_conciseness","label":"Structure & Conciseness","score":0-10,"reason":"..."},
-    {"key":"confidence_presence","label":"Confidence & Presence","score":0-10,"reason":"..."}
-  ],
-  "strengths": ["...", "...", "..."],
-  "improvements": ["...", "...", "..."],
-  "evidence_quotes": ["short quote 1", "short quote 2", "short quote 3"],
-  "summary": "2-3 sentence summary",
-  "confidence": "low|medium|high"
-}
-
-Rules:
-- Base feedback on transcript evidence only.
-- Keep reasons concise and actionable.
-- If interviewer is alex, weigh technical depth more; if sophia, weigh leadership/collaboration depth more.
-- If transcript is short (few turns), set confidence to "low" and mention that the sample is limited.
-`.trim();
-
-  const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.2,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: "You are an interview coach. Return valid JSON only." },
-      { role: "user", content: prompt },
-    ],
-  });
-  const raw = response.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw);
-  const score = normalizeScore(parsed);
-  if (shortTranscript && score.confidence !== "low") {
-    score.confidence = "low";
+    return NextResponse.json(
+      {
+        detail:
+          "Not enough conversation to score yet. Try one full answer and end again.",
+      },
+      { status: 400 },
+    );
   }
 
-  const session = await insertInterviewSession({
-    userId: user.id,
-    resumeId: body?.resume_id ?? null,
-    interviewer,
-    transcript,
-    score,
-  });
+  try {
+    const openai = getOpenAI();
 
-  return NextResponse.json({ session_id: session.id, score: session.score });
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a precise interview scoring assistant. Return valid JSON only.",
+        },
+        {
+          role: "user",
+          content: buildPrompt({ interviewer, transcript }),
+        },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as Partial<InterviewScoreResult> & {
+      dimensions?: unknown[];
+      evidence_quotes?: string[];
+    };
+
+    const result: InterviewScoreResult = {
+      overall_score:
+        typeof parsed.overall_score === "number"
+          ? Math.max(0, Math.min(100, Math.round(parsed.overall_score)))
+          : 0,
+      confidence:
+        parsed.confidence === "low" ||
+        parsed.confidence === "medium" ||
+        parsed.confidence === "high"
+          ? parsed.confidence
+          : "low",
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+      improvements: Array.isArray(parsed.improvements)
+        ? parsed.improvements
+        : [],
+      summary: typeof parsed.summary === "string" ? parsed.summary : "",
+      dimensions: Array.isArray(parsed.dimensions)
+        ? parsed.dimensions.map(normalizeDimension)
+        : [],
+      evidence_quotes: Array.isArray(parsed.evidence_quotes)
+        ? parsed.evidence_quotes
+        : [],
+    };
+
+    return NextResponse.json({ score: result });
+  } catch (error) {
+    console.error("Interview scoring failed:", error);
+    return NextResponse.json(
+      {
+        detail:
+          error instanceof Error ? error.message : "Interview scoring failed",
+      },
+      { status: 500 },
+    );
+  }
 }
-

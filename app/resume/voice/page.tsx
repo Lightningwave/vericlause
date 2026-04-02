@@ -25,17 +25,147 @@ const browserLangMap: Record<SupportedLocale, string> = {
   ta: "ta-IN",
 };
 
-// Short labels for the question list panel
-const QUESTION_LABELS: Record<string, string> = {
-  full_name: "Full Name",
-  age: "Age",
-  job_title: "Target Role",
-  summary: "About You",
-  experience: "Work Experience",
-  achievement: "Achievement",
-  education: "Education",
-  skills: "Skills",
-  anything_else: "Additional Info",
+const VOICE_RESUME_UI: Record<
+  SupportedLocale,
+  {
+    questionLabels: Record<string, string>;
+    questionsTitle: string;
+    howItWorksTitle: string;
+    howItWorksSteps: string[];
+    allResponsesRecorded: string;
+    reviewAnswers: string;
+    reviewAnswersDescription: string;
+    edit: string;
+    generatingResume: string;
+    generateMyResume: string;
+    correctingTranscription: string;
+    skip: string;
+    saveAndReturn: string;
+  }
+> = {
+  en: {
+    questionLabels: {
+      full_name: "Full Name",
+      age: "Age",
+      job_title: "Target Role",
+      summary: "About You",
+      experience: "Work Experience",
+      achievement: "Achievement",
+      education: "Education",
+      skills: "Skills",
+      anything_else: "Additional Info",
+    },
+    questionsTitle: "Questions",
+    howItWorksTitle: "How this works",
+    howItWorksSteps: [
+      "Click the mic and answer each question naturally.",
+      "Review the transcribed text and correct any errors.",
+      "Use Skip if a question does not apply to you.",
+      "Click Generate Resume at the end to create your resume.",
+    ],
+    allResponsesRecorded: "All responses recorded.",
+    reviewAnswers: "Review your answers",
+    reviewAnswersDescription:
+      "Review your answers below, then generate your resume.",
+    edit: "Edit",
+    generatingResume: "Generating your resume…",
+    generateMyResume: "Generate My Resume",
+    correctingTranscription: "Correcting transcription…",
+    skip: "Skip",
+    saveAndReturn: "Save & Return",
+  },
+  zh: {
+    questionLabels: {
+      full_name: "姓名",
+      age: "年龄",
+      job_title: "目标职位",
+      summary: "关于你自己",
+      experience: "工作经验",
+      achievement: "成就",
+      education: "教育背景",
+      skills: "技能",
+      anything_else: "补充信息",
+    },
+    questionsTitle: "问题",
+    howItWorksTitle: "使用说明",
+    howItWorksSteps: [
+      "点击麦克风，并自然回答每个问题。",
+      "检查转录内容，并修正任何错误。",
+      "如果某个问题不适用，可点击跳过。",
+      "最后点击生成简历来创建你的简历。",
+    ],
+    allResponsesRecorded: "所有回答已记录。",
+    reviewAnswers: "检查你的回答",
+    reviewAnswersDescription: "请先检查以下回答，然后生成你的简历。",
+    edit: "编辑",
+    generatingResume: "正在生成你的简历…",
+    generateMyResume: "生成我的简历",
+    correctingTranscription: "正在修正转录内容…",
+    skip: "跳过",
+    saveAndReturn: "保存并返回",
+  },
+  ms: {
+    questionLabels: {
+      full_name: "Nama Penuh",
+      age: "Umur",
+      job_title: "Jawatan Sasaran",
+      summary: "Tentang Anda",
+      experience: "Pengalaman Kerja",
+      achievement: "Pencapaian",
+      education: "Pendidikan",
+      skills: "Kemahiran",
+      anything_else: "Maklumat Tambahan",
+    },
+    questionsTitle: "Soalan",
+    howItWorksTitle: "Cara ia berfungsi",
+    howItWorksSteps: [
+      "Klik mikrofon dan jawab setiap soalan secara semula jadi.",
+      "Semak teks transkrip dan betulkan sebarang ralat.",
+      "Gunakan Langkau jika soalan tidak berkaitan dengan anda.",
+      "Klik Jana Resume pada akhir untuk mencipta resume anda.",
+    ],
+    allResponsesRecorded: "Semua jawapan telah direkodkan.",
+    reviewAnswers: "Semak jawapan anda",
+    reviewAnswersDescription:
+      "Semak jawapan anda di bawah, kemudian jana resume anda.",
+    edit: "Edit",
+    generatingResume: "Sedang menjana resume anda…",
+    generateMyResume: "Jana Resume Saya",
+    correctingTranscription: "Sedang membetulkan transkripsi…",
+    skip: "Langkau",
+    saveAndReturn: "Simpan & Kembali",
+  },
+  ta: {
+    questionLabels: {
+      full_name: "முழுப்பெயர்",
+      age: "வயது",
+      job_title: "இலக்கு பணி",
+      summary: "உங்களைப் பற்றி",
+      experience: "வேலை அனுபவம்",
+      achievement: "சாதனை",
+      education: "கல்வி",
+      skills: "திறன்கள்",
+      anything_else: "கூடுதல் தகவல்",
+    },
+    questionsTitle: "கேள்விகள்",
+    howItWorksTitle: "இது எப்படி செயல்படுகிறது",
+    howItWorksSteps: [
+      "மைக்ரோஃபோனை அழுத்தி ஒவ்வொரு கேள்விக்கும் இயல்பாக பதிலளிக்கவும்.",
+      "மாற்றிய உரையை பார்த்து பிழைகள் இருந்தால் திருத்தவும்.",
+      "ஒரு கேள்வி உங்களுக்கு பொருந்தாவிட்டால் தவிர் என்பதைப் பயன்படுத்தவும்.",
+      "முடிவில் Resume உருவாக்க என்பதைக் கிளிக் செய்து உங்கள் resume-ஐ உருவாக்கவும்.",
+    ],
+    allResponsesRecorded: "அனைத்து பதில்களும் பதிவு செய்யப்பட்டன.",
+    reviewAnswers: "உங்கள் பதில்களைப் பார்க்கவும்",
+    reviewAnswersDescription:
+      "கீழே உள்ள பதில்களை சரிபார்த்து, பிறகு உங்கள் resume-ஐ உருவாக்கவும்.",
+    edit: "திருத்து",
+    generatingResume: "உங்கள் resume உருவாக்கப்படுகிறது…",
+    generateMyResume: "என் Resume-ஐ உருவாக்கு",
+    correctingTranscription: "உரைமாற்றம் திருத்தப்படுகிறது…",
+    skip: "தவிர்",
+    saveAndReturn: "சேமித்து திரும்பு",
+  },
 };
 
 // FIX 1 — detect letter-by-letter name spelling
@@ -62,7 +192,9 @@ function quickCorrect(text: string): string {
 }
 
 function getBestVoice(locale: SupportedLocale) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return null;
+  }
 
   const voices = window.speechSynthesis.getVoices();
 
@@ -76,13 +208,17 @@ function getBestVoice(locale: SupportedLocale) {
   const targets = preferredLangs[locale];
 
   for (const target of targets) {
-    const exact = voices.find((voice) => voice.lang.toLowerCase() === target.toLowerCase());
+    const exact = voices.find(
+      (voice) => voice.lang.toLowerCase() === target.toLowerCase(),
+    );
     if (exact) return exact;
   }
 
   for (const target of targets) {
     const partial = voices.find((voice) =>
-      voice.lang.toLowerCase().startsWith(target.toLowerCase().split("-")[0]),
+      voice.lang
+        .toLowerCase()
+        .startsWith(target.toLowerCase().split("-")[0]),
     );
     if (partial) return partial;
   }
@@ -94,7 +230,11 @@ export default function VoiceResumePage() {
   const { t, locale } = useLanguage();
   const router = useRouter();
   const safeLocale: SupportedLocale =
-    locale === "en" || locale === "zh" || locale === "ms" || locale === "ta" ? locale : "en";
+    locale === "en" || locale === "zh" || locale === "ms" || locale === "ta"
+      ? locale
+      : "en";
+
+  const ui = VOICE_RESUME_UI[safeLocale];
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<AnswerMap>({});
@@ -219,7 +359,7 @@ export default function VoiceResumePage() {
           en: "Please tell me your education background.",
           zh: "请介绍你的教育背景。",
           ms: "Sila ceritakan latar belakang pendidikan anda.",
-          ta: "உங்கள் கல்வி பின்னணியைச் சொல்லுங்கள்.",
+          ta: "உங்கள் கல்வி பின்னணியைச் சொல்லுங்கள்。",
         },
         placeholder: {
           en: "State your education",
@@ -283,58 +423,77 @@ export default function VoiceResumePage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return;
 
-    const Ctor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const Ctor =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
 
     if (!Ctor) {
-      setSpeechSupported(false)
-      return
+      setSpeechSupported(false);
+      return;
     }
 
-    setSpeechSupported(true)
-    const recognition = new Ctor()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = browserLangMap[safeLocale]
+    setSpeechSupported(true);
+    const recognition = new Ctor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = browserLangMap[safeLocale];
 
     recognition.onresult = (event: any) => {
-      if (!isRecordingRef.current) return
-      let finalText = ''
-      let interimText = ''
+      if (!isRecordingRef.current) return;
+      let finalText = "";
+      let interimText = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) finalText += event.results[i][0].transcript
-        else interimText += event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalText += event.results[i][0].transcript;
+        } else {
+          interimText += event.results[i][0].transcript;
+        }
       }
       if (finalText) {
-        accumulatedTextRef.current = (accumulatedTextRef.current + ' ' + quickCorrect(finalText)).trim()
+        accumulatedTextRef.current = (
+          accumulatedTextRef.current +
+          " " +
+          quickCorrect(finalText)
+        ).trim();
       }
-      currentTranscriptRef.current = interimText
-      const combined = [accumulatedTextRef.current, currentTranscriptRef.current].filter(Boolean).join(' ').trim()
-      setDraft(combined)
-    }
+      currentTranscriptRef.current = interimText;
+      const combined = [
+        accumulatedTextRef.current,
+        currentTranscriptRef.current,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      setDraft(combined);
+    };
 
     recognition.onend = () => {
       if (isRecordingRef.current) {
-        try { recognition.start() } catch {}
+        try {
+          recognition.start();
+        } catch {}
       } else {
-        setIsListening(false)
+        setIsListening(false);
       }
-    }
+    };
 
     recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech' || event.error === 'aborted') return
-      isRecordingRef.current = false
-      setIsListening(false)
-    }
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      isRecordingRef.current = false;
+      setIsListening(false);
+    };
 
-    recognitionRef.current = recognition
+    recognitionRef.current = recognition;
 
     return () => {
-      isRecordingRef.current = false
-      try { recognition.stop() } catch {}
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      isRecordingRef.current = false;
+      try {
+        recognition.stop();
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeLocale]);
 
   useEffect(() => {
@@ -360,7 +519,8 @@ export default function VoiceResumePage() {
 
     // FIX 2: AI autocorrect
     const qId = questions[currentIndex]?.id;
-    const qType = qId === "age" ? "age" : qId === "full_name" ? "name" : "general";
+    const qType =
+      qId === "age" ? "age" : qId === "full_name" ? "name" : "general";
 
     let cancelled = false;
     setIsAutocorrecting(true);
@@ -371,7 +531,11 @@ export default function VoiceResumePage() {
     fetch("/api/resume/voice-autocorrect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: textToCorrect, questionType: qType, language: safeLocale }),
+      body: JSON.stringify({
+        text: textToCorrect,
+        questionType: qType,
+        language: safeLocale,
+      }),
       signal: controller.signal,
     })
       .then((r) => r.json())
@@ -390,7 +554,7 @@ export default function VoiceResumePage() {
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isListening]);
 
   function speakPrompt(text: string, lang: SupportedLocale) {
@@ -399,7 +563,8 @@ export default function VoiceResumePage() {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    const matchedVoice = getBestVoice(lang) || (lang === "ta" ? getBestVoice("en") : null);
+    const matchedVoice =
+      getBestVoice(lang) || (lang === "ta" ? getBestVoice("en") : null);
 
     utterance.lang = browserLangMap[lang];
     utterance.rate = 1;
@@ -416,7 +581,6 @@ export default function VoiceResumePage() {
   function startListening() {
     if (!recognitionRef.current) return;
     setError(null);
-    // Preserve any existing manually typed text
     accumulatedTextRef.current = draft;
     currentTranscriptRef.current = "";
     isRecordingRef.current = true;
@@ -428,7 +592,6 @@ export default function VoiceResumePage() {
   function stopListening() {
     isRecordingRef.current = false;
     recognitionRef.current?.stop();
-    // isListening set to false via onend → setIsListening(false)
   }
 
   function jumpToQuestion(index: number) {
@@ -446,13 +609,8 @@ export default function VoiceResumePage() {
   function saveAndNext() {
     if (!currentQuestion || !draft.trim()) return;
 
-    // Capture the answer before any clearing
     const answer = draft.trim();
 
-    // Clear textarea and refs FIRST — before stopListening — so that any
-    // late onresult event (guarded by isRecordingRef) cannot re-populate
-    // the draft. This fixes the age-question bug where a short utterance's
-    // final result arrived after the clear and overwrote it.
     setDraft("");
     accumulatedTextRef.current = "";
     currentTranscriptRef.current = "";
@@ -465,10 +623,12 @@ export default function VoiceResumePage() {
     };
 
     setAnswers(nextAnswers);
-    sessionStorage.setItem("vericlause.voiceResumeAnswers", JSON.stringify(nextAnswers));
+    sessionStorage.setItem(
+      "vericlause.voiceResumeAnswers",
+      JSON.stringify(nextAnswers),
+    );
     sessionStorage.setItem("vericlause.resumeSource", "voice");
 
-    // If editing a single answer from the completion screen, return there
     if (editingFromFinished) {
       setEditingFromFinished(false);
       setFinished(true);
@@ -490,7 +650,6 @@ export default function VoiceResumePage() {
     accumulatedTextRef.current = "";
     currentTranscriptRef.current = "";
 
-    // If editing from finished, return to completion screen
     if (editingFromFinished) {
       setEditingFromFinished(false);
       setFinished(true);
@@ -498,7 +657,10 @@ export default function VoiceResumePage() {
     }
 
     if (isLastQuestion) {
-      sessionStorage.setItem("vericlause.voiceResumeAnswers", JSON.stringify(answers));
+      sessionStorage.setItem(
+        "vericlause.voiceResumeAnswers",
+        JSON.stringify(answers),
+      );
       sessionStorage.setItem("vericlause.resumeSource", "voice");
       setFinished(true);
       return;
@@ -541,26 +703,34 @@ export default function VoiceResumePage() {
       if (data.resumeId) {
         sessionStorage.setItem("vericlause.lastResumeId", data.resumeId);
         if (data.feedback) {
-          sessionStorage.setItem("vericlause.resumeFeedback", JSON.stringify(data.feedback));
+          sessionStorage.setItem(
+            "vericlause.resumeFeedback",
+            JSON.stringify(data.feedback),
+          );
         }
         router.push(`/resume/review?resume_id=${data.resumeId}`);
       } else {
         router.push("/resume/review");
       }
     } catch (e) {
-      setGenerateError(e instanceof Error ? e.message : "Generation failed");
+      setGenerateError(
+        e instanceof Error ? e.message : "Generation failed",
+      );
       setGenerating(false);
     }
   }
 
-  const completedCount = Math.min(Object.keys(answers).length + (draft.trim() ? 1 : 0), questions.length);
-  const progressPercent = Math.round((completedCount / questions.length) * 100);
+  const completedCount = Math.min(
+    Object.keys(answers).length + (draft.trim() ? 1 : 0),
+    questions.length,
+  );
+  const progressPercent = Math.round(
+    (completedCount / questions.length) * 100,
+  );
 
   return (
     <main className="min-h-screen bg-[#f8f8f6]">
-      <SiteNavbar
-        rightSlot={<UserMenu />}
-      />
+      <SiteNavbar rightSlot={<UserMenu />} />
 
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
         <div className="mb-8 max-w-3xl">
@@ -576,7 +746,6 @@ export default function VoiceResumePage() {
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-          {/* Left card — question or completion state */}
           {finished ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
               <div className="flex flex-col items-center text-center">
@@ -590,17 +759,16 @@ export default function VoiceResumePage() {
                   </svg>
                 </div>
                 <h2 className="font-serif text-2xl font-semibold text-navy-950">
-                  All responses recorded.
+                  {ui.allResponsesRecorded}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Review your answers below, then generate your resume.
+                  {ui.reviewAnswersDescription}
                 </p>
               </div>
 
-              {/* FIX 3 — review + edit section */}
               <div className="mt-6">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                  Review your answers
+                  {ui.reviewAnswers}
                 </h3>
                 <div className="space-y-2">
                   {questions.map((q, i) => {
@@ -613,16 +781,18 @@ export default function VoiceResumePage() {
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-slate-500">
-                            {QUESTION_LABELS[q.id]}
+                            {ui.questionLabels[q.id] ?? q.id}
                           </p>
-                          <p className="mt-0.5 line-clamp-2 text-sm text-slate-800">{answer}</p>
+                          <p className="mt-0.5 line-clamp-2 text-sm text-slate-800">
+                            {answer}
+                          </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => jumpToQuestion(i)}
                           className="flex-shrink-0 rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100"
                         >
-                          Edit
+                          {ui.edit}
                         </button>
                       </div>
                     );
@@ -642,7 +812,7 @@ export default function VoiceResumePage() {
                 disabled={generating}
                 className="mt-6 w-full rounded-xl bg-navy-950 px-8 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {generating ? "Generating your resume…" : "Generate My Resume"}
+                {generating ? ui.generatingResume : ui.generateMyResume}
               </button>
             </div>
           ) : (
@@ -659,7 +829,9 @@ export default function VoiceResumePage() {
 
                 <button
                   type="button"
-                  onClick={() => speakPrompt(currentQuestion.prompt[safeLocale], safeLocale)}
+                  onClick={() =>
+                    speakPrompt(currentQuestion.prompt[safeLocale], safeLocale)
+                  }
                   className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   {t("voice_resume_repeat")}
@@ -700,7 +872,6 @@ export default function VoiceResumePage() {
                   className="min-h-[180px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
                 />
 
-                {/* FIX 2 — autocorrect spinner */}
                 {isAutocorrecting && (
                   <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
                     <svg
@@ -722,12 +893,11 @@ export default function VoiceResumePage() {
                         d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                       />
                     </svg>
-                    Correcting transcription…
+                    {ui.correctingTranscription}
                   </div>
                 )}
 
                 <div className="mt-4 flex flex-wrap items-center gap-3">
-                  {/* Mic icon button (TASK A) */}
                   <div className="relative flex items-center justify-center">
                     {isListening && (
                       <span className="absolute inline-flex h-12 w-12 animate-ping rounded-full bg-red-400 opacity-25" />
@@ -736,7 +906,11 @@ export default function VoiceResumePage() {
                       type="button"
                       onClick={handleMicClick}
                       disabled={!speechSupported}
-                      title={isListening ? t("voice_resume_stop_recording") : t("voice_resume_start_recording")}
+                      title={
+                        isListening
+                          ? t("voice_resume_stop_recording")
+                          : t("voice_resume_start_recording")
+                      }
                       className={`relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-50 ${
                         isListening
                           ? "border-red-300 bg-red-50 text-red-600"
@@ -765,13 +939,12 @@ export default function VoiceResumePage() {
                     {t("voice_resume_back")}
                   </button>
 
-                  {/* Skip button (TASK C) */}
                   <button
                     type="button"
                     onClick={skipQuestion}
                     className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                   >
-                    Skip
+                    {ui.skip}
                   </button>
 
                   <button
@@ -781,21 +954,19 @@ export default function VoiceResumePage() {
                     className="rounded-lg bg-[#b88a44] px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {editingFromFinished
-                      ? "Save & Return"
+                      ? ui.saveAndReturn
                       : isLastQuestion
-                      ? t("voice_resume_finish")
-                      : t("voice_resume_next")}
+                        ? t("voice_resume_finish")
+                        : t("voice_resume_next")}
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Right sidebar — question list + how this works */}
           <aside className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            {/* Question list (TASK E) */}
             <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              Questions
+              {ui.questionsTitle}
             </h3>
             <ol className="mt-3 space-y-1">
               {questions.map((q, i) => {
@@ -808,8 +979,8 @@ export default function VoiceResumePage() {
                       isActive
                         ? "bg-navy-950 text-white"
                         : isCompleted
-                        ? "text-slate-700"
-                        : "text-slate-400"
+                          ? "text-slate-700"
+                          : "text-slate-400"
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
@@ -818,8 +989,8 @@ export default function VoiceResumePage() {
                           isActive
                             ? "bg-white/20 text-white"
                             : isCompleted
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-slate-100 text-slate-400"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-400"
                         }`}
                       >
                         {isCompleted ? (
@@ -835,7 +1006,7 @@ export default function VoiceResumePage() {
                         )}
                       </span>
                       <span className="truncate">
-                        {QUESTION_LABELS[q.id] ?? q.id}
+                        {ui.questionLabels[q.id] ?? q.id}
                       </span>
                     </div>
                     {answers[q.id] && (
@@ -848,16 +1019,12 @@ export default function VoiceResumePage() {
               })}
             </ol>
 
-            {/* How this works (TASK G) */}
             <div className="mt-6 border-t border-slate-100 pt-5">
-              <h3 className="text-sm font-semibold text-navy-950">How this works</h3>
+              <h3 className="text-sm font-semibold text-navy-950">
+                {ui.howItWorksTitle}
+              </h3>
               <ol className="mt-3 space-y-3">
-                {[
-                  "Click the mic and answer each question naturally.",
-                  "Review the transcribed text and correct any errors.",
-                  "Use Skip if a question does not apply to you.",
-                  "Click Generate Resume at the end to create your resume.",
-                ].map((step, i) => (
+                {ui.howItWorksSteps.map((step, i) => (
                   <li key={i} className="flex gap-3 text-sm leading-6 text-slate-600">
                     <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
                       {i + 1}
