@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -30,7 +30,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const supabase = createClient();
+  let supabase;
+  try {
+    supabase = createServiceRoleClient();
+  } catch (e) {
+    console.error("Supabase service role not configured:", e);
+    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+  }
 
   // Handle the event
   try {
@@ -55,8 +61,8 @@ export async function POST(req: Request) {
           break;
         }
 
-        // Update user profile to Pro
-        const { error } = await supabase
+        // Update user profile to Pro (service role bypasses RLS; anon client has no auth.uid() here)
+        const { data: updatedRows, error } = await supabase
           .from("profiles")
           .update({
             plan: "pro",
@@ -65,13 +71,18 @@ export async function POST(req: Request) {
             current_period_end: periodEnd,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", userId);
+          .eq("id", userId)
+          .select("id");
 
         if (error) {
           console.error(`Error updating user profile: ${error.message}`);
-        } else {
-          console.log(`User ${userId} upgraded to Pro`);
+          return NextResponse.json({ error: "Profile update failed" }, { status: 500 });
         }
+        if (!updatedRows?.length) {
+          console.error(`No profile row for user id ${userId}`);
+          return NextResponse.json({ error: "Profile not found" }, { status: 500 });
+        }
+        console.log(`User ${userId} upgraded to Pro`);
         break;
       }
 
@@ -80,7 +91,7 @@ export async function POST(req: Request) {
         const customerId = subscription.customer as string;
 
         // Revert user to free plan
-        const { error } = await supabase
+        const { data: downgraded, error } = await supabase
           .from("profiles")
           .update({
             plan: "free",
@@ -88,10 +99,15 @@ export async function POST(req: Request) {
             current_period_end: null,
             updated_at: new Date().toISOString(),
           })
-          .eq("stripe_customer_id", customerId);
+          .eq("stripe_customer_id", customerId)
+          .select("id");
 
         if (error) {
           console.error(`Error downgrading user profile: ${error.message}`);
+          return NextResponse.json({ error: "Profile update failed" }, { status: 500 });
+        }
+        if (!downgraded?.length) {
+          console.warn(`No profile for stripe_customer_id ${customerId}`);
         } else {
           console.log(`Customer ${customerId} reverted to free tier`);
         }
