@@ -1,15 +1,13 @@
 import React from "react";
-import { Document, Page, View, Text, Image, StyleSheet, Font } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { ResumeTemplateData } from "./types";
-
-Font.register({ family: "NotoSansSC", src: "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2" });
 
 const NAVY = "#1B2E4B";
 const GOLD = "#C9A040";
 const LIGHT_GOLD = "#E8C97A";
 
 const styles = StyleSheet.create({
-  page: { fontFamily: "NotoSansSC", backgroundColor: "#ffffff", fontSize: 9 },
+  page: { backgroundColor: "#ffffff", fontSize: 9 },
   header: {
     backgroundColor: NAVY,
     paddingVertical: 28,
@@ -22,7 +20,6 @@ const styles = StyleSheet.create({
   headerPhoto: { width: 65, height: 65, borderRadius: 32 },
   headerName: {
     fontSize: 26,
-    fontFamily: "NotoSansSC",
     color: GOLD,
     letterSpacing: 3,
     textTransform: "uppercase",
@@ -72,7 +69,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#dde3eb",
     paddingBottom: 3,
   },
-  expHeader: { fontSize: 9.5, fontFamily: "NotoSansSC", color: "#111111", marginBottom: 2 },
+  expHeader: { fontSize: 9.5, color: "#111111", marginBottom: 2 },
   expMeta: { fontSize: 8, color: "#888888", marginBottom: 4 },
   bodyText: { fontSize: 9, lineHeight: 1.55, color: "#333333", marginBottom: 4 },
   bulletRow: { flexDirection: "row", marginBottom: 3 },

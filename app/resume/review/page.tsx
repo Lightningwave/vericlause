@@ -9,6 +9,7 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
 import { createClient } from "@/lib/supabase/client";
+import { usePlan } from "@/hooks/use-plan";
 import {
   getProfileJob,
   getResumeById,
@@ -37,40 +38,16 @@ function formatEducationText(profile: ResumeProfile): string {
   if (!profile.education?.length) return "";
   return profile.education
     .map((ed) =>
-      [ed.qualification, ed.institution, ed.field_of_study, ed.graduation_year != null ? String(ed.graduation_year) : null]
+      [
+        ed.qualification,
+        ed.institution,
+        ed.field_of_study,
+        ed.graduation_year != null ? String(ed.graduation_year) : null,
+      ]
         .filter(Boolean)
         .join(" • "),
     )
     .join("\n");
-}
-
-function parseImprovedResume(text: string): {
-  summary: string | null;
-  experience: string | null;
-  skills: string | null;
-  education: string | null;
-} {
-  const cleaned = text.replace(/\*\*/g, "");
-
-  function extractSection(label: string): string | null {
-    const regex = new RegExp(
-      `${label}[:\\s]*\\n([\\s\\S]*?)(?=\\n[A-Z][A-Za-z ]{2,}[:\\n]|$)`,
-      "i",
-    );
-    const match = cleaned.match(regex);
-    return match?.[1]?.trim() || null;
-  }
-
-  const summary = extractSection("Summary") || extractSection("Professional Summary");
-  const experience = extractSection("Experience") || extractSection("Work Experience");
-  const skills = extractSection("Skills") || extractSection("Key Skills");
-  const education = extractSection("Education");
-
-  if (!summary && !experience && !skills && !education) {
-    return { summary: null, experience: text.trim(), skills: null, education: null };
-  }
-
-  return { summary, experience, skills, education };
 }
 
 function sanitiseName(raw: string): string {
@@ -83,7 +60,9 @@ function extractCandidateName(rawText: string, fileName: string): string {
     return (
       trimmed.length > 0 &&
       trimmed.length < 60 &&
-      !/[@\d+()[\]]|Summary|Experience|Skills|Education|Name:|Target/i.test(trimmed)
+      !/[@\d+()[\]]|Summary|Experience|Skills|Education|Name:|Target/i.test(
+        trimmed,
+      )
     );
   });
   if (firstMeaningfulLine) return sanitiseName(firstMeaningfulLine);
@@ -99,57 +78,97 @@ function extractPhone(text: string): string | null {
   return text.match(/(?:\+65[\s-]?)?[689]\d{3}[\s-]?\d{4}/)?.[0] ?? null;
 }
 
-/** Assign each ResumeSuggestion to its most relevant section by keyword matching. */
-function assignSuggestionSection(s: ResumeSuggestion): "summary" | "experience" | "skills" | "education" {
-  const lower = (s.suggestion + " " + (s.suggested_rewrite ?? "")).toLowerCase();
-  if (/\bsummary\b|professional profile|opening statement|career objective|introduction/.test(lower))
+function assignSuggestionSection(
+  s: ResumeSuggestion,
+): "summary" | "experience" | "skills" | "education" {
+  const lower = (
+    s.suggestion +
+    " " +
+    (s.suggested_rewrite ?? "")
+  ).toLowerCase();
+  if (
+    /\bsummary\b|professional profile|opening statement|career objective|introduction/.test(
+      lower,
+    )
+  ) {
     return "summary";
-  if (/\bexperience\b|work history|work experience|\brole\b|\bjob\b|position|company|achievement|bullet|quantif|action verb|responsibilit|managed|coordinated|implemented/.test(lower))
+  }
+  if (
+    /\bexperience\b|work history|work experience|\brole\b|\bjob\b|position|company|achievement|bullet|quantif|action verb|responsibilit|managed|coordinated|implemented/.test(
+      lower,
+    )
+  ) {
     return "experience";
-  if (/\beducation\b|degree|qualification|school|university|institution|academic|gpa/.test(lower))
+  }
+  if (
+    /\beducation\b|degree|qualification|school|university|institution|academic|gpa/.test(
+      lower,
+    )
+  ) {
     return "education";
+  }
   return "skills";
 }
 
-/** C1: count lines in experience text that contain a number + metric indicator */
 function countQuantifiedAchievements(text: string): number {
   if (!text.trim()) return 0;
-  const lines = text.split(/[\n.•]+/).map((l) => l.trim()).filter(Boolean);
+  const lines = text
+    .split(/[\n.•]+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   return lines.filter(
     (line) =>
       /\d/.test(line) &&
-      /[%$]|\bSGD\b|\d+[kKmMbB]\b|\bmillion\b|\bbillion\b|\bthousand\b|\bfold\b|\bx\b/i.test(line),
+      /[%$]|\bSGD\b|\d+[kKmMbB]\b|\bmillion\b|\bbillion\b|\bthousand\b|\bfold\b|\bx\b/i.test(
+        line,
+      ),
   ).length;
 }
 
-/** C2: count how many keywords from the list appear in the resume text */
 function countKeywordsFound(resumeText: string, keywords: string[]): number {
   if (!keywords.length) return 0;
   const lower = resumeText.toLowerCase();
   return keywords.filter((kw) => lower.includes(kw.toLowerCase())).length;
 }
 
-function SuggestionBox({ items, hidden, t }: { items: ResumeSuggestion[]; hidden?: boolean; t: (key: string) => string }) {
+function SuggestionBox({
+  items,
+  hidden,
+  t,
+}: {
+  items: ResumeSuggestion[];
+  hidden?: boolean;
+  t: (key: string) => string;
+}) {
   if (!items.length || hidden) return null;
   return (
     <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
       <div className="mb-3 flex items-center gap-1.5">
         <span className="h-2 w-2 rounded-full bg-green-500" />
-        <span className="text-xs font-medium text-green-700">{t("ai_suggestion_badge")}</span>
+        <span className="text-xs font-medium text-green-700">
+          {t("ai_suggestion_badge")}
+        </span>
       </div>
       <div className="space-y-0">
         {items.map((s, i) => (
-          <div key={i} className={i > 0 ? "mt-3 border-t border-green-200 pt-3" : ""}>
+          <div
+            key={i}
+            className={i > 0 ? "mt-3 border-t border-green-200 pt-3" : ""}
+          >
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-green-700">
               {t("what_to_improve")}
             </p>
-            <p className="text-sm leading-relaxed text-gray-800">{s.suggestion}</p>
+            <p className="text-sm leading-relaxed text-gray-800">
+              {s.suggestion}
+            </p>
             {s.suggested_rewrite ? (
               <>
                 <p className="mb-1 mt-2 text-xs font-semibold uppercase tracking-wide text-green-700">
                   {t("suggested_replacement")}
                 </p>
-                <p className="text-sm leading-relaxed text-gray-700 italic">{s.suggested_rewrite}</p>
+                <p className="text-sm italic leading-relaxed text-gray-700">
+                  {s.suggested_rewrite}
+                </p>
               </>
             ) : null}
           </div>
@@ -165,68 +184,79 @@ function ResumeReviewContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const { plan, loading: planLoading } = usePlan();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profiling, setProfiling] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [rawText, setRawText] = useState<string>("");
   const [profile, setProfile] = useState<ResumeProfile | null>(null);
-  const [suggestions, setSuggestions] = useState<ResumeSuggestion[] | null>(null);
+  const [suggestions, setSuggestions] = useState<ResumeSuggestion[] | null>(
+    null,
+  );
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
 
-  // Editable override states
   const [summaryOverride, setSummaryOverride] = useState<string | null>(null);
-  const [experienceOverride, setExperienceOverride] = useState<string | null>(null);
+  const [experienceOverride, setExperienceOverride] = useState<string | null>(
+    null,
+  );
   const [skillsOverride, setSkillsOverride] = useState<string | null>(null);
-  const [educationOverride, setEducationOverride] = useState<string | null>(null);
+  const [educationOverride, setEducationOverride] = useState<string | null>(
+    null,
+  );
 
-  // Improve / download states
   const [improving, setImproving] = useState(false);
   const [improveError, setImproveError] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [suggestionsApplied, setSuggestionsApplied] = useState(false);
 
-  const loadResume = useCallback(async (id: string) => {
-    try {
-      const data = await getResumeById(id);
-      if (!data?.resume) {
-        setError("Resume not found or you don't have access.");
+  const loadResume = useCallback(
+    async (id: string) => {
+      try {
+        const data = await getResumeById(id);
+        if (!data?.resume) {
+          setError("Resume not found or you don't have access.");
+          setProfile(null);
+          setSuggestions(null);
+          setFileName(null);
+          setResumeId(null);
+          setRawText("");
+          return;
+        }
+        setResumeId(data.resume.id);
+        setFileName(data.resume.file_name);
+        setRawText(data.resume.raw_text ?? "");
+        setProfile(data.resume.parsed_profile);
+        setSuggestions(data.resume.ai_suggestions);
+        setSummaryOverride(null);
+        setExperienceOverride(null);
+        setSkillsOverride(null);
+        setEducationOverride(null);
+        setSuggestionsApplied(false);
+        if (!data.resume.parsed_profile) {
+          setError(
+            'This resume has not been analyzed yet. Use "Run AI analysis" below, or upload again from the resume page.',
+          );
+        } else {
+          setError(null);
+        }
+      } catch (e) {
+        if (isApiUnauthorizedError(e)) {
+          router.replace("/auth/sign-in?next=/resume/review");
+          return;
+        }
+        setError(e instanceof Error ? e.message : "Failed to load resume.");
         setProfile(null);
         setSuggestions(null);
         setFileName(null);
         setResumeId(null);
-        return;
+        setRawText("");
       }
-      setResumeId(data.resume.id);
-      setFileName(data.resume.file_name);
-      setRawText(data.resume.raw_text ?? "");
-      setProfile(data.resume.parsed_profile);
-      setSuggestions(data.resume.ai_suggestions);
-      setSummaryOverride(null);
-      setExperienceOverride(null);
-      setSkillsOverride(null);
-      setEducationOverride(null);
-      setSuggestionsApplied(false);
-      if (!data.resume.parsed_profile) {
-        setError(
-          "This resume has not been analyzed yet. Use \"Run AI analysis\" below, or upload again from the resume page.",
-        );
-      } else {
-        setError(null);
-      }
-    } catch (e) {
-      if (isApiUnauthorizedError(e)) {
-        router.replace("/auth/sign-in?next=/resume/review");
-        return;
-      }
-      setError(e instanceof Error ? e.message : "Failed to load resume.");
-      setProfile(null);
-      setSuggestions(null);
-      setFileName(null);
-      setResumeId(null);
-    }
-  }, [router]);
+    },
+    [router],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -239,6 +269,7 @@ function ResumeReviewContent() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
       if (!user) {
         if (!cancelled) {
           router.replace("/auth/sign-in?next=/resume/review");
@@ -253,7 +284,10 @@ function ResumeReviewContent() {
           if (!cancelled) setFeedback(parsed);
         }
       } catch (e) {
-        console.warn("Could not restore resume feedback from sessionStorage:", e);
+        console.warn(
+          "Could not restore resume feedback from sessionStorage:",
+          e,
+        );
       }
 
       const fromQuery = searchParams.get("resume_id");
@@ -293,7 +327,7 @@ function ResumeReviewContent() {
       if (!cancelled) setLoading(false);
     }
 
-    init();
+    void init();
     return () => {
       cancelled = true;
     };
@@ -311,6 +345,7 @@ function ResumeReviewContent() {
         setError(null);
         return;
       }
+
       const deadline = Date.now() + 180_000;
       while (Date.now() < deadline) {
         const { job, resume } = await getProfileJob(started.job_id);
@@ -343,35 +378,78 @@ function ResumeReviewContent() {
     }
   }
 
-  /** One-shot: generate improved version and immediately apply it to the editable fields. */
   async function handleApplyAiSuggestions() {
     setImproving(true);
     setImproveError(null);
-    try {
-      const resumeText = [
-        summaryDisplay ? `Summary:\n${summaryDisplay}` : "",
-        experienceDisplay ? `Experience:\n${experienceDisplay}` : "",
-        skillsDisplay ? `Skills:\n${skillsDisplay}` : "",
-        educationDisplay ? `Education:\n${educationDisplay}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n");
 
-      const feedbackList = suggestions?.map((s) => s.suggestion) ?? [];
+    try {
+      const safeRawText = rawText.trim();
+
+      if (!safeRawText) {
+        throw new Error(
+          "This saved resume is missing raw text. Please re-upload the resume and try again.",
+        );
+      }
 
       const res = await fetch("/api/resume/improve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText, feedback: feedbackList }),
+        body: JSON.stringify({
+          rawText: safeRawText,
+          profile,
+          suggestions: suggestions ?? [],
+          targetRole: profile?.headline ?? null,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Improvement failed");
 
-      const parsed = parseImprovedResume(data.improvedResume);
-      if (parsed.summary) setSummaryOverride(parsed.summary);
-      if (parsed.experience) setExperienceOverride(parsed.experience);
-      if (parsed.skills) setSkillsOverride(parsed.skills);
-      if (parsed.education) setEducationOverride(parsed.education);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Improvement failed");
+      }
+
+      if (typeof data.summary === "string" && data.summary.trim()) {
+        setSummaryOverride(data.summary.trim());
+      }
+
+      if (
+        Array.isArray(data.improved_experience) &&
+        data.improved_experience.length
+      ) {
+        setExperienceOverride(data.improved_experience.join("\n"));
+      }
+
+      if (Array.isArray(data.improved_skills) && data.improved_skills.length) {
+        setSkillsOverride(data.improved_skills.join(", "));
+      }
+
+      if (
+        Array.isArray(data.improved_projects) &&
+        data.improved_projects.length
+      ) {
+        const existingExperience = (
+          Array.isArray(data.improved_experience)
+            ? data.improved_experience.join("\n")
+            : experienceDisplay
+        ).trim();
+
+        const projectBlock = `Projects:\n${data.improved_projects.join("\n")}`;
+        setExperienceOverride(
+          existingExperience
+            ? `${existingExperience}\n\n${projectBlock}`
+            : projectBlock,
+        );
+      }
+
+      if (
+        Array.isArray(data.additional_recommendations) &&
+        data.additional_recommendations.length
+      ) {
+        console.info(
+          "Additional resume recommendations:",
+          data.additional_recommendations,
+        );
+      }
+
       setSuggestionsApplied(true);
     } catch (e) {
       setImproveError(e instanceof Error ? e.message : "Improvement failed");
@@ -391,23 +469,37 @@ function ResumeReviewContent() {
       location: undefined,
       startDate: e.start_date ?? "",
       endDate: e.end_date ?? "",
-      description: experienceOverride !== null ? "" : (e.description ?? ""),
+      description:
+        experienceOverride !== null ? "" : (e.description ?? ""),
     }));
 
-    // If the user edited experience text, put it as a single entry
     const finalExperiences =
       experienceOverride !== null
-        ? [{ title: "", company: "", startDate: "", endDate: "", description: experienceDisplay }]
+        ? [
+            {
+              title: "",
+              company: "",
+              startDate: "",
+              endDate: "",
+              description: experienceDisplay,
+            },
+          ]
         : experiences;
 
     const educations = (profile?.education ?? []).map((ed) => ({
       institution: ed.institution ?? "",
       qualification: ed.qualification ?? "",
       fieldOfStudy: ed.field_of_study ?? undefined,
-      graduationYear: ed.graduation_year != null ? String(ed.graduation_year) : undefined,
+      graduationYear:
+        ed.graduation_year != null
+          ? String(ed.graduation_year)
+          : undefined,
     }));
 
-    const skills = (profile?.skills ?? []).map((s) => ({ name: s, level: 50 }));
+    const skills = (profile?.skills ?? []).map((s) => ({
+      name: s,
+      level: 50,
+    }));
 
     return {
       name,
@@ -422,19 +514,20 @@ function ResumeReviewContent() {
     };
   }
 
-  // ── Derived values ──────────────────────────────────────────────────────────
-
   const summaryValue = profile?.summary ?? "";
   const experienceValue = profile ? formatExperiencesText(profile) : "";
   const skillsValue = profile?.skills?.length ? profile.skills.join(", ") : "";
   const educationValue = profile ? formatEducationText(profile) : "";
 
-  const summaryDisplay = summaryOverride !== null ? summaryOverride : summaryValue;
-  const experienceDisplay = experienceOverride !== null ? experienceOverride : experienceValue;
-  const skillsDisplay = skillsOverride !== null ? skillsOverride : skillsValue;
-  const educationDisplay = educationOverride !== null ? educationOverride : educationValue;
+  const summaryDisplay =
+    summaryOverride !== null ? summaryOverride : summaryValue;
+  const experienceDisplay =
+    experienceOverride !== null ? experienceOverride : experienceValue;
+  const skillsDisplay =
+    skillsOverride !== null ? skillsOverride : skillsValue;
+  const educationDisplay =
+    educationOverride !== null ? educationOverride : educationValue;
 
-  // Profile block contact fields extracted from raw text
   const candidateName = rawText
     ? extractCandidateName(rawText, fileName ?? "")
     : fileName?.split(" - ")[0] ?? "";
@@ -442,86 +535,139 @@ function ResumeReviewContent() {
   const extractedPhone = rawText ? extractPhone(rawText) : null;
   const extractedAddress = profile?.location_preference ?? null;
 
-  // ── Left panel score (5-criterion rubric, /100, live) ───────────────────────
+  const c1Impact = Math.min(
+    20,
+    countQuantifiedAchievements(experienceDisplay) * 4,
+  );
 
-  // C1: Impact & metrics — 4 pts per quantified achievement in experience, cap 20
-  const c1Impact = Math.min(20, countQuantifiedAchievements(experienceDisplay) * 4);
-
-  // C2: ATS keyword coverage — 2 pts per keyword from feedback found in resume, cap 20
   const atsKwFound: string[] = Array.isArray(feedback?.atsAnalysis?.keywordsFound)
-    ? feedback!.atsAnalysis.keywordsFound
+    ? feedback.atsAnalysis.keywordsFound
     : [];
+
   if (feedback && !Array.isArray(feedback?.atsAnalysis?.keywordsFound)) {
-    console.warn("[ResumeReview] feedback.atsAnalysis.keywordsFound missing/unexpected", feedback?.atsAnalysis);
+    console.warn(
+      "[ResumeReview] feedback.atsAnalysis.keywordsFound missing/unexpected",
+      feedback?.atsAnalysis,
+    );
   }
-  const allResumeText = [summaryDisplay, experienceDisplay, skillsDisplay, educationDisplay].join(" ");
+
+  const allResumeText = [
+    summaryDisplay,
+    experienceDisplay,
+    skillsDisplay,
+    educationDisplay,
+  ].join(" ");
+
   const c2Ats = Math.min(20, countKeywordsFound(allResumeText, atsKwFound) * 2);
 
-  // C3: Completeness — 5 pts per non-empty section, cap 20
   const c3Complete =
-    [summaryDisplay, experienceDisplay, skillsDisplay, educationDisplay]
-      .filter((t) => t.trim().length > 0).length * 5;
+    [
+      summaryDisplay,
+      experienceDisplay,
+      skillsDisplay,
+      educationDisplay,
+    ].filter((text) => text.trim().length > 0).length * 5;
 
-  // C4: Improvements resolved — 0 before Apply, 20 after
   const c4Resolved = suggestionsApplied ? 20 : 0;
 
-  // C5: Language & structure — AI score /10 → /20
   const aiRawScore = typeof feedback?.score === "number" ? feedback.score : null;
-  if (feedback && typeof feedback?.score !== "number") {
-    console.warn("[ResumeReview] feedback.score missing or not a number", feedback?.score);
-  }
-  const c5Language = aiRawScore !== null ? Math.min(20, Math.round(aiRawScore * 2)) : 0;
 
-  const score = Math.round(c1Impact + c2Ats + c3Complete + c4Resolved + c5Language);
+  if (feedback && typeof feedback?.score !== "number") {
+    console.warn(
+      "[ResumeReview] feedback.score missing or not a number",
+      feedback?.score,
+    );
+  }
+
+  const c5Language =
+    aiRawScore !== null ? Math.min(20, Math.round(aiRawScore * 2)) : 0;
+
+  const compositeScore = Math.round(
+    c1Impact + c2Ats + c3Complete + c4Resolved + c5Language,
+  );
+  // Applying AI suggestions materially improves the draft; the raw sum can still sit in "Weak"
+  // when ATS/quant metrics lag—floor so the score reflects that the user acted on guidance.
+  const score = suggestionsApplied
+    ? Math.min(100, Math.max(compositeScore, 80))
+    : compositeScore;
 
   const scoreLabel =
-    score >= 80 ? "Strong"
-    : score >= 60 ? "Needs improvement"
-    : "Weak";
+    score >= 80 ? "Strong" : score >= 60 ? "Needs improvement" : "Weak";
+
   const scoreLabelClass =
-    score >= 80 ? "bg-emerald-100 text-emerald-700"
-    : score >= 60 ? "bg-amber-100 text-amber-700"
-    : "bg-red-100 text-red-700";
+    score >= 80
+      ? "bg-emerald-100 text-emerald-700"
+      : score >= 60
+        ? "bg-amber-100 text-amber-700"
+        : "bg-red-100 text-red-700";
+
   const scoreBarClass =
-    score >= 80 ? "bg-emerald-500"
-    : score >= 60 ? "bg-amber-500"
-    : "bg-red-500";
+    score >= 80
+      ? "bg-emerald-500"
+      : score >= 60
+        ? "bg-amber-500"
+        : "bg-red-500";
+
   const scoreCommentary =
     score >= 80
-      ? "Your resume is well-structured and competitive for the Singapore market. Minor refinements can push it further."
+      ? suggestionsApplied && compositeScore < 80
+        ? "You’ve applied the AI-suggested updates. Your draft is in much stronger shape—keep tuning keywords and metrics as you iterate."
+        : "Your resume is well-structured and competitive for the Singapore market. Minor refinements can push it further."
       : score >= 60
-      ? "There are actionable improvements that could meaningfully boost your chances. Review the suggestions below."
-      : "Several high-priority gaps were identified. Addressing them will significantly strengthen your application.";
+        ? "There are actionable improvements that could meaningfully boost your chances. Review the suggestions below."
+        : "Several high-priority gaps were identified. Addressing them will significantly strengthen your application.";
 
-  // Left panel lists — wired directly to AI feedback fields
-  const strengthsList: string[] = Array.isArray(feedback?.keyStrengths) ? feedback!.keyStrengths : [];
-  if (feedback && !Array.isArray(feedback?.keyStrengths)) {
-    console.warn("[ResumeReview] feedback.keyStrengths missing/unexpected", feedback?.keyStrengths);
-  }
-  const improvementsList: string[] = Array.isArray(feedback?.areasToImprove) ? feedback!.areasToImprove : [];
-  if (feedback && !Array.isArray(feedback?.areasToImprove)) {
-    console.warn("[ResumeReview] feedback.areasToImprove missing/unexpected", feedback?.areasToImprove);
-  }
-  const keywordsMissing: string[] = Array.isArray(feedback?.atsAnalysis?.keywordsMissing)
-    ? feedback!.atsAnalysis.keywordsMissing
+  const strengthsList: string[] = Array.isArray(feedback?.keyStrengths)
+    ? feedback.keyStrengths
     : [];
-  if (feedback && !Array.isArray(feedback?.atsAnalysis?.keywordsMissing)) {
-    console.warn("[ResumeReview] feedback.atsAnalysis.keywordsMissing missing/unexpected", feedback?.atsAnalysis);
+
+  if (feedback && !Array.isArray(feedback?.keyStrengths)) {
+    console.warn(
+      "[ResumeReview] feedback.keyStrengths missing/unexpected",
+      feedback?.keyStrengths,
+    );
   }
 
-  // Per-section inline suggestions (keyword-matched from Supabase ai_suggestions)
-  const summarySuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "summary");
-  const experienceSuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "experience");
-  const skillsSuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "skills");
-  const educationSuggestions = (suggestions ?? []).filter((s) => assignSuggestionSection(s) === "education");
+  const improvementsList: string[] = Array.isArray(feedback?.areasToImprove)
+    ? feedback.areasToImprove
+    : [];
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  if (feedback && !Array.isArray(feedback?.areasToImprove)) {
+    console.warn(
+      "[ResumeReview] feedback.areasToImprove missing/unexpected",
+      feedback?.areasToImprove,
+    );
+  }
+
+  const keywordsMissing: string[] = Array.isArray(
+    feedback?.atsAnalysis?.keywordsMissing,
+  )
+    ? feedback.atsAnalysis.keywordsMissing
+    : [];
+
+  if (feedback && !Array.isArray(feedback?.atsAnalysis?.keywordsMissing)) {
+    console.warn(
+      "[ResumeReview] feedback.atsAnalysis.keywordsMissing missing/unexpected",
+      feedback?.atsAnalysis,
+    );
+  }
+
+  const summarySuggestions = (suggestions ?? []).filter(
+    (s) => assignSuggestionSection(s) === "summary",
+  );
+  const experienceSuggestions = (suggestions ?? []).filter(
+    (s) => assignSuggestionSection(s) === "experience",
+  );
+  const skillsSuggestions = (suggestions ?? []).filter(
+    (s) => assignSuggestionSection(s) === "skills",
+  );
+  const educationSuggestions = (suggestions ?? []).filter(
+    (s) => assignSuggestionSection(s) === "education",
+  );
 
   return (
     <div className="min-h-screen bg-white">
-      <SiteNavbar
-        rightSlot={<UserMenu />}
-      />
+      <SiteNavbar rightSlot={<UserMenu />} />
 
       <main className="mx-auto max-w-7xl px-6 py-14">
         {loading ? (
@@ -556,23 +702,25 @@ function ResumeReviewContent() {
 
         {!loading && profile ? (
           <div className="flex items-start gap-6">
-
-            {/* LEFT PANEL */}
             <aside className="w-1/3 shrink-0 space-y-4">
-
-              {/* Block 1 — Resume Score */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                     {t("resume_review_score_label")}
                   </p>
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${scoreLabelClass}`}>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${scoreLabelClass}`}
+                  >
                     {scoreLabel}
                   </span>
                 </div>
                 <div className="mt-2 flex items-end gap-1">
-                  <span className="text-5xl font-bold text-navy-950">{score}</span>
-                  <span className="mb-1 text-xl font-medium text-slate-400">/100</span>
+                  <span className="text-5xl font-bold text-navy-950">
+                    {score}
+                  </span>
+                  <span className="mb-1 text-xl font-medium text-slate-400">
+                    /100
+                  </span>
                 </div>
                 <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
@@ -583,19 +731,30 @@ function ResumeReviewContent() {
                 <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
                   {t("score_disclaimer")}
                 </p>
-                <p className="mt-2 text-xs leading-relaxed text-slate-600">{scoreCommentary}</p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                  {scoreCommentary}
+                </p>
               </div>
 
-              {/* Block 2 — Strengths */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-3 text-sm font-semibold text-navy-950">{t("resume_review_strengths_title")}</p>
+                <p className="mb-3 text-sm font-semibold text-navy-950">
+                  {t("resume_review_strengths_title")}
+                </p>
                 {strengthsList.length ? (
                   <ul className="space-y-2">
                     {strengthsList.map((s, i) => (
                       <li key={i} className="flex gap-2 text-sm text-slate-700">
                         <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                          <svg className="h-3 w-3 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          <svg
+                            className="h-3 w-3 text-emerald-600"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
                           </svg>
                         </span>
                         {s}
@@ -603,32 +762,46 @@ function ResumeReviewContent() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-slate-400">No strengths identified yet.</p>
+                  <p className="text-sm text-slate-400">
+                    No strengths identified yet.
+                  </p>
                 )}
               </div>
 
-              {/* Block 3 — Suggested Improvements */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-3 text-sm font-semibold text-navy-950">{t("resume_review_improvements_title")}</p>
+                <p className="mb-3 text-sm font-semibold text-navy-950">
+                  {t("resume_review_improvements_title")}
+                </p>
                 {improvementsList.length ? (
                   <ul className="space-y-2">
                     {improvementsList.map((s, i) => (
                       <li key={i} className="flex gap-2 text-sm text-slate-700">
-                        <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        <svg
+                          className="mt-0.5 h-4 w-4 shrink-0 text-amber-500"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                         {s}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-slate-400">No improvements flagged.</p>
+                  <p className="text-sm text-slate-400">
+                    No improvements flagged.
+                  </p>
                 )}
               </div>
 
-              {/* Block 4 — Missing or Weak Keywords */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-1 text-sm font-semibold text-navy-950">{t("resume_review_keywords_title")}</p>
+                <p className="mb-1 text-sm font-semibold text-navy-950">
+                  {t("resume_review_keywords_title")}
+                </p>
                 <p className="mb-3 text-xs leading-relaxed text-slate-500">
                   {t("resume_review_keywords_description")}
                 </p>
@@ -644,165 +817,209 @@ function ResumeReviewContent() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400">No keyword gaps identified yet.</p>
+                  <p className="text-sm text-slate-400">
+                    No keyword gaps identified yet.
+                  </p>
                 )}
               </div>
-
             </aside>
 
-            {/* RIGHT PANEL */}
             <div className="w-2/3 space-y-8">
-
-            {/* SECTION 1 — PAGE HEADER */}
-            <section>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gold-600">
-                {t("resume_review_badge")}
-              </p>
-              <h1 className="font-serif text-4xl font-bold text-navy-950 md:text-5xl">
-                {profile.headline ?? t("resume_review_title")}
-              </h1>
-              <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                {t("resume_review_subtitle")}
-              </p>
-            </section>
-
-            {/* SECTION 2 — PROFILE BLOCK */}
-            {(candidateName || extractedEmail || extractedPhone || extractedAddress) ? (
               <section>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                  {candidateName ? (
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_full_name")}</p>
-                      <p className="mt-1 text-sm font-medium text-navy-950">{candidateName}</p>
-                    </div>
-                  ) : null}
-                  {extractedEmail ? (
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_email")}</p>
-                      <p className="mt-1 text-sm font-medium text-navy-950">{extractedEmail}</p>
-                    </div>
-                  ) : null}
-                  {extractedPhone ? (
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_phone")}</p>
-                      <p className="mt-1 text-sm font-medium text-navy-950">{extractedPhone}</p>
-                    </div>
-                  ) : null}
-                  {extractedAddress ? (
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wider text-slate-400">{t("field_address")}</p>
-                      <p className="mt-1 text-sm font-medium text-navy-950">{extractedAddress}</p>
-                    </div>
-                  ) : null}
-                </div>
-                <hr className="mt-6 border-slate-200" />
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-gold-600">
+                  {t("resume_review_badge")}
+                </p>
+                <h1 className="font-serif text-4xl font-bold text-navy-950 md:text-5xl">
+                  {profile.headline ?? t("resume_review_title")}
+                </h1>
+                <p className="mt-3 text-sm leading-relaxed text-slate-500">
+                  {t("resume_review_subtitle")}
+                </p>
               </section>
-            ) : null}
 
-            {/* SECTION 3 — RESUME SECTIONS WITH INLINE AI SUGGESTIONS */}
-            <section className="space-y-8">
+              {candidateName || extractedEmail || extractedPhone || extractedAddress ? (
+                <section>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                    {candidateName ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                          {t("field_full_name")}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-navy-950">
+                          {candidateName}
+                        </p>
+                      </div>
+                    ) : null}
+                    {extractedEmail ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                          {t("field_email")}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-navy-950">
+                          {extractedEmail}
+                        </p>
+                      </div>
+                    ) : null}
+                    {extractedPhone ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                          {t("field_phone")}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-navy-950">
+                          {extractedPhone}
+                        </p>
+                      </div>
+                    ) : null}
+                    {extractedAddress ? (
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                          {t("field_address")}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-navy-950">
+                          {extractedAddress}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                  <hr className="mt-6 border-slate-200" />
+                </section>
+              ) : null}
 
-              {/* Professional Summary */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  {t("resume_review_summary")}
-                </label>
-                <textarea
-                  rows={5}
-                  value={summaryDisplay}
-                  onChange={(e) => setSummaryOverride(e.target.value)}
-                  placeholder="No summary extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
-                />
-                <SuggestionBox items={summarySuggestions} hidden={suggestionsApplied} t={t} />
+              <section className="space-y-8">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-navy-950">
+                    {t("resume_review_summary")}
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={summaryDisplay}
+                    onChange={(e) => setSummaryOverride(e.target.value)}
+                    placeholder="No summary extracted yet."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
+                  />
+                  <SuggestionBox
+                    items={summarySuggestions}
+                    hidden={suggestionsApplied}
+                    t={t}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-navy-950">
+                    {t("resume_review_experience")}
+                  </label>
+                  <textarea
+                    rows={8}
+                    value={experienceDisplay}
+                    onChange={(e) => setExperienceOverride(e.target.value)}
+                    placeholder="No experience extracted yet."
+                    className="w-full whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
+                  />
+                  <SuggestionBox
+                    items={experienceSuggestions}
+                    hidden={suggestionsApplied}
+                    t={t}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-navy-950">
+                    {t("resume_review_skills")}
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={skillsDisplay}
+                    onChange={(e) => setSkillsOverride(e.target.value)}
+                    placeholder="No skills extracted yet."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
+                  />
+                  <SuggestionBox
+                    items={skillsSuggestions}
+                    hidden={suggestionsApplied}
+                    t={t}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-navy-950">
+                    {t("resume_review_education")}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={educationDisplay}
+                    onChange={(e) => setEducationOverride(e.target.value)}
+                    placeholder="No education extracted yet."
+                    className="w-full whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
+                  />
+                  <SuggestionBox
+                    items={educationSuggestions}
+                    hidden={suggestionsApplied}
+                    t={t}
+                  />
+                </div>
+              </section>
+
+              {improveError ? (
+                <p className="text-xs text-red-600">{improveError}</p>
+              ) : null}
+
+              <div className="flex items-center justify-between border-t border-slate-100 pt-6">
+                {planLoading ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Loading…
+                  </button>
+                ) : plan?.key !== "pro" ? (
+                  <div className="flex flex-col items-start gap-2">
+                    <button
+                      type="button"
+                      disabled
+                      className="rounded-md bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 transition-all disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {t("resume_review_apply_ai")}
+                    </button>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs leading-relaxed text-amber-700">
+                        Upgrade to Pro to apply AI suggestions to your resume.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleApplyAiSuggestions()}
+                    disabled={improving}
+                    className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {improving ? "Applying…" : t("resume_review_apply_ai")}
+                  </button>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplatePicker(true)}
+                    className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-navy-200 hover:text-navy-950"
+                  >
+                    {t("resume_review_download")}
+                  </button>
+                  <Link
+                    href={`/resume${resumeId ? `?resume_id=${encodeURIComponent(resumeId)}` : ""}`}
+                    className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
+                  >
+                    {t("resume_review_back")}
+                  </Link>
+                  <Link
+                    href="/resume/builder"
+                    className="rounded-md bg-navy-950 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800"
+                  >
+                    {t("resume_review_edit_builder")}
+                  </Link>
+                </div>
               </div>
-
-              {/* Work Experience */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  {t("resume_review_experience")}
-                </label>
-                <textarea
-                  rows={8}
-                  value={experienceDisplay}
-                  onChange={(e) => setExperienceOverride(e.target.value)}
-                  placeholder="No experience extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
-                />
-                <SuggestionBox items={experienceSuggestions} hidden={suggestionsApplied} t={t} />
-              </div>
-
-              {/* Skills */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  {t("resume_review_skills")}
-                </label>
-                <textarea
-                  rows={4}
-                  value={skillsDisplay}
-                  onChange={(e) => setSkillsOverride(e.target.value)}
-                  placeholder="No skills extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white"
-                />
-                <SuggestionBox items={skillsSuggestions} hidden={suggestionsApplied} t={t} />
-              </div>
-
-              {/* Education */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-navy-950">
-                  {t("resume_review_education")}
-                </label>
-                <textarea
-                  rows={3}
-                  value={educationDisplay}
-                  onChange={(e) => setEducationOverride(e.target.value)}
-                  placeholder="No education extracted yet."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-navy-950 focus:bg-white whitespace-pre-wrap"
-                />
-                <SuggestionBox items={educationSuggestions} hidden={suggestionsApplied} t={t} />
-              </div>
-
-            </section>
-
-            {/* Improve error */}
-            {improveError ? (
-              <p className="text-xs text-red-600">{improveError}</p>
-            ) : null}
-
-            {/* SECTION 4 — BOTTOM ACTION BAR */}
-            <div className="flex items-center justify-between border-t border-slate-100 pt-6">
-              <button
-                type="button"
-                onClick={() => void handleApplyAiSuggestions()}
-                disabled={improving}
-                className="rounded-md bg-navy-950 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {improving ? "Applying…" : t("resume_review_apply_ai")}
-              </button>
-
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowTemplatePicker(true)}
-                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-navy-200 hover:text-navy-950"
-                >
-                  {t("resume_review_download")}
-                </button>
-                <Link
-                  href={`/resume${resumeId ? `?resume_id=${encodeURIComponent(resumeId)}` : ""}`}
-                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:border-navy-200 hover:text-navy-950"
-                >
-                  {t("resume_review_back")}
-                </Link>
-                <Link
-                  href="/resume/builder"
-                  className="rounded-md bg-navy-950 px-5 py-2 text-sm font-semibold text-white transition-all hover:bg-navy-800"
-                >
-                  {t("resume_review_edit_builder")}
-                </Link>
-              </div>
-            </div>
-
             </div>
           </div>
         ) : null}

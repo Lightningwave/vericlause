@@ -8,10 +8,10 @@ Compliance verification for Singapore employment contracts. Grounds every answer
 2. [Stack](#stack)  
 3. [Database](#database)  
 4. [AI workflow](#ai-workflow)  
-5. [Quick start](#quick-start)  
-6. [Deploy to Vercel](#deploy-to-vercel)  
-7. [Project layout](#project-layout)  
-
+5. [Subscription & Billing](#subscription--billing)
+6. [Quick start](#quick-start)  
+7. [Deploy to Vercel](#deploy-to-vercel)  
+8. [Project layout](#project-layout)  
 ---
 
 ## Features
@@ -263,6 +263,26 @@ Framed as indicative estimates (disclaimer included)
 **Azure AI API namespace:**
 - `GET /api/azure/speech-token`: Azure Speech SDK token
 - `POST /api/azure/avatar-relay`: Azure AI Avatar session relay
+
+## Subscription & Billing
+
+VeriClause supports highly configurable billing tiers built atop Stripe, utilizing Supabase to store and enforce limits.
+
+### Architecture
+All SaaS infrastructure relies on the single source of truth database model:
+- **`profiles` table**: Upon sign up, a Postgres Trigger creates a free profile storing their `stripe_customer_id`, current `plan` string (e.g. `free`, `pro`, `business`), and expiration info.
+- **Access Middleware**: Found in `lib/billing/access.ts`, these internal functions lookup the user `plan` and return `planKey` structures mapping limits securely before any feature triggers.
+
+### Usage Engine & Features Tracked
+We track exact consumption directly via Supabase `row count` checks, entirely skipping the need for manual usage counters, eliminating sync issues. Found in `lib/billing/usage.ts`:
+- **Contract Analyses**: Enforced as a `lifetime` or `month` window depending on the tier. Tracks successful analyses via the `reports` table.
+- **AI Reviews**: Enforced strictly as a `day` window (e.g., resets at midnight). Tracks uploaded analyses via the `resumes` table.
+- Both metrics are streamed to the frontend `/profile` page via `/api/billing/usage/route.ts` where they're displayed via Progress bars using the `useUsage()` hook.
+
+### Stripe Integration Workflow
+1. **Upgrading (`/api/billing/checkout`)**: Redirects users to Stripe. Passes `client_reference_id` set to the User ID.
+2. **Syncing (`/api/billing/webhook`)**: Responds to `checkout.session.completed` and `customer.subscription.updated`. Upgrades/Downgrades are applied reliably in the background without relying on client-side JS.
+3. **Managing (`/api/billing/portal`)**: Secure Customer Billing Portal redirect to allow users self-service management (Cancellations, Card updates) safely off-premises.
 
 ## Quick Start
 

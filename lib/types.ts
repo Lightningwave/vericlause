@@ -52,12 +52,12 @@ export interface ComplianceReport {
 
 export interface ResumeSuggestion {
   type:
-    | "critical_fix"
-    | "enhancement"
-    | "design_feedback"
-    | "content_gap"
-    | "impact_opportunity"
-    | "ats_optimization";
+  | "critical_fix"
+  | "enhancement"
+  | "design_feedback"
+  | "content_gap"
+  | "impact_opportunity"
+  | "ats_optimization";
   priority: "high" | "medium" | "low";
   category: "formatting" | "content" | "structure" | "keywords" | "impact";
   suggestion: string;
@@ -120,12 +120,56 @@ export interface KeyTermComparison {
   verdict_b?: "compliant" | "caution" | "violated";
 }
 
+export interface CanonicalTermComparison {
+  key: string;
+  label: string;
+  contract_a_value: string | null;
+  contract_b_value: string | null;
+  assessment: "a_better" | "b_better" | "equal" | "different";
+  verdict_a?: "compliant" | "caution" | "violated";
+  verdict_b?: "compliant" | "caution" | "violated";
+}
+
 export interface ContractComparison {
   document_a_id: string;
   document_b_id: string;
   key_terms: KeyTermComparison[];
+  canonical_terms?: CanonicalTermComparison[];
   clauses: ClauseComparison[];
   summary: string;
+  recommendation?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Interview scoring
+// ---------------------------------------------------------------------------
+
+export interface InterviewTranscriptLine {
+  role: "user" | "agent";
+  text: string;
+}
+
+export interface InterviewScoreDimension {
+  key:
+  | "clarity_communication"
+  | "role_relevance"
+  | "technical_or_leadership_depth"
+  | "problem_solving_examples"
+  | "structure_conciseness"
+  | "confidence_presence";
+  label: string;
+  score: number; // 0-10
+  reason: string;
+}
+
+export interface InterviewScoreResult {
+  overall_score: number; // 0-100
+  dimensions: InterviewScoreDimension[];
+  strengths: string[];
+  improvements: string[];
+  evidence_quotes: string[];
+  summary: string;
+  confidence?: "low" | "medium" | "high";
 }
 
 // ---------------------------------------------------------------------------

@@ -8,17 +8,93 @@ import { UserMenu } from "@/components/layout/UserMenu";
 import { ResumeList } from "@/components/resume/ResumeList";
 import { useLanguage } from "@/components/providers/language-provider";
 import { useResumeStatus } from "@/components/providers/resume-status-provider";
+import { useUsage } from "@/hooks/use-usage";
 import { createClient } from "@/lib/supabase/client";
-import { getProfileJob, getResumeById, listResumes, profileResume, uploadResume, type ResumeSummary } from "@/lib/api";
+import {
+  getProfileJob,
+  getResumeById,
+  listResumes,
+  profileResume,
+  uploadResume,
+  type ResumeSummary,
+} from "@/lib/api";
 import type { ResumeProfile } from "@/lib/types";
 import type { ResumeFeedback } from "@/app/api/resume/route";
+
+function StepPill({
+  number,
+  label,
+  active,
+  complete,
+}: {
+  number: number;
+  label: string;
+  active?: boolean;
+  complete?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+        complete
+          ? "border-emerald-200 bg-emerald-50"
+          : active
+            ? "border-navy-950 bg-white shadow-sm"
+            : "border-slate-200 bg-slate-50"
+      }`}
+    >
+      <span
+        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+          complete
+            ? "bg-emerald-600 text-white"
+            : active
+              ? "bg-navy-950 text-white"
+              : "bg-white text-slate-500 border border-slate-200"
+        }`}
+      >
+        {complete ? "✓" : number}
+      </span>
+      <span
+        className={`text-sm font-medium ${
+          complete ? "text-emerald-800" : active ? "text-navy-950" : "text-slate-500"
+        }`}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function StatusBanner({
+  tone,
+  children,
+}: {
+  tone: "success" | "warning" | "error" | "info";
+  children: React.ReactNode;
+}) {
+  const styles =
+    tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      : tone === "warning"
+        ? "border-amber-200 bg-amber-50 text-amber-900"
+        : tone === "error"
+          ? "border-red-200 bg-red-50 text-red-700"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return <div className={`rounded-2xl border px-4 py-3 text-sm ${styles}`}>{children}</div>;
+}
 
 function ResumeOnboardingContent() {
   const { t, locale } = useLanguage();
   const { status: resumeStatus, refetch: refetchResumeStatus } = useResumeStatus();
+  const { usage } = useUsage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const reviewUsage = usage?.aiReviews;
+  const isLimitReached = reviewUsage?.limit != null && reviewUsage.used >= reviewUsage.limit;
+
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const [uploading, setUploading] = useState(false);
@@ -27,12 +103,10 @@ function ResumeOnboardingContent() {
   const [lastResumeId, setLastResumeId] = useState<string | null>(null);
   const [userResumes, setUserResumes] = useState<ResumeSummary[]>([]);
 
-  // Voice-to-text state
   const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
   const [voiceText, setVoiceText] = useState("");
   const recognizerRef = useRef<{ stop: () => void } | null>(null);
 
-  // Upload / analysis state
   const [uploadComplete, setUploadComplete] = useState(false);
   const [feedback, setFeedback] = useState<ResumeFeedback | null>(null);
   const [analysing, setAnalysing] = useState(false);
@@ -40,6 +114,7 @@ function ResumeOnboardingContent() {
   const [analysisStep, setAnalysisStep] = useState(0);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   const analysisSteps = [
     t("upload_step_reading"),
@@ -49,7 +124,6 @@ function ResumeOnboardingContent() {
     t("upload_step_finalising"),
   ];
 
-  // Stage 0 = no file, 1 = file selected, 2 = uploaded, 3 = analysed
   const stage = !selectedFile ? 0 : !uploadComplete ? 1 : !analysisComplete ? 2 : 3;
 
   useEffect(() => {
@@ -76,10 +150,6 @@ function ResumeOnboardingContent() {
           setUserResumes(r.resumes);
           if (paramResumeId) {
             setLastResumeId(paramResumeId);
-            const match = r.resumes.find((re) => re.id === paramResumeId);
-            if (match) {
-              // resume found from URL param — no banner needed, stage will reflect state
-            }
           }
         })
         .catch(() => setUserResumes([]));
@@ -109,8 +179,16 @@ function ResumeOnboardingContent() {
     if (file) setFile(file);
   }
 
+  function handleDrop(event: React.DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    setDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) setFile(file);
+  }
+
   function handleClear() {
     setFile(null);
+    setVoiceText("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -126,6 +204,7 @@ function ResumeOnboardingContent() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
     if (!user) {
       router.push("/auth/sign-in?next=/resume");
       return;
@@ -138,6 +217,7 @@ function ResumeOnboardingContent() {
     }
 
     setUploading(true);
+
     try {
       const uploadResult = await uploadResume(selectedFile);
       const { resume_id } = uploadResult;
@@ -169,9 +249,7 @@ function ResumeOnboardingContent() {
         setLastResumeId(resume_id);
         try {
           sessionStorage.setItem("vericlause.lastResumeId", resume_id);
-        } catch {
-          /* ignore */
-        }
+        } catch {}
         setUploadComplete(true);
         setProfiling(false);
         return;
@@ -180,27 +258,28 @@ function ResumeOnboardingContent() {
       const deadline = Date.now() + 180_000;
       while (Date.now() < deadline) {
         const { job, resume } = await getProfileJob(started.job_id);
+
         if (job.status === "succeeded" && resume?.parsed_profile) {
           setLastResumeId(resume_id);
           try {
             sessionStorage.setItem("vericlause.lastResumeId", resume_id);
-          } catch {
-            /* ignore */
-          }
+          } catch {}
           setUploadComplete(true);
           setProfiling(false);
           return;
         }
+
         if (job.status === "failed") {
           throw new Error(job.error ?? t("resume_error_profiling_failed"));
         }
+
         await new Promise((r) => setTimeout(r, 1500));
       }
+
       try {
         sessionStorage.setItem("vericlause.lastResumeId", resume_id);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
+
       setLastResumeId(resume_id);
       setUploadComplete(true);
     } catch (e) {
@@ -217,12 +296,13 @@ function ResumeOnboardingContent() {
 
   async function handleAnalyse() {
     if (!selectedFile) return;
+
     setAnalysing(true);
     setAnalysisError(null);
     setFeedback(null);
 
-    // FIX 2: translate resume text if non-English locale
     let translatedText: string | null = null;
+
     if (locale !== "en" && lastResumeId) {
       setTranslating(true);
       try {
@@ -238,7 +318,6 @@ function ResumeOnboardingContent() {
           translatedText = (data.translatedText as string) || null;
         }
       } catch {
-        // ignore — proceed without translation
       } finally {
         setTranslating(false);
       }
@@ -262,7 +341,7 @@ function ResumeOnboardingContent() {
       setFeedback(json.feedback as ResumeFeedback);
       try {
         sessionStorage.setItem("vericlause.resumeFeedback", JSON.stringify(json.feedback));
-      } catch { /* ignore */ }
+      } catch {}
       setAnalysisComplete(true);
     } catch {
       setAnalysisError("Network error. Please check your connection and try again.");
@@ -288,14 +367,19 @@ function ResumeOnboardingContent() {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = false;
+
     const micLangMap: Record<string, string> = {
-      en: "en-SG", zh: "zh-CN", ms: "ms-MY", ta: "ta-IN",
+      en: "en-SG",
+      zh: "zh-CN",
+      ms: "ms-MY",
+      ta: "ta-IN",
     };
+
     recognition.lang = micLangMap[locale] ?? "en-SG";
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[event.results.length - 1][0].transcript;
-      setVoiceText((prev) => (prev ? prev + " " + transcript : transcript));
+      setVoiceText((prev) => (prev ? `${prev} ${transcript}` : transcript));
     };
 
     recognition.onerror = () => setMicState("idle");
@@ -313,9 +397,7 @@ function ResumeOnboardingContent() {
 
   return (
     <main className="min-h-screen bg-[#f8f8f6]">
-      <SiteNavbar
-        rightSlot={<UserMenu />}
-      />
+      <SiteNavbar rightSlot={<UserMenu />} />
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:py-14">
         <div className="mb-8 max-w-3xl">
@@ -328,21 +410,37 @@ function ResumeOnboardingContent() {
           <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
             {t("resume_page_hero_lead")}
           </p>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <StepPill number={1} label={t("resume_upload_card_title")} active={stage === 0 || stage === 1} complete={stage > 1} />
+            <StepPill number={2} label={t("resume_analyse_button")} active={stage === 2} complete={stage > 2} />
+            <StepPill number={3} label={t("resume_go_review")} active={stage === 3} />
+          </div>
+
           {resumeStatus?.has_profile ? (
-            <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              {t("resume_status_has_profile_banner")}
-            </p>
+            <div className="mt-6">
+              <StatusBanner tone="success">{t("resume_status_has_profile_banner")}</StatusBanner>
+            </div>
           ) : resumeStatus?.has_resume ? (
-            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              {t("resume_status_has_resume_banner")}
-            </p>
+            <div className="mt-6">
+              <StatusBanner tone="warning">{t("resume_status_has_resume_banner")}</StatusBanner>
+            </div>
           ) : null}
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-navy-950">{t("resume_upload_card_title")}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{t("resume_upload_card_intro")}</p>
+        <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-navy-950">{t("resume_upload_card_title")}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {t("resume_upload_card_intro")}
+                </p>
+              </div>
+              <div className="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 sm:block">
+                {selectedFileName ? t("resume_selected_file") : t("resume_upload_card_title")}
+              </div>
+            </div>
 
             <form
               className="mt-6"
@@ -351,24 +449,136 @@ function ResumeOnboardingContent() {
                 void handleUpload();
               }}
             >
-              <div className="flex items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.docx"
-                  onChange={handleFileChange}
-                  className="block flex-1 text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-navy-50 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-navy-700 hover:file:bg-navy-100"
-                />
+              <button
+                type="button"
+                disabled={isLimitReached}
+                onClick={() => {
+                  if (!isLimitReached) fileInputRef.current?.click();
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!isLimitReached) setDragActive(true);
+                }}
+                onDragLeave={() => {
+                  if (!isLimitReached) setDragActive(false);
+                }}
+                onDrop={isLimitReached ? undefined : handleDrop}
+                className={`group flex w-full flex-col items-center justify-center rounded-[24px] border border-dashed px-6 py-8 text-center transition ${
+                  isLimitReached
+                    ? "border-amber-200 bg-amber-50 cursor-not-allowed opacity-90"
+                    : dragActive
+                      ? "border-navy-950 bg-navy-50"
+                      : selectedFileName
+                        ? "border-emerald-300 bg-emerald-50/70 hover:border-emerald-400"
+                        : "border-slate-300 bg-slate-50 hover:border-navy-950 hover:bg-white"
+                }`}
+              >
+                {isLimitReached ? (
+                  <>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth="1.8">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <p className="mt-4 text-base font-semibold text-amber-900">
+                      AI Review Limit Reached
+                    </p>
+                    <p className="mt-2 text-sm text-amber-700">
+                      Upgrade via your dashboard to review more resumes today.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className={`flex h-14 w-14 items-center justify-center rounded-2xl transition ${
+                        selectedFileName ? "bg-emerald-100 text-emerald-700" : "bg-white text-navy-950 shadow-sm"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" aria-hidden="true">
+                        <path
+                          d="M12 16V4m0 0-4 4m4-4 4 4M5 16.5v1.25A2.25 2.25 0 0 0 7.25 20h9.5A2.25 2.25 0 0 0 19 17.75V16.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+
+                    <p className="mt-4 text-base font-semibold text-navy-950">
+                      {selectedFileName || t("resume_upload_button")}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      PDF / DOCX
+                    </p>
+
+                    <span className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition group-hover:border-navy-950 group-hover:text-navy-950">
+                      Choose File
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {error ? (
+                <div className="mt-4">
+                  <StatusBanner tone="error">{error}</StatusBanner>
+                </div>
+              ) : null}
+
+              {stage === 2 ? (
+                <div className="mt-4">
+                  <StatusBanner tone="success">{t("upload_success_banner")}</StatusBanner>
+                </div>
+              ) : null}
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <button
+                  type="submit"
+                  disabled={stage !== 1 || uploading || profiling || isLimitReached}
+                  className={`inline-flex h-12 items-center justify-center rounded-xl px-5 text-sm font-semibold text-white transition ${
+                    stage === 1 && !uploading && !profiling && !isLimitReached
+                      ? "bg-navy-950 hover:-translate-y-0.5 hover:opacity-95"
+                      : "bg-slate-300"
+                  } disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-60`}
+                >
+                  {uploading || profiling ? t("resume_processing") : t("resume_upload_button")}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={uploading || profiling}
+                  onClick={handleClear}
+                  className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {t("resume_clear_button")}
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-8 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-sm font-semibold text-slate-700">
+                  {t("voice_describe_label")}
+                </label>
+
                 <button
                   type="button"
                   onClick={handleMicClick}
                   title={micState === "listening" ? "Stop recording" : "Start voice input"}
-                  className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition ${
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
                     micState === "listening"
                       ? "animate-pulse border-red-300 bg-red-50 text-red-600"
                       : micState === "processing"
-                      ? "border-slate-200 bg-slate-50 text-slate-400"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        ? "border-slate-200 bg-slate-100 text-slate-400"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-navy-950 hover:text-navy-950"
                   }`}
                 >
                   {micState === "processing" ? (
@@ -385,91 +595,59 @@ function ResumeOnboardingContent() {
                 </button>
               </div>
 
-              {selectedFileName ? (
-                <p className="mt-3 text-sm font-medium text-navy-950">
-                  {t("resume_selected_file")}: {selectedFileName}
-                </p>
-              ) : null}
-
-              {error ? (
-                <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
-              ) : null}
-
-              {/* Upload button — active only at stage 1 */}
-              <button
-                type="submit"
-                disabled={stage !== 1 || uploading || profiling}
-                className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none ${
-                  stage === 1 && !uploading && !profiling
-                    ? "bg-navy-950 hover:opacity-90"
-                    : "bg-slate-300"
-                }`}
-              >
-                {uploading || profiling ? t("resume_processing") : t("resume_upload_button")}
-              </button>
-
-              {/* Stage 2 banner — upload done, waiting for analysis */}
-              {stage === 2 ? (
-                <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                  {t("upload_success_banner")}
-                </p>
-              ) : null}
-            </form>
-
-            <div className="mt-5">
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                {t("voice_describe_label")}
-              </label>
               <textarea
                 value={voiceText}
                 onChange={(e) => setVoiceText(e.target.value)}
                 placeholder={t("voice_textarea_placeholder")}
-                rows={4}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
+                rows={5}
+                className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-navy-950"
               />
+
+              <button
+                type="button"
+                onClick={() => void handleAnalyse()}
+                disabled={stage !== 2 || analysing || translating}
+                className={`mt-4 inline-flex h-12 w-full items-center justify-center rounded-xl px-5 text-sm font-semibold transition ${
+                  stage === 2 && !analysing && !translating
+                    ? "bg-[#b88a44] text-white hover:-translate-y-0.5 hover:opacity-95"
+                    : "bg-white border border-slate-200 text-slate-400"
+                } disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-60`}
+              >
+                {analysing ? t("resume_analysing_label") : t("resume_analyse_button")}
+              </button>
             </div>
 
-            {/* Analyse button — active only at stage 2 */}
-            <button
-              type="button"
-              onClick={() => void handleAnalyse()}
-              disabled={stage !== 2 || analysing || translating}
-              className={`mt-4 w-full rounded-xl px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none ${
-                stage === 2 && !analysing && !translating
-                  ? "border border-[#b88a44] text-[#b88a44] hover:bg-amber-50"
-                  : "border border-slate-200 text-slate-400 bg-white"
-              }`}
-            >
-              {analysing ? t("resume_analysing_label") : t("resume_analyse_button")}
-            </button>
-
             {translating ? (
-              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                {t("upload_step_translating")}
+              <div className="mt-4">
+                <StatusBanner tone="warning">{t("upload_step_translating")}</StatusBanner>
               </div>
             ) : null}
 
             {analysing ? (
-              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-                <div className="space-y-1.5">
+              <div className="mt-4 rounded-[24px] border border-amber-100 bg-amber-50 px-4 py-4">
+                <div className="space-y-2">
                   {analysisSteps.map((step, i) => (
                     <div
                       key={i}
-                      className={`flex items-center gap-2.5 text-sm transition-opacity duration-500 ${
+                      className={`flex items-center gap-3 text-sm transition-opacity duration-500 ${
                         i <= analysisStep ? "opacity-100" : "opacity-25"
                       }`}
                     >
                       {i < analysisStep ? (
-                        <svg className="h-3.5 w-3.5 shrink-0 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        <svg className="h-4 w-4 shrink-0 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
                         </svg>
                       ) : i === analysisStep ? (
-                        <svg className="h-3.5 w-3.5 shrink-0 animate-spin text-[#b88a44]" viewBox="0 0 24 24" fill="none">
+                        <svg className="h-4 w-4 shrink-0 animate-spin text-[#b88a44]" viewBox="0 0 24 24" fill="none">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                         </svg>
                       ) : (
-                        <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-slate-300" />
+                        <span className="h-4 w-4 shrink-0 rounded-full border border-slate-300 bg-white" />
                       )}
                       <span className={i === analysisStep ? "font-medium text-[#b88a44]" : "text-slate-500"}>
                         {step}
@@ -481,68 +659,63 @@ function ResumeOnboardingContent() {
             ) : null}
 
             {analysisError ? (
-              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {analysisError}
-              </p>
+              <div className="mt-4">
+                <StatusBanner tone="error">{analysisError}</StatusBanner>
+              </div>
             ) : null}
 
-            {/* Stage 3 banner — analysis done */}
             {stage === 3 && feedback ? (
-              <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                {t("upload_complete_banner").replace("{score}", String(Math.min(100, Math.round((feedback.score / 10) * 100))))}
-              </p>
+              <div className="mt-4">
+                <StatusBanner tone="success">
+                  {t("upload_complete_banner").replace(
+                    "{score}",
+                    String(Math.min(100, Math.round((feedback.score / 10) * 100))),
+                  )}
+                </StatusBanner>
+              </div>
             ) : null}
 
-            <div className="mt-3 flex flex-wrap gap-3">
-              <button
-                type="button"
-                disabled={uploading || profiling}
-                onClick={handleClear}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-              >
-                {t("resume_clear_button")}
-              </button>
-            </div>
-
-            {/* Go to Review button — active only at stage 3 */}
             <button
               type="button"
               disabled={stage !== 3}
               onClick={() => router.push(reviewHref)}
-              className={`mt-4 flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none ${
+              className={`mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl px-5 text-sm font-semibold transition ${
                 stage === 3
-                  ? "border border-navy-950 bg-navy-950 text-white hover:opacity-90"
+                  ? "bg-navy-950 text-white hover:-translate-y-0.5 hover:opacity-95"
                   : "border border-slate-200 bg-white text-slate-400"
-              }`}
+              } disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-60`}
             >
               {t("resume_go_review")}
             </button>
           </section>
 
           <aside className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <h2 className="text-xl font-semibold text-navy-950">{t("resume_alt_option_title")}</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">{t("resume_alt_option_body")}</p>
 
               <Link
                 href="/resume/voice"
-                className="mt-4 inline-flex rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="mt-5 inline-flex items-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-navy-950 hover:bg-slate-50 hover:text-navy-950"
               >
                 {t("nav_voice_resume")}
               </Link>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-navy-950">{t("resume_journey_title")}</h2>
-              <ol className="mt-4 space-y-3">
+              <ol className="mt-5 space-y-4">
                 {([
                   { labelKey: "resume_journey_step1_label", descKey: "resume_journey_step1_desc" },
                   { labelKey: "resume_journey_step2_label", descKey: "resume_journey_step2_desc" },
                   { labelKey: "resume_journey_step3_label", descKey: "resume_journey_step3_desc" },
                   { labelKey: "resume_journey_step4_label", descKey: "resume_journey_step4_desc" },
                 ] as const).map((step, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-navy-950 text-[10px] font-bold text-white">
+                  <li
+                    key={i}
+                    className="flex gap-3 rounded-2xl border border-transparent px-2 py-2 transition hover:border-slate-200 hover:bg-slate-50"
+                  >
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-950 text-[10px] font-bold text-white">
                       {i + 1}
                     </span>
                     <div>
@@ -556,26 +729,25 @@ function ResumeOnboardingContent() {
           </aside>
         </div>
 
-        {/* AI Feedback section — only rendered when feedback data exists */}
         {feedback ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
+          <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl font-semibold text-navy-950">{t("ai_feedback_title")}</h2>
-              <span className="text-sm font-semibold text-navy-950">
+              <span className="inline-flex items-end gap-1 rounded-full bg-slate-50 px-4 py-2 text-sm font-semibold text-navy-950">
                 {t("ai_score_label")} <span className="text-2xl">{feedback.score}</span>
-                <span className="font-normal text-slate-400"> / 10</span>
+                <span className="font-normal text-slate-400">/ 10</span>
               </span>
             </div>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   {t("ai_overall_impression")}
                 </p>
                 <p className="text-sm leading-6 text-slate-700">{feedback.overallImpression}</p>
               </div>
 
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-600">
                   {t("ai_key_strengths")}
                 </p>
@@ -591,7 +763,7 @@ function ResumeOnboardingContent() {
                 </ul>
               </div>
 
-              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-600">
                   {t("ai_areas_to_improve")}
                 </p>
@@ -607,14 +779,14 @@ function ResumeOnboardingContent() {
                 </ul>
               </div>
 
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   {t("ai_suggested_edits")}
                 </p>
                 <ul className="space-y-1.5">
                   {feedback.suggestedEdits.map((s, i) => (
                     <li key={i} className="flex gap-2 text-sm text-slate-700">
-                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-navy-100 text-[10px] font-bold text-navy-700">
+                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-navy-700">
                         {i + 1}
                       </span>
                       {s}
@@ -624,7 +796,7 @@ function ResumeOnboardingContent() {
               </div>
 
               {feedback.atsAnalysis ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 sm:col-span-2">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 sm:col-span-2">
                   <div className="mb-3 flex items-center gap-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                       {t("ai_ats_analysis")}
@@ -639,9 +811,11 @@ function ResumeOnboardingContent() {
                       {feedback.atsAnalysis.atsFriendly ? t("ai_ats_friendly") : t("ai_ats_not_friendly")}
                     </span>
                   </div>
+
                   {feedback.atsAnalysis.atsNotes ? (
                     <p className="mb-3 text-sm leading-6 text-slate-700">{feedback.atsAnalysis.atsNotes}</p>
                   ) : null}
+
                   {feedback.atsAnalysis.keywordsFound?.length ? (
                     <div className="mb-2">
                       <p className="mb-1.5 text-xs font-medium text-slate-500">{t("ai_keywords_found")}</p>
@@ -657,6 +831,7 @@ function ResumeOnboardingContent() {
                       </div>
                     </div>
                   ) : null}
+
                   {feedback.atsAnalysis.keywordsMissing?.length ? (
                     <div>
                       <p className="mb-1.5 text-xs font-medium text-slate-500">{t("ai_keywords_missing")}</p>
@@ -676,7 +851,7 @@ function ResumeOnboardingContent() {
               ) : null}
 
               {feedback.careerProgression ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                     {t("ai_career_progression")}
                   </p>
@@ -685,7 +860,7 @@ function ResumeOnboardingContent() {
               ) : null}
 
               {feedback.salaryBenchmark ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                     {t("ai_salary_benchmark")}
                   </p>
@@ -703,7 +878,7 @@ function ResumeOnboardingContent() {
           </div>
         ) : null}
 
-        <div className="mt-10 max-w-3xl">
+        <div className="mt-10 max-w-4xl">
           <ResumeList resumes={userResumes} onDeleted={handleResumeDeleted} className="mt-0" />
         </div>
       </section>

@@ -11,8 +11,13 @@ import {
 import { maxJsonBodyBytes, parseJsonBody } from "@/lib/api/limits";
 import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
 import { runComplianceCheck, complianceScore } from "@/lib/services/rag";
-import { buildCompareUserPrompt, COMPARE_SYSTEM_MESSAGE } from "@/lib/services/compare";
-import type { ExtractedContract, ContractComparison, EmployeeContext } from "@/lib/types";
+import {
+  buildCompareUserPrompt,
+  buildNormalizedComparison,
+  COMPARE_SYSTEM_MESSAGE,
+} from "@/lib/services/compare";
+import { hasFeatureAccess } from "@/lib/billing/access";
+import type { ExtractedContract, EmployeeContext } from "@/lib/types";
 
 function getOpenAI() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -26,6 +31,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
+  const canCompare = await hasFeatureAccess(user.id, "contractComparison");
+  if (!canCompare) {
+    return NextResponse.json(
+      {
+        detail:
+          "Contract comparison is available on Pro and Business plans.",
+      },
+      { status: 403 },
+    );
+  }
+
   if (!allowRateLimit(user.id, "llm")) {
     return rateLimitedResponse(60);
   }
@@ -34,9 +50,11 @@ export async function POST(req: NextRequest) {
     document_a_id: string;
     document_b_id: string;
   }>(req, maxJsonBodyBytes());
+
   if (!jsonIn.ok) {
     return jsonIn.response;
   }
+
   const { document_a_id, document_b_id } = jsonIn.data;
 
   if (!document_a_id || !document_b_id) {
@@ -52,12 +70,18 @@ export async function POST(req: NextRequest) {
   ]);
 
   if (!docA || !docB || docA.user_id !== user.id || docB.user_id !== user.id) {
-    return NextResponse.json({ detail: "One or both documents were not found" }, { status: 404 });
+    return NextResponse.json(
+      { detail: "One or both documents were not found" },
+      { status: 404 },
+    );
   }
 
   if (!docA.extracted || !docB.extracted) {
     return NextResponse.json(
-      { detail: "Both documents must have extracted data. Re-upload if extraction failed." },
+      {
+        detail:
+          "Both documents must have extracted data. Re-upload if extraction failed.",
+      },
       { status: 422 },
     );
   }
@@ -69,14 +93,18 @@ export async function POST(req: NextRequest) {
 
   const comparisonTask = (async () => {
     try {
-      // 1. Ensure both documents have reports (verdicts)
       const fetchOrAnalyze = async (doc: typeof docA) => {
         const reports = await getReportsByDocument(doc.id);
-        if (reports.length > 0) return reports[0].verdicts;
+        if (reports.length > 0) {
+          return reports[0].verdicts;
+        }
 
-        // Run analysis if no report exists
         const extracted = doc.extracted as ExtractedContract;
-        const ctx: EmployeeContext = { monthly_salary: extracted.salary, work_type: null };
+        const ctx: EmployeeContext = {
+          monthly_salary: extracted.salary,
+          work_type: null,
+        };
+
         const verdicts = await runComplianceCheck(extracted, doc.raw_text, ctx);
         const score = complianceScore(verdicts);
         await insertReport(doc.id, user.id, verdicts, score);
@@ -89,26 +117,36 @@ export async function POST(req: NextRequest) {
       ]);
 
       const openai = getOpenAI();
+      const userPrompt = buildCompareUserPrompt(
+        verdictsA,
+        verdictsB,
+        docA.extracted as ExtractedContract,
+        docB.extracted as ExtractedContract,
+      );
+
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         temperature: 0.2,
+        max_tokens: 8192,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: COMPARE_SYSTEM_MESSAGE },
-          { role: "user", content: buildCompareUserPrompt(verdictsA, verdictsB) },
+          { role: "user", content: userPrompt },
         ],
       });
 
       const raw = response.choices[0]?.message?.content ?? "{}";
       const parsed = JSON.parse(raw);
 
-      const result: ContractComparison = {
+      const result = buildNormalizedComparison({
         document_a_id,
         document_b_id,
-        key_terms: parsed.key_terms ?? [],
-        clauses: parsed.clauses ?? [],
-        summary: parsed.summary ?? "",
-      };
+        parsed,
+        verdictsA,
+        verdictsB,
+        extractedA: docA.extracted as ExtractedContract,
+        extractedB: docB.extracted as ExtractedContract,
+      });
 
       await updateComparisonJob(job.id, user.id, {
         status: "succeeded",
@@ -128,7 +166,9 @@ export async function POST(req: NextRequest) {
 
   const result = await Promise.race([
     comparisonTask,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), ANALYZE_TIMEOUT_MS)),
+    new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), ANALYZE_TIMEOUT_MS),
+    ),
   ]).catch((err: unknown) => {
     throw err;
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyTermComparison } from "@/lib/types";
+import type { CanonicalTermComparison, KeyTermComparison } from "@/lib/types";
 import { useLanguage } from "@/components/providers/language-provider";
 
 const ASSESSMENT_STYLES: Record<string, { bg: string; text: string }> = {
@@ -18,14 +18,26 @@ const VERDICT_STYLES: Record<string, { bg: string; text: string; dot: string }> 
 
 export function ComparisonTable({
   terms,
+  canonicalTerms,
   labelA,
   labelB,
 }: {
   terms: KeyTermComparison[];
+  canonicalTerms?: CanonicalTermComparison[];
   labelA: string;
   labelB: string;
 }) {
   const { t } = useLanguage();
+  const rows: KeyTermComparison[] = canonicalTerms?.length
+    ? canonicalTerms.map((item) => ({
+        term: item.label,
+        contract_a_value: item.contract_a_value,
+        contract_b_value: item.contract_b_value,
+        assessment: item.assessment,
+        verdict_a: item.verdict_a,
+        verdict_b: item.verdict_b,
+      }))
+    : terms;
 
   const labelFor = (assessment: string) => {
     switch (assessment) {
@@ -60,7 +72,7 @@ export function ComparisonTable({
           </tr>
         </thead>
         <tbody>
-          {terms.map((row, i) => {
+          {rows.map((row, i) => {
             const style = ASSESSMENT_STYLES[row.assessment] ?? ASSESSMENT_STYLES.equal;
             const vA = row.verdict_a ? VERDICT_STYLES[row.verdict_a] : null;
             const vB = row.verdict_b ? VERDICT_STYLES[row.verdict_b] : null;

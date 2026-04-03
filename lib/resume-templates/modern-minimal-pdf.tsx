@@ -1,12 +1,10 @@
 import React from "react";
-import { Document, Page, View, Text, Image, StyleSheet, Font } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { ResumeTemplateData } from "./types";
 
-Font.register({ family: "NotoSansSC", src: "https://fonts.gstatic.com/s/notosanssc/v36/k3kCo84MPvpLmixcA63oeAL7Iqp5IZJF9bmaG9_FnYxNbPzS5HE.woff2" });
-
 const styles = StyleSheet.create({
-  page: { padding: 44, fontFamily: "NotoSansSC", backgroundColor: "#ffffff", fontSize: 9 },
-  name: { fontSize: 22, fontFamily: "NotoSansSC", color: "#000000", marginBottom: 3 },
+  page: { padding: 44, backgroundColor: "#ffffff", fontSize: 9 },
+  name: { fontSize: 26, color: "#111111", marginBottom: 2 },
   addressLine: { fontSize: 9, color: "#444444", marginBottom: 2 },
   contactRow: { flexDirection: "row", marginBottom: 10 },
   contactItem: { fontSize: 9, color: "#444444", marginRight: 24 },
@@ -22,7 +20,7 @@ const styles = StyleSheet.create({
     color: "#000000",
     paddingTop: 1,
   },
-  jobTitle: { fontSize: 9.5, fontFamily: "NotoSansSC", color: "#111111", marginBottom: 2 },
+  jobTitle: { fontSize: 10, color: "#111111", marginBottom: 2 },
   jobMeta: { fontSize: 8.5, color: "#777777", marginBottom: 4 },
   body: { fontSize: 9, lineHeight: 1.55, color: "#333333", marginBottom: 3 },
   bulletRow: { flexDirection: "row", marginBottom: 2 },

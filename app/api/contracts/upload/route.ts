@@ -9,11 +9,40 @@ import {
 } from "@/lib/services/db";
 import { assertUploadSize, maxUploadBytes } from "@/lib/api/limits";
 import { allowRateLimit, rateLimitedResponse } from "@/lib/api/rate-limit";
+import { getContractAnalysisLimit } from "@/lib/billing/access";
+import { buildUsageLimitMessage, isWithinUsageLimit } from "@/lib/billing/usage";
+
 
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+
+  const contractLimit = await getContractAnalysisLimit(user.id);
+  const usage = await isWithinUsageLimit({
+    userId: user.id,
+    kind: "contract_full_analysis",
+    window: contractLimit.window,
+    limit: contractLimit.limit,
+  });
+
+  if (!usage.allowed) {
+    return NextResponse.json(
+      {
+        detail: buildUsageLimitMessage({
+          kind: "contract_full_analysis",
+          window: contractLimit.window,
+          limit: contractLimit.limit,
+        }),
+        code: "contract_analysis_limit_reached",
+        used: usage.used,
+        remaining: usage.remaining,
+        limit: usage.limit,
+        window: contractLimit.window,
+      },
+      { status: 403 },
+    );
   }
 
   if (!allowRateLimit(user.id, "upload")) {
@@ -35,13 +64,42 @@ export async function POST(req: NextRequest) {
 
   const name = (file as File).name ?? "";
   if (!name.toLowerCase().endsWith(".pdf")) {
-    return NextResponse.json({ detail: "Only PDF files are accepted" }, { status: 400 });
+    return NextResponse.json(
+      { detail: "Only PDF files are accepted" },
+      { status: 400 },
+    );
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
+  let rawText: string;
+  let pages: Awaited<ReturnType<typeof pdfToText>>["pages"] = [];
+
+  try {
+    const parsed = await pdfToText(buffer);
+    rawText = parsed.text;
+    pages = parsed.pages;
+  } catch (e) {
+    return NextResponse.json(
+      {
+        detail: `PDF could not be read: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      },
+      { status: 422 },
+    );
+  }
+
+  if (!rawText.trim()) {
+    return NextResponse.json(
+      { detail: "PDF produced no text" },
+      { status: 422 },
+    );
+  }
+
   const existing = await findDuplicateDocument(user.id, name);
-  if (existing?.extracted) {
+
+  if (existing?.file_path) {
     return NextResponse.json({
       document_id: existing.id,
       raw_text_length: existing.raw_text.length,
@@ -50,40 +108,47 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  let rawText: string;
-  let pages: Awaited<ReturnType<typeof pdfToText>>["pages"] = [];
+  let filePath: string;
   try {
-    const parsed = await pdfToText(buffer);
-    rawText = parsed.text;
-    pages = parsed.pages;
+    filePath = await uploadPdfToStorage(user.id, name, buffer);
   } catch (e) {
     return NextResponse.json(
-      { detail: `PDF could not be read: ${e instanceof Error ? e.message : e}` },
-      { status: 422 },
+      {
+        detail: `Failed to store PDF: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      },
+      { status: 500 },
     );
   }
 
-  if (!rawText.trim()) {
-    return NextResponse.json({ detail: "PDF produced no text" }, { status: 422 });
+  let extracted = null;
+  let extractionError: string | undefined;
+
+  try {
+    extracted = await extractContractEntities(rawText, pages);
+  } catch (e) {
+    extractionError =
+      e instanceof Error ? e.message : "Extraction failed";
   }
 
-  const [storageResult, extractionResult] = await Promise.allSettled([
-    uploadPdfToStorage(user.id, name, buffer),
-    extractContractEntities(rawText, pages),
-  ]);
+  try {
+    const doc = await insertDocument(user.id, name, rawText, extracted, filePath);
 
-  const filePath = storageResult.status === "fulfilled" ? storageResult.value : undefined;
-  const extracted = extractionResult.status === "fulfilled" ? extractionResult.value : null;
-  const extractionError = extractionResult.status === "rejected"
-    ? (extractionResult.reason instanceof Error ? extractionResult.reason.message : "Extraction failed")
-    : undefined;
-
-  const doc = await insertDocument(user.id, name, rawText, extracted, filePath);
-
-  return NextResponse.json({
-    document_id: doc.id,
-    raw_text_length: rawText.length,
-    extracted,
-    ...(extractionError ? { extraction_error: extractionError } : {}),
-  });
+    return NextResponse.json({
+      document_id: doc.id,
+      raw_text_length: rawText.length,
+      extracted,
+      ...(extractionError ? { extraction_error: extractionError } : {}),
+    });
+  } catch (e) {
+    return NextResponse.json(
+      {
+        detail: `Failed to save document record: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      },
+      { status: 500 },
+    );
+  }
 }

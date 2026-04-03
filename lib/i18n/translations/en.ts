@@ -747,6 +747,85 @@ jobs_continue_interview: "Continue to Interview Prep",
   ai_keywords_missing: "Keywords Missing",
   ai_career_progression: "Career Progression",
   ai_salary_benchmark: "Salary Benchmark",
+    nav_pricing: "Pricing",
+
+  pricing_eyebrow: "Pricing",
+  pricing_title: "Flexible plans for AI contract review",
+  pricing_subtitle:
+    "Choose a plan that fits how often you review contracts, compare offers, and use AI tools across your workflow.",
+  pricing_per_month: "/month",
+
+  pricing_free_title: "Free",
+  pricing_free_description:
+    "Try VeriClause for free with 1 full contract analysis (lifetime) and 2 AI resume reviews per week.",
+  pricing_free_feature_1: "1 full contract analysis (lifetime)",
+  pricing_free_feature_2: "2 AI resume reviews per week",
+  pricing_free_feature_3: "Basic clause risk detection",
+  pricing_free_feature_4: "Standard dashboard access",
+  pricing_free_feature_5: "Community support",
+  pricing_free_cta: "Get Started Free",
+
+  pricing_pro_title: "Pro",
+  pricing_pro_description:
+    "Best for active job seekers and professionals who want up to 10 contract analyses per month, plus full interview practice.",
+  pricing_pro_feature_1:
+    "Up to 10 full contract analyses per month",
+  pricing_pro_feature_2: "20 AI resume reviews per month",
+  pricing_pro_feature_3: "Contract comparison tools",
+  pricing_pro_feature_4: "Priority AI processing",
+  pricing_pro_feature_5: "Resume, job discovery, and interview tools included",
+  pricing_pro_feature_6: "Export summary reports",
+  pricing_pro_cta: "Start Pro",
+
+  pricing_business_title: "Business",
+  pricing_business_description:
+    "For teams who want unlimited contract analyses, full interview practice, and unlimited AI resume reviews.",
+  pricing_business_feature_1:
+    "Unlimited full contract analyses",
+  pricing_business_feature_2: "Unlimited AI resume reviews",
+  pricing_business_feature_3: "Advanced benchmarking and comparison",
+  pricing_business_feature_4: "Shared team workspace",
+  pricing_business_feature_5: "Priority support",
+  pricing_business_cta: "Contact Sales",
+
+  pricing_value_1_title: "Faster decisions",
+  pricing_value_1_description:
+    "Review clauses, compare offers, and understand key risk points without a long manual process.",
+  pricing_value_2_title: "Built for clarity",
+  pricing_value_2_description:
+    "Get structured outputs, simpler language, and easier next steps for contract review.",
+  pricing_value_3_title: "Made for teams too",
+  pricing_value_3_description:
+    "Support individual users today and scale later for recruiters, consultants, and HR teams.",
+
+  pricing_guidance_eyebrow: "Plan Guidance",
+  pricing_guidance_title: "Choose the plan that fits your workflow",
+  pricing_guidance_description:
+    "Instead of a long pricing explanation, this section helps users quickly decide which plan suits them best.",
+  pricing_guidance_free:
+    "Best when you want to sample contract analysis (1 lifetime) and limited resume reviews before upgrading.",
+  pricing_guidance_pro:
+    "Best when you want regular contract analyses with a monthly cap, plus full interview practice.",
+  pricing_guidance_business:
+    "Best for higher-volume teams that need unlimited contract analyses and full interview practice.",
+
+  pricing_all_plans_title: "Included in every plan",
+  pricing_all_plans_1: "Secure contract upload flow",
+  pricing_all_plans_2: "AI-assisted clause analysis",
+  pricing_all_plans_3: "Clear conclusion-based experience",
+  pricing_all_plans_4: "Access to core product updates",
+
+  pricing_faq_eyebrow: "FAQ",
+  pricing_faq_title: "Questions users may ask",
+  pricing_faq_q1: "Can I switch plans later?",
+  pricing_faq_a1:
+    "Yes. Start on Free for 1 contract analysis (lifetime) and 2 resume reviews per week. Upgrade to Pro for up to 10 contract analyses per month and 20 resume reviews per month. Business is unlimited.",
+  pricing_faq_q2: "Why position Pro at S$9/month?",
+  pricing_faq_a2:
+    "For regular users, Pro is the most balanced option because it offers more usage, more tools, and a smoother experience without reaching team-level pricing.",
+  pricing_faq_q3: "Who is Business for?",
+  pricing_faq_a3:
+    "Business is suited for recruiters, consultants, HR teams, or any higher-frequency user who needs larger quotas, collaboration, and faster support.",
 };
 
 export default en;

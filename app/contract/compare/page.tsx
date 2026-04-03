@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { SiteNavbar } from "@/components/layout/SiteNavbar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { ComparisonTable } from "@/components/contract/ComparisonTable";
 import { ClauseDiff } from "@/components/contract/ClauseDiff";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +11,7 @@ import { uploadPdf, compareContracts, getComparisonJob, listDocuments, type Docu
 import type { ContractComparison } from "@/lib/types";
 import { useLanguage } from "@/components/providers/language-provider";
 import type { Locale } from "@/lib/i18n/types";
+import { usePlan } from "@/hooks/use-plan";
 
 function dateLocaleForUi(locale: Locale): string {
   const map: Record<Locale, string> = { en: "en-SG", zh: "zh-SG", ms: "ms-SG", ta: "ta-SG" };
@@ -36,12 +38,13 @@ const EMPTY_SLOT: SlotState = {
 };
 
 function getAssessmentCounts(comparison: ContractComparison) {
-  return comparison.key_terms.reduce(
+  const allItems = [...comparison.key_terms, ...comparison.clauses];
+  return allItems.reduce(
     (acc, item) => {
       if (item.assessment === "a_better") acc.a += 1;
       else if (item.assessment === "b_better") acc.b += 1;
       else if (item.assessment === "different") acc.diff += 1;
-      else acc.equal += 1;
+      else if (item.assessment === "equal") acc.equal += 1;
       return acc;
     },
     { a: 0, b: 0, diff: 0, equal: 0 },
@@ -72,6 +75,27 @@ function cautionItems(comparison: ContractComparison) {
     .slice(0, 3);
 }
 
+function redFlagItems(comparison: ContractComparison) {
+  const flags: { source: string; topic: string; value: string | null; verdict: string }[] = [];
+  for (const clause of comparison.clauses) {
+    if (clause.verdict_a === "violated") {
+      flags.push({ source: "A", topic: clause.clause_topic, value: clause.contract_a_value, verdict: "violated" });
+    }
+    if (clause.verdict_b === "violated") {
+      flags.push({ source: "B", topic: clause.clause_topic, value: clause.contract_b_value, verdict: "violated" });
+    }
+  }
+  for (const term of comparison.key_terms) {
+    if (term.verdict_a === "violated") {
+      flags.push({ source: "A", topic: term.term, value: term.contract_a_value, verdict: "violated" });
+    }
+    if (term.verdict_b === "violated") {
+      flags.push({ source: "B", topic: term.term, value: term.contract_b_value, verdict: "violated" });
+    }
+  }
+  return flags;
+}
+
 function StatCard({
   label,
   value,
@@ -96,6 +120,8 @@ export default function ComparePage() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [userDocs, setUserDocs] = useState<DocumentSummary[]>([]);
+  const { plan, hasFeature, loading: planLoading } = usePlan();
+  const canCompare = hasFeature("contractComparison");
 
   const [slotA, setSlotA] = useState<SlotState>(EMPTY_SLOT);
   const [slotB, setSlotB] = useState<SlotState>(EMPTY_SLOT);
@@ -190,7 +216,7 @@ export default function ComparePage() {
 
     try {
       const response = await compareContracts(slotA.documentId, slotB.documentId);
-      
+
       if (response.status === "succeeded" && response.result) {
         setComparison(response.result);
         setCompareState("ready");
@@ -234,19 +260,7 @@ export default function ComparePage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <SiteNavbar
-        rightSlot={
-          <button
-            onClick={async () => {
-              const supabase = createClient();
-              await supabase.auth.signOut();
-              router.push("/");
-              router.refresh();
-            }}
-            className="text-sm font-medium text-slate-600 transition-colors hover:text-navy-950"
-          >
-            {t("dash_sign_out")}
-          </button>
-        }
+        rightSlot={<UserMenu />}
       />
 
       <main className="mx-auto max-w-7xl px-6 py-10">
@@ -306,19 +320,44 @@ export default function ComparePage() {
               <p className="mt-2 text-sm text-slate-600">{t("compare_ai_action_desc")}</p>
             </div>
 
-            <button
-              onClick={handleCompare}
-              disabled={
-                !slotA.documentId || !slotB.documentId || compareState === "comparing"
-              }
-              className={`inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition ${
-                slotA.documentId && slotB.documentId && compareState !== "comparing"
-                  ? "bg-navy-950 text-white hover:bg-navy-900"
-                  : "cursor-not-allowed bg-slate-200 text-slate-500"
-              }`}
-            >
-              {compareState === "comparing" ? t("compare_button_comparing") : t("compare_button_run")}
-            </button>
+            {canCompare ? (
+              <button
+                onClick={handleCompare}
+                disabled={
+                  !slotA.documentId || !slotB.documentId || compareState === "comparing"
+                }
+                className={`inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-medium transition ${slotA.documentId && slotB.documentId && compareState !== "comparing"
+                    ? "bg-navy-950 text-white hover:bg-navy-900"
+                    : "cursor-not-allowed bg-slate-200 text-slate-500"
+                  }`}
+              >
+                {compareState === "comparing" ? t("compare_button_comparing") : t("compare_button_run")}
+              </button>
+            ) : (
+              <div className="flex items-center gap-4">
+                <p className="max-w-[200px] text-right text-xs text-slate-500">
+                  AI Comparison is a Pro feature.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/billing/checkout", {
+                        method: "POST",
+                        body: JSON.stringify({ plan: "pro" }),
+                      });
+                      const { url } = await res.json();
+                      if (url) window.location.href = url;
+                    } catch (err) {
+                      console.error("Checkout error:", err);
+                    }
+                  }}
+                  className="rounded-lg bg-[#b88a44] px-6 py-3 text-sm font-bold text-navy-950 shadow-sm transition hover:bg-[#a67a39]"
+                >
+                  Upgrade
+                </button>
+              </div>
+            )}
           </div>
 
           {compareError ? (
@@ -365,11 +404,10 @@ export default function ComparePage() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`rounded-xl px-3 py-2 text-xs font-medium transition ${
-                    activeTab === tab
+                  className={`rounded-xl px-3 py-2 text-xs font-medium transition ${activeTab === tab
                       ? "bg-navy-950 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                    }`}
                 >
                   {tab === "summary"
                     ? t("compare_tab_summary")
@@ -406,12 +444,26 @@ export default function ComparePage() {
 
             {comparison && activeTab === "summary" && (
               <div className="space-y-5">
+                {/* AI Summary */}
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     {t("compare_summary_label")}
                   </p>
                   <p className="mt-3 text-sm leading-7 text-slate-700">{comparison.summary}</p>
                 </div>
+
+                {/* AI Recommendation */}
+                {comparison.recommendation && plan?.key === "pro" && (
+                  <div className="rounded-2xl border border-navy-900/20 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-[#b88a44]" aria-hidden />
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#b88a44]">
+                        Our Recommendation
+                      </p>
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-slate-700">{comparison.recommendation}</p>
+                  </div>
+                )}
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
@@ -441,6 +493,32 @@ export default function ComparePage() {
                   </div>
                 </div>
 
+                {/* Red Flags */}
+                {redFlagItems(comparison).length > 0 && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-red-500" aria-hidden />
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-700">
+                        Red Flags — Legal Violations
+                      </p>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {redFlagItems(comparison).map((flag, index) => (
+                        <div key={`flag-${index}`} className="rounded-xl border border-red-200 bg-white p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700">
+                              Contract {flag.source}
+                            </span>
+                            <p className="text-sm font-semibold text-slate-900">{flag.topic}</p>
+                          </div>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">{flag.value ?? "Not specified"}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Differences */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     {t("compare_top_differences")}
@@ -460,6 +538,7 @@ export default function ComparePage() {
             {comparison && activeTab === "terms" && (
               <ComparisonTable
                 terms={comparison.key_terms}
+                canonicalTerms={comparison.canonical_terms}
                 labelA={labelA}
                 labelB={labelB}
               />
