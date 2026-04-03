@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import LanguageSwitcher from "./language-switcher";
 import { useLanguage } from "../providers/language-provider";
@@ -65,9 +65,25 @@ function CloseIcon({ className = "h-5 w-5" }: { className?: string }) {
 export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
   const { t } = useLanguage();
   const pathname = usePathname();
+  const router = useRouter();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMobileGroup, setOpenMobileGroup] = useState<string | null>(null);
+
+  const handleContractAnalysisClick = (href: string) => {
+    try {
+      sessionStorage.removeItem("vericlause.contractFlowStep");
+    } catch {
+      //
+    }
+    if (pathname === "/contract" || pathname === "/contract/") {
+      if (typeof window !== "undefined") {
+        window.location.href = "/contract";
+      }
+    } else {
+      router.push(href);
+    }
+  };
 
   const navGroups = useMemo<NavGroup[]>(
     () => [
@@ -157,7 +173,19 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
 
               if (!group.items?.length) {
                 return (
-                  <Link key={group.label} href={group.href} className={topLinkClasses(active)}>
+                  <Link
+                    key={group.label}
+                    href={group.href}
+                    className={topLinkClasses(active)}
+                    onClick={
+                      group.href === "/contract"
+                        ? (e) => {
+                            e.preventDefault();
+                            handleContractAnalysisClick("/contract");
+                          }
+                        : undefined
+                    }
+                  >
                     <span>{t(group.label)}</span>
                   </Link>
                 );
@@ -165,7 +193,18 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
 
               return (
                 <div key={group.label} className="group relative">
-                  <Link href={group.href} className={topLinkClasses(active)}>
+                  <Link
+                    href={group.href}
+                    className={topLinkClasses(active)}
+                    onClick={
+                      group.href === "/contract"
+                        ? (e) => {
+                            e.preventDefault();
+                            handleContractAnalysisClick("/contract");
+                          }
+                        : undefined
+                    }
+                  >
                     <span>{t(group.label)}</span>
                     <ChevronDownIcon className="h-4 w-4" />
                   </Link>
@@ -177,6 +216,14 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
                           key={item.href}
                           href={item.href}
                           className={subLinkClasses(isPathActive(item.href))}
+                          onClick={
+                            item.href === "/contract"
+                              ? (e) => {
+                                  e.preventDefault();
+                                  handleContractAnalysisClick("/contract");
+                                }
+                              : undefined
+                          }
                         >
                           {t(item.label)}
                         </Link>
@@ -217,7 +264,15 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
                       key={group.label}
                       href={group.href}
                       className={topLinkClasses(active)}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={
+                        group.href === "/contract"
+                          ? (e) => {
+                              e.preventDefault();
+                              setMobileOpen(false);
+                              handleContractAnalysisClick("/contract");
+                            }
+                          : () => setMobileOpen(false)
+                      }
                     >
                       {t(group.label)}
                     </Link>
@@ -230,7 +285,15 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
                       <Link
                         href={group.href}
                         className={topLinkClasses(active)}
-                        onClick={() => setMobileOpen(false)}
+                        onClick={
+                          group.href === "/contract"
+                            ? (e) => {
+                                e.preventDefault();
+                                setMobileOpen(false);
+                                handleContractAnalysisClick("/contract");
+                              }
+                            : () => setMobileOpen(false)
+                        }
                       >
                         {t(group.label)}
                       </Link>
@@ -257,7 +320,15 @@ export function SiteNavbar({ rightSlot, compact = false }: SiteNavbarProps) {
                               key={item.href}
                               href={item.href}
                               className={subLinkClasses(isPathActive(item.href))}
-                              onClick={() => setMobileOpen(false)}
+                              onClick={
+                                item.href === "/contract"
+                                  ? (e) => {
+                                      e.preventDefault();
+                                      setMobileOpen(false);
+                                      handleContractAnalysisClick("/contract");
+                                    }
+                                  : () => setMobileOpen(false)
+                              }
                             >
                               {t(item.label)}
                             </Link>

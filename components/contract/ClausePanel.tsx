@@ -95,11 +95,6 @@ export function ClausePanel({ clauses, verdicts, activeClause, onClauseClick, sh
             <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
               {clause.clause_text}
             </p>
-            {clause.locations?.[0] && (
-              <p className="mt-2 text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                Source page {clause.locations[0].page_number}
-              </p>
-            )}
             {v?.explanation && (
               <p className={`mt-2 text-xs font-medium ${style.label} border-t border-current/10 pt-2`}>
                 {showTranslation && v.translated_explanation ? v.translated_explanation : v.explanation}
