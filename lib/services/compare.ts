@@ -138,7 +138,13 @@ export function buildCompareUserPrompt(
            "verdict_b": "compliant"|"caution"|"violated"|null
          }
       
-      Assess from the employee's perspective — "a_better" means Contract A is more favorable for the employee.`;
+      CRITICAL INSTRUCTIONS:
+      - NEVER use generic explanations like "Both contracts mention this topic" or "They differ in their approach."
+      - For EVERY clause, provide 2-3 sentences of DETAILED analysis comparing the specific wording, legal risks (referencing the verdicts provided), and the practical impact on the employee.
+      - If one contract is "violated" or "caution" and the other is "compliant", your explanation MUST explicitly state why the compliant one is safer.
+      - If a "Position & Duties" clause is vague (e.g., "assigned by company") versus specific, highlight the employee's risk of being assigned unrelated tasks.
+      - If one contract doesn't mention a topic that the other does, the explanation should note the lack of protection in the missing contract.
+      - Assess from the employee's perspective — "a_better" means Contract A is more favorable for the employee.`;
 }
 
 const VALID_ASSESSMENTS = new Set(["a_better", "b_better", "equal", "different"]);
@@ -435,12 +441,21 @@ function buildClauseFallbacks(verdictsA: ComplianceVerdict[], verdictsB: Complia
     const hasB = bValue !== "N/A";
     const assessment =
       hasA && hasB ? (aValue === bValue ? "equal" : "different") : "different";
+    let fallbackExplanation = "This topic appears in only one contract's structured analysis.";
+    if (hasA && hasB) {
+      if (a?.verdict === b?.verdict) {
+        fallbackExplanation = `Both contracts specify this topic and are considered ${a?.verdict ?? "reviewed"}. Review the contract text for specific wording differences.`;
+      } else {
+        fallbackExplanation = `Contract A is marked as ${a?.verdict ?? "reviewed"} while Contract B is marked as ${b?.verdict ?? "reviewed"} for this topic. See detailed text for specific differences.`;
+      }
+    }
+    
     rows.push({
       clause_topic: topicFromCanonicalKey(topicKey),
       contract_a_value: hasA ? aValue : null,
       contract_b_value: hasB ? bValue : null,
       assessment,
-      explanation: hasA && hasB ? "Both contracts mention this topic." : "Only one contract clearly specifies this topic.",
+      explanation: fallbackExplanation,
       verdict_a: a?.verdict,
       verdict_b: b?.verdict,
     });

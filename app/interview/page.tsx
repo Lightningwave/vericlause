@@ -114,7 +114,7 @@ const INTERVIEW_COPY = {
     prepStudyEyebrow: "Before you connect",
     prepStudyTitle: "Interactive prep",
     prepStudyHint:
-      "Pick a host, then tap Generate prep (calls our AI once). Open each topic and check every box — only then you can start practice with that host.",
+      "Pick a host, then tap Generate prep. Open each topic and check every box — only then you can start practice with that host.",
     prepHostTabAlex: "Alex · hiring manager style",
     prepHostTabSophia: "Sophia · behavioural style",
     prepTopicProgress: "{open} of {total} topics opened",
@@ -1847,9 +1847,18 @@ function InterviewContent() {
                 )}
 
                 {scoreError && !isScoring && (
-                  <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                    {scoreError}
-                  </p>
+                  <div className="mt-4 space-y-4">
+                    <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                      {scoreError}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={resetPractice}
+                      className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10"
+                    >
+                      {copy.newPractice}
+                    </button>
+                  </div>
                 )}
 
                 {scoreResult && !isScoring && (
