@@ -204,6 +204,8 @@ function locateClause(
     locations: [
       {
         page_number: best.page.page_number,
+        page_width: best.page.page_width,
+        page_height: best.page.page_height,
         ...(mergedBox ? { b_box: mergedBox } : {}),
       },
     ],

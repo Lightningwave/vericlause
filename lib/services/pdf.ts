@@ -56,13 +56,24 @@ function parsePagesFromItems(rawItems: { pages?: unknown[] } | undefined): PdfPa
       if (Array.isArray(p.items)) {
         for (const item of p.items) {
           const it = item as Record<string, unknown>;
+          let b_box: [number, number, number, number] | undefined;
+          if (Array.isArray(it.b_box) && it.b_box.length === 4) {
+            b_box = it.b_box as [number, number, number, number];
+          } else if (Array.isArray(it.bbox) && it.bbox.length > 0) {
+            const b = it.bbox[0] as Record<string, unknown>;
+            const x = typeof b.x === "number" ? b.x : null;
+            const y = typeof b.y === "number" ? b.y : null;
+            const w = typeof b.w === "number" ? b.w : null;
+            const h = typeof b.h === "number" ? b.h : null;
+            if (x !== null && y !== null && w !== null && h !== null) {
+              b_box = [x, y, x + w, y + h];
+            }
+          }
           items.push({
             type: typeof it.type === "string" ? it.type : "text",
             value: typeof it.value === "string" ? it.value : (typeof it.md === "string" ? it.md : ""),
             md: typeof it.md === "string" ? it.md : undefined,
-            b_box: Array.isArray(it.b_box) && it.b_box.length === 4
-              ? (it.b_box as [number, number, number, number])
-              : undefined,
+            b_box,
           });
         }
       }

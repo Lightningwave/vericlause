@@ -5,6 +5,9 @@ export interface EmployeeContext {
 
 export interface ClauseLocation {
   page_number: number;
+  /** Page size from the same parse as b_box (needed to map boxes to the live PDF). */
+  page_width?: number;
+  page_height?: number;
   b_box?: [number, number, number, number];
 }
 
