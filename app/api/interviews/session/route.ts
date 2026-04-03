@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser, getResume, listResumes } from "@/lib/services/db";
 import { hasFeatureAccess } from "@/lib/billing/access";
+import { extractJobFromUrl } from "@/lib/services/jobRecommendation";
 import OpenAI from "openai";
 
 
@@ -71,6 +72,7 @@ async function generateSeedQuestions(params: {
   interviewer: "alex" | "sophia";
   parsedProfile: Record<string, unknown>;
   targetRole?: string | null;
+  jobContext?: string | null;
   difficulty: "easy" | "medium" | "hard";
 }): Promise<string[]> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -97,42 +99,48 @@ async function generateSeedQuestions(params: {
 
   const difficultyGuidance =
     difficulty === "easy"
-      ? "Easy: questions should be friendly and accessible; avoid heavy jargon; focus on clarity and confidence-building."
+      ? "Easy: questions should be friendly and accessible; avoid heavy jargon; focus on clarity and confidence-building. Where it helps, weave in a brief illustrative angle or one short example clause (clearly framed as an example) so the candidate knows the shape of a strong answer—do not write a full scripted response."
       : difficulty === "hard"
         ? "Hard: questions should be more probing; require specifics, trade-offs, and metrics; include at least 1 challenging scenario; keep it fair and relevant to the resume."
         : "Medium: balanced difficulty; ask for concrete examples and some detail without being overly intense.";
 
   const prompt = `
-You are generating interview practice questions.
+You are an expert interviewer generating high-fidelity practice questions.
 
-Interviewer persona:
-- Name: ${persona.name}
-- Style: ${persona.style}
+### Context
+Candidate Resume: ${profileJson}
+Target Role: ${targetRole || "not specified"}
+Job Description/Context: ${params.jobContext || "not specified"}
 
-Candidate parsed profile JSON:
-${profileJson}
+### Interviewer Persona
+- **Name**: ${persona.name}
+- **Style**: ${persona.style}
+- **Goal**: ${
+      params.interviewer === "alex"
+        ? "Alex wants proof of technical/operational ownership: tools, metrics, 'The How', and trade-offs."
+        : "Sophia wants proof of leadership, strategic influence, 'The Why', and conflict resolution."
+    }
 
-Target role (if provided): ${targetRole || "not specified"}
-Difficulty: ${difficulty} — ${difficultyGuidance}
+### Instructions
+1. **Gap Analysis**:
+   - **If Job Context is provided**: Compare Job Context to Resume. Identify 3 "Must-Wins" (matches) and 1 "Gap" (a skill/requirement in JD that is missing/weak in Resume).
+   - **If Job Context is NOT provided**: Focus on the 4 most impressive/high-impact details from the Candidate Resume related to their Target Role.
+2. **Generate exactly 5 questions** following this sequence:
+   - **Q1 (Role-Fit/Intro)**: A professional intro tailored to the target role.
+   - **Q2 (Experience Deep-Dive)**: Probe a high-signal achievement from the resume that matches a JD "Must-Win" (if context provided) or is a top-tier accomplishment (if no context).
+   - **Q3 (JD Gap Inquiry)**:
+     - **If context provided**: Probe the identified "Gap". Ask how they would handle that specific JD requirement.
+     - **If NO context**: Ask a challenging follow-up on their most senior experience or a related higher-level responsibility.
+   - **Q4 (Behavioural - STAR)**: A scenario question (Conflict, Feedback, Prioritization) that requires a **STAR** (Situation-Task-Action-Result) response.
+   - **Q5 (Scenario/Trade-off)**: A realistic operational scenario for this target role. **Alex** asks about technical/execution trade-offs; **Sophia** asks about stakeholder/strategic trade-offs.
 
-Write exactly 5 interview practice questions in the style of common online interview prep (realistic, widely used patterns), but tailored to this candidate.
+### Constraints
+- Difficulty: ${difficulty} — ${difficultyGuidance}
+- Each question must be 1–2 sentences.
+- Grounded in facts; never invent employers or titles.
+- DO NOT mention "JSON", "parsed profile", or "resume".
 
-Hard requirements:
-- Each question must reference at least one concrete detail from the candidate profile (e.g., a skill, role title, company, project/impact detail, seniority, or target role). Do not write purely generic questions.
-- Keep each question to 1–2 sentences and make it sound like something a real interviewer would ask.
-- Do not mention "JSON", "parsed profile", or "resume" explicitly.
-
-Coverage requirements (exactly one question per slot, in order):
-1) Role-fit / intro: ask for a concise intro tailored to the target role.
-2) Experience deep-dive: pick one recent or high-signal experience and probe scope + outcomes.
-3) Persona-specific deep-dive:
-   - Alex: drill into a concrete skill/tool/process mentioned in the profile; ask for how they used it + how they measured success.
-   - Sophia: drill into leadership/collaboration/motivation grounded in a specific experience; ask for stakeholders + what changed.
-4) Behavioural: a common behavioural pattern (conflict, feedback, ambiguity, or prioritization) grounded in their background.
-5) Scenario/trade-off: a realistic scenario for the target role requiring trade-offs; adjust difficulty accordingly (easy=more guided, hard=more probing).
-
-Output format:
-- Output ONLY a JSON array of 5 strings, in the same order as the slots above. No markdown, no extra text.
+Output ONLY a JSON array of 5 strings.
 `.trim();
 
   try {
@@ -153,6 +161,86 @@ Output format:
     return questions;
   } catch {
     return [];
+  }
+}
+
+async function generatePracticeGuide(params: {
+  interviewer: "alex" | "sophia";
+  difficulty: "easy" | "medium";
+  parsedProfile: Record<string, unknown>;
+  targetRole: string | null;
+  jobContext?: string | null;
+  seedQuestions: string[];
+}): Promise<string | null> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+
+  const openai = new OpenAI({ apiKey });
+  const personaName = params.interviewer === "sophia" ? "Sophia" : "Alex";
+  const personaStyle =
+    params.interviewer === "sophia"
+      ? "executive recruiter; behavioural STAR questions; leadership, collaboration, motivation, cultural fit"
+      : "hiring manager; execution, tools, metrics, scope, problem-solving, ownership";
+
+  const difficultyNote =
+    params.difficulty === "easy"
+      ? "Easy: warm, supportive, confidence-building; no intimidation; simple language. Besides guidance, include clearly labeled example phrases, sentence starters, or tiny STAR-style micro-outlines the candidate can adapt—grounded only in facts from the profile; never invent employers, titles, or achievements."
+      : "Medium: still fair and professional, but expect more detail, specifics, and light pressure—the live questions will feel harder than Easy.";
+
+  const seeds =
+    params.seedQuestions.length > 0
+      ? params.seedQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")
+      : "(none — host will improvise from profile)";
+
+  const profileJson = JSON.stringify(params.parsedProfile);
+
+  const prompt = `
+You are a world-class interview coach writing a practice prep guide for a 5-minute voice session.
+
+Context
+- Interviewer: ${personaName} (${personaStyle})
+- Difficulty: ${params.difficulty}
+- Target role: ${params.targetRole ?? "General"}
+- Job context: ${params.jobContext ?? "Not specified"}
+
+Seed questions (Q1–Q5, in order):
+${seeds}
+
+Candidate profile (JSON — use facts only):
+${profileJson}
+
+Content rules
+1. Hidden goals: For each seed Q1–Q5, name what the interviewer is really evaluating (one clear sentence per question).
+2. STAR: For Q4 only, give a four-part skeleton labeled exactly on separate lines: Situation: / Task: / Action: / Result: — each followed by one short sentence grounded in their real experience (no invented employers or metrics).
+3. Alignment: If job context exists, give one concrete bridge from resume to JD. If not, lead with their strongest differentiator and how to stress it in answers.
+4. Tone: direct, plain English, empowering. No jargon about “JSON” or “parsed profile”.
+
+CRITICAL FORMAT (the app parses this mechanically — violations break the UI)
+- Use ONLY these section headers, each on its own line, exactly starting with two hash marks and a space:
+## Why this session matters
+## What ${personaName} is really testing (per question)
+## STAR skeleton for Q4
+## How to position your story
+## Final checklist
+- Do not use **asterisk bold**, # headings, or markdown tables anywhere.
+- In "What ${personaName} is really testing", use a numbered list: lines must start with "1. ", "2. ", … "5. " then plain text (no bold).
+- In "Final checklist" put ONLY 3–5 items, one per line, each starting with a hyphen and space: "- " then short imperative text (no checkmarks, no bold, no duplicate labels).
+
+Length: about 350–500 words total.
+`.trim();
+
+  try {
+    const result = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.45,
+      max_tokens: 1200,
+    });
+    const guide = result.choices[0]?.message?.content?.trim();
+    return guide || null;
+  } catch (e) {
+    console.error("generatePracticeGuide:", e);
+    return null;
   }
 }
 
@@ -180,6 +268,8 @@ export async function GET(req: NextRequest) {
   const requestedResumeId = searchParams.get("resume_id");
   const requestedTargetRole = searchParams.get("target_role");
   const requestedDifficulty = searchParams.get("difficulty");
+  const requestedJobUrl = searchParams.get("job_url");
+  const requestedJobDescription = searchParams.get("job_description");
 
   const interviewer = INTERVIEWERS[interviewerId] ?? INTERVIEWERS.alex;
 
@@ -211,6 +301,28 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     );
   }
+
+  // Scrape Job URL if provided
+  let scrapedJobDescription: string | null = null;
+  let scrapedJobTitle: string | null = null;
+  let scrapedCompany: string | null = null;
+
+  if (requestedJobUrl) {
+    try {
+      const scraped = await extractJobFromUrl(requestedJobUrl);
+      scrapedJobDescription = scraped.description || null;
+      scrapedJobTitle = scraped.title || null;
+      scrapedCompany = scraped.company || null;
+    } catch (err) {
+      console.error("Interview session scrape error:", err);
+    }
+  }
+
+  const jobContext = [
+    scrapedJobTitle ? `Role Title: ${scrapedJobTitle}` : null,
+    scrapedCompany ? `Company: ${scrapedCompany}` : null,
+    requestedJobDescription || scrapedJobDescription ? `Job Description: ${requestedJobDescription || scrapedJobDescription}` : null,
+  ].filter(Boolean).join("\n");
 
   const context = buildProfileContext({
     fileName: (resume.file_name as string | null) ?? null,
@@ -247,7 +359,7 @@ export async function GET(req: NextRequest) {
   const effectiveTargetRole =
     (requestedTargetRole && requestedTargetRole.trim().length > 0
       ? requestedTargetRole
-      : (parsedProfile.target_roles as unknown as string[] | undefined)?.[0]) ??
+      : scrapedJobTitle || (parsedProfile.target_roles as unknown as string[] | undefined)?.[0]) ??
     (safeString(parsedProfile.headline) ?? null);
 
   const difficulty: "easy" | "medium" | "hard" =
@@ -263,8 +375,21 @@ export async function GET(req: NextRequest) {
       | "sophia",
     parsedProfile,
     targetRole: effectiveTargetRole,
+    jobContext,
     difficulty,
   });
+
+  const practiceGuide =
+    difficulty === "easy" || difficulty === "medium"
+      ? await generatePracticeGuide({
+          interviewer: interviewerId === "sophia" ? "sophia" : "alex",
+          difficulty,
+          parsedProfile,
+          targetRole: effectiveTargetRole,
+          jobContext,
+          seedQuestions: personaQuestions,
+        })
+      : null;
 
   const seedQuestionsText =
     personaQuestions.length > 0
@@ -307,6 +432,9 @@ ${context}
 
 # Practice target role
 ${effectiveTargetRole ?? "null"}
+
+# Job Context
+${jobContext || "None provided"}
 ${seedQuestionsText}
   `.trim();
 
@@ -322,5 +450,10 @@ ${seedQuestionsText}
     agent_id: agentId,
     dynamic_instructions: dynamicInstructions,
     first_message: firstMessage,
+    practice_guide: practiceGuide,
+    job_metadata: {
+      title: scrapedJobTitle,
+      company: scrapedCompany,
+    },
   });
 }
