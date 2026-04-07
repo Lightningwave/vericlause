@@ -261,3 +261,28 @@ create policy "Users can view their own interview sessions"
 
 create index if not exists idx_interview_sessions_user_id on public.interview_sessions(user_id);
 create index if not exists idx_interview_sessions_resume_id on public.interview_sessions(resume_id);
+
+-- 7. User profiles (billing / plan; used by lib/billing and Stripe webhooks)
+create table if not exists public.profiles (
+  id                              uuid primary key references auth.users(id) on delete cascade,
+  plan                            text not null default 'free',
+  stripe_customer_id              text,
+  stripe_subscription_id          text,
+  current_period_end              timestamptz,
+  subscription_cancel_at_period_end boolean not null default false,
+  updated_at                      timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+
+create policy "Users can insert own profile"
+  on public.profiles for insert
+  with check (auth.uid() = id);
+
+create policy "Users can read own profile"
+  on public.profiles for select
+  using (auth.uid() = id);
+
+create policy "Users can update own profile"
+  on public.profiles for update
+  using (auth.uid() = id);
